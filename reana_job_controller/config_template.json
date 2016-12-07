@@ -1,0 +1,92 @@
+{
+    "alice": {
+        "k8s_volume": {
+            "name": "pv",
+            "cephfs": {
+                "monitors": [
+                    "128.142.36.227:6790",
+                    "128.142.39.77:6790",
+                    "128.142.39.144:6790"
+                ],
+                "path": "/k8s/alice",
+                "user": "k8s",
+                "secretRef": {
+                    "name": "ceph-secret",
+                    "readOnly": false
+                }
+            }
+        }
+    },
+    "atlas": {
+        "k8s_volume": {
+            "name": "pv",
+            "cephfs": {
+                "monitors": [
+                    "128.142.36.227:6790",
+                    "128.142.39.77:6790",
+                    "128.142.39.144:6790"
+                ],
+                "path": "/k8s/atlas",
+                "user": "k8s",
+                "secretRef": {
+                    "name": "ceph-secret",
+                    "readOnly": false
+                }
+            }
+        }
+    },
+    "cms": {
+        "k8s_volume": {
+            "name": "pv",
+            "cephfs": {
+                "monitors": [
+                    "128.142.36.227:6790",
+                    "128.142.39.77:6790",
+                    "128.142.39.144:6790"
+                ],
+                "path": "/k8s/cms",
+                "user": "k8s",
+                "secretRef": {
+                    "name": "ceph-secret",
+                    "readOnly": false
+                }
+            }
+        }
+    },
+    "lhcb": {
+        "k8s_volume": {
+            "name": "pv",
+            "cephfs": {
+                "monitors": [
+                    "128.142.36.227:6790",
+                    "128.142.39.77:6790",
+                    "128.142.39.144:6790"
+                ],
+                "path": "/k8s/lhcb",
+                "user": "k8s",
+                "secretRef": {
+                    "name": "ceph-secret",
+                    "readOnly": false
+                }
+            }
+        }
+    },
+    "recast": {
+        "k8s_volume": {
+            "name": "pv",
+            "cephfs": {
+                "monitors": [
+                    "128.142.36.227:6790",
+                    "128.142.39.77:6790",
+                    "128.142.39.144:6790"
+                ],
+                "path": "/k8s/recast",
+                "user": "k8s",
+                "secretRef": {
+                    "name": "ceph-secret",
+                    "readOnly": false
+                }
+            }
+        }
+    }
+}
