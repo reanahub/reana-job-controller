@@ -2,6 +2,7 @@ import logging
 import time
 import pykube
 from six.moves.urllib.parse import urlencode
+import volume_templates
 
 api = pykube.HTTPClient(pykube.KubeConfig.from_service_account())
 api.session.verify = False
@@ -12,7 +13,17 @@ def get_jobs():
             filter(namespace=pykube.all)]
 
 
-def create_job(job_id, docker_img, cmd, volumes, env_vars, namespace):
+def add_shared_volume(job, namespace):
+    volume = volume_templates.get_k8s_cephfs_volume(namespace)
+    mount_path = volume_templates.CEPHFS_MOUNT_PATH
+    job['spec']['template']['spec']['containers'][0]['volumeMounts'].append(
+        {'name': volume['name'], 'mountPath': mount_path}
+    )
+    job['spec']['template']['spec']['volumes'].append(volume)
+
+
+def create_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
+               shared_file_system):
     job = {
         'kind': 'Job',
         'apiVersion': 'batch/v1',
@@ -30,31 +41,38 @@ def create_job(job_id, docker_img, cmd, volumes, env_vars, namespace):
                     'containers': [
                         {
                             'name': job_id,
-                            'image': docker_img
+                            'image': docker_img,
+                            'env': [],
+                            'volumeMounts': []
                         },
                     ],
+                    'volumes': [],
                     'restartPolicy': 'OnFailure'
                 }
             }
         }
     }
 
-    import shlex
     if cmd:
+        import shlex
         (job['spec']['template']['spec']['containers']
          [0]['command']) = shlex.split(cmd)
 
     if env_vars:
-        job['spec']['template']['spec']['containers'][0]['env'] = []
         for var, value in env_vars.items():
             job['spec']['template']['spec']['containers'][0]['env'].append(
                 {'name': var, 'value': value}
             )
 
-    if volumes:
-        job['spec']['template']['spec']['containers'][0]['volumeMounts'] = []
-        job['spec']['template']['spec']['volumes'] = []
-        for volume, mount_path in volumes:
+    if shared_file_system:
+        add_shared_volume(job, namespace)
+
+    if cvmfs_repos:
+        for num, repo in enumerate(cvmfs_repos):
+            volume = volume_templates.get_k8s_cvmfs_volume(namespace, repo)
+            mount_path = volume_templates.get_cvmfs_mount_point(repo)
+
+            volume['name'] += '-{}'.format(num)
             (job['spec']['template']['spec']['containers'][0]
                 ['volumeMounts'].append(
                     {'name': volume['name'], 'mountPath': mount_path}

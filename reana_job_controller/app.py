@@ -1,5 +1,4 @@
 import copy
-import json
 import logging
 import threading
 import uuid
@@ -10,11 +9,6 @@ from flask import Flask, abort, jsonify, request
 app = Flask(__name__)
 app.secret_key = "mega secret key"
 JOB_DB = {}
-
-
-def get_config(experiment):
-    with open('config_template.json', 'r') as config:
-        return json.load(config)[experiment]
 
 
 def filter_jobs(job_db):
@@ -49,18 +43,21 @@ def create_job():
     cmd = request.json['cmd'] if 'cmd' in request.json else None
     env_vars = (request.json['env-vars']
                 if 'env-vars' in request.json else {})
-    experiment_config = get_config(request.json['experiment'])
 
-    k8s_volume = experiment_config['k8s_volume']
+    if request.json.get('cvmfs_mounts'):
+        cvmfs_repos = request.json.get('cvmfs_mounts')
+    else:
+        cvmfs_repos = []
 
     job_id = str(uuid.uuid4())
 
     job_obj = k8s.create_job(job_id,
                              request.json['docker-img'],
                              cmd,
-                             [(k8s_volume, '/data')],
+                             cvmfs_repos,
                              env_vars,
-                             request.json['experiment'])
+                             request.json['experiment'],
+                             shared_file_system=True)
 
     if job_obj:
         job = copy.deepcopy(request.json)
