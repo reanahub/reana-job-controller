@@ -1,7 +1,6 @@
 import logging
 import time
 import pykube
-from six.moves.urllib.parse import urlencode
 import volume_templates
 
 api = pykube.HTTPClient(pykube.KubeConfig.from_service_account())
@@ -187,9 +186,7 @@ def watch_pods(job_db):
                         logging.info(
                             'Getting {} logs'.format(pod.name)
                         )
-                        # Remove when Pykube 0.14.0 is released
-                        pod.logs = logs
-                        job_db[job_name]['log'] = pod.logs(pod)
+                        job_db[job_name]['log'] = pod.logs()
                         logging.info(
                             'Cleaning Job {}'.format(job_name)
                         )
@@ -201,44 +198,3 @@ def watch_pods(job_db):
                     logging.debug(
                         'Event: {}\nObject:\n{}'.format(event.type, pod.obj)
                     )
-
-
-# Remove this function when Pykube 0.14.0 is released
-def logs(self, container=None, pretty=None, previous=False,
-         since_seconds=None, since_time=None, timestamps=False,
-         tail_lines=None, limit_bytes=None):
-    """
-    Produces the same result as calling kubectl logs pod/<pod-name>.
-    Check parameters meaning at
-    http://kubernetes.io/docs/api-reference/v1/operations/,
-    part 'read log of the specified Pod'. The result is plain text.
-    """
-    log_call = "log"
-    params = {}
-    if container is not None:
-        params["container"] = container
-    if pretty is not None:
-        params["pretty"] = pretty
-    if previous:
-        params["previous"] = "true"
-    if since_seconds is not None and since_time is None:
-        params["sinceSeconds"] = int(since_seconds)
-    elif since_time is not None and since_seconds is None:
-        params["sinceTime"] = since_time
-    if timestamps:
-        params["timestamps"] = "true"
-    if tail_lines is not None:
-        params["tailLines"] = int(tail_lines)
-    if limit_bytes is not None:
-        params["limitBytes"] = int(limit_bytes)
-
-    query_string = urlencode(params)
-    log_call += "?{}".format(query_string) if query_string else ""
-    kwargs = {
-        "version": self.version,
-        "namespace": self.namespace,
-        "operation": log_call,
-    }
-    r = self.api.get(**self.api_kwargs(**kwargs))
-    r.raise_for_status()
-    return r.text

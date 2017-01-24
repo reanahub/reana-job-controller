@@ -1,2 +1,2 @@
 Flask==0.10.1
-pykube==0.13.0
+pykube==0.14.0
