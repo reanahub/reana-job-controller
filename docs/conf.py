@@ -111,7 +111,7 @@ html_theme_options = {
     'logo': 'logo-reana.png',
     'description': 'REANA Job Controller',
     'github_user': 'reanahub',
-    'github_repo': 'reana',
+    'github_repo': 'reana-job-controller',
     'github_button': False,
     'github_banner': True,
     'show_powered_by': False,
