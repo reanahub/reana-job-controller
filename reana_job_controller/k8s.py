@@ -125,8 +125,8 @@ def watch_pods(job_db):
             logging.info('New Pod event received')
             pod = event.object
             unended_jobs = [j for j in job_db.keys()
-                            if not job_db[j]['deleted']
-                            and job_db[j]['status'] != 'failed']
+                            if not job_db[j]['deleted'] and
+                            job_db[j]['status'] != 'failed']
             # FIX ME: watch out here, if they change the naming convention at
             # some point the following line won't work. Get job name from API.
             job_name = '-'.join(pod.name.split('-')[:-1])

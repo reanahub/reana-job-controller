@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/bin/sh
 #
 # This file is part of REANA.
 # Copyright (C) 2017 CERN.
@@ -20,10 +20,9 @@
 # granted to it by virtue of its status as an Intergovernmental Organization or
 # submit itself to any jurisdiction.
 
-"""REANA-Job-Controller."""
-
-from __future__ import absolute_import, print_function
-
-from .version import __version__
-
-__all__ = ('__version__', )
+#pydocstyle reana_job_controller && \
+isort -rc -c -df **/*.py && \
+check-manifest --ignore ".travis-*" && \
+sphinx-build -qnNW docs docs/_build/html && \
+python setup.py test && \
+sphinx-build -qnNW -b doctest docs docs/_build/doctest

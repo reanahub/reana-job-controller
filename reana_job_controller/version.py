@@ -20,10 +20,12 @@
 # granted to it by virtue of its status as an Intergovernmental Organization or
 # submit itself to any jurisdiction.
 
-"""REANA-Job-Controller."""
+"""Version information for REANA-Job-Controller.
+
+This file is imported by ``reana_job_controller.__init__`` and parsed by
+``setup.py``.
+"""
 
 from __future__ import absolute_import, print_function
 
-from .version import __version__
-
-__all__ = ('__version__', )
+__version__ = "0.0.1.dev20170123"
