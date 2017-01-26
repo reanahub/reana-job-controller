@@ -20,6 +20,8 @@
 # granted to it by virtue of its status as an Intergovernmental Organization or
 # submit itself to any jurisdiction.
 
+"""Kubernetes wrapper."""
+
 import logging
 import time
 import pykube
@@ -30,11 +32,18 @@ api.session.verify = False
 
 
 def get_jobs():
+    """Get Kubernetes job objects."""
     return [job.obj for job in pykube.Job.objects(api).
             filter(namespace=pykube.all)]
 
 
 def add_shared_volume(job, namespace):
+    """Add shared CephFS volume to a given job spec.
+
+    :param job: Kubernetes job spec.
+    :param namespace: Job's namespace FIXME namespace is already
+        inside job spec.
+    """
     volume = volume_templates.get_k8s_cephfs_volume(namespace)
     mount_path = volume_templates.CEPHFS_MOUNT_PATH
     job['spec']['template']['spec']['containers'][0]['volumeMounts'].append(
@@ -45,6 +54,20 @@ def add_shared_volume(job, namespace):
 
 def create_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
                shared_file_system):
+    """Create Kubernetes job.
+
+    :param job_id: Job uuid.
+    :param docker_img: Docker image to run the job.
+    :param cmd: Command provided to the docker container.
+    :param cvmfs_repos: List of CVMFS repository names.
+    :param env_vars: Dictionary representing environment variables
+        as {'var_name': 'var_value'}.
+    :param namespace: Job's namespace.
+    :shared_file_system: Boolean which represents whether the job
+        should have a shared file system mounted.
+    :returns: Kubernetes job object if the job was successfuly created,
+        None if not.
+    """
     job = {
         'kind': 'Job',
         'apiVersion': 'batch/v1',
@@ -110,6 +133,10 @@ def create_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
 
 
 def watch_jobs(job_db):
+    """Open stream connection to k8s apiserver to watch all jobs status.
+
+    :param job_db: Dictionary which contains all current jobs.
+    """
     while True:
         logging.debug('Starting a new stream request to watch Jobs')
         stream = pykube.Job.objects(api).filter(namespace=pykube.all).watch()
@@ -157,6 +184,10 @@ def watch_jobs(job_db):
 
 
 def watch_pods(job_db):
+    """Open stream connection to k8s apiserver to watch all pods status.
+
+    :param job_db: Dictionary which contains all current jobs.
+    """
     while True:
         logging.info('Starting a new stream request to watch Pods')
         stream = pykube.Pod.objects(api).filter(namespace=pykube.all).watch()
@@ -166,7 +197,7 @@ def watch_pods(job_db):
             unended_jobs = [j for j in job_db.keys()
                             if not job_db[j]['deleted'] and
                             job_db[j]['status'] != 'failed']
-            # FIX ME: watch out here, if they change the naming convention at
+            # FIXME: watch out here, if they change the naming convention at
             # some point the following line won't work. Get job name from API.
             job_name = '-'.join(pod.name.split('-')[:-1])
             # Store existing job pod if not done yet

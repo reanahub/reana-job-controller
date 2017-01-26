@@ -20,6 +20,8 @@
 # granted to it by virtue of its status as an Intergovernmental Organization or
 # submit itself to any jurisdiction.
 
+"""Volume template generation."""
+
 import json
 from string import Template
 
@@ -78,13 +80,18 @@ k8s_cvmfs_template = Template("""{
 
 
 def get_cvmfs_mount_point(repository_name):
+    """Generate mount point for a given CVMFS repository.
+
+    :param repository_name: CVMFS repository name.
+    :returns: The repository's mount point.
+    """
     return '/cvmfs/{repository}'.format(
         repository=CVMFS_REPOSITORIES[repository_name]
     )
 
 
 def get_k8s_cephfs_volume(experiment):
-    """Render k8s CephFS volume template
+    """Render k8s CephFS volume template.
 
     :param experiment: Experiment name.
     :returns: k8s CephFS volume spec as a dictionary.
@@ -97,7 +104,7 @@ def get_k8s_cephfs_volume(experiment):
 
 
 def get_k8s_cvmfs_volume(experiment, repository):
-    """Render k8s CVMFS volume template
+    """Render k8s CVMFS volume template.
 
     :param experiment: Experiment name.
     :returns: k8s CVMFS volume spec as a dictionary.
