@@ -61,6 +61,11 @@ setup_requires = [
     'pytest-runner>=2.7',
 ]
 
+install_requires = [
+    'Flask==0.10.1',
+    'pykube>=0.14.0',
+]
+
 packages = find_packages()
 
 
@@ -82,6 +87,7 @@ setup(
     packages=['reana_job_controller', ],
     zip_safe=False,
     extras_require=extras_require,
+    install_requires=install_requires,
     setup_requires=setup_requires,
     tests_require=tests_require,
     classifiers=[

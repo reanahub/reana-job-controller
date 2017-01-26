@@ -27,8 +27,9 @@ import logging
 import threading
 import uuid
 
-import k8s
 from flask import Flask, abort, jsonify, request
+
+import k8s
 
 app = Flask(__name__)
 app.secret_key = "mega secret key"
