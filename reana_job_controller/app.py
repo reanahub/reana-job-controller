@@ -52,11 +52,11 @@ def filter_jobs(job_db):
     return job_db_copy
 
 
-@app.route('/api/v1.0/jobs', methods=['GET'])
+@app.route('/jobs', methods=['GET'])
 def get_jobs():
     """Get all jobs.
 
-    .. http:get:: /api/v1.0/jobs
+    .. http:get:: /jobs
 
         Returns a JSON list with all the jobs.
 
@@ -64,7 +64,7 @@ def get_jobs():
 
         .. sourcecode:: http
 
-            GET /api/v1.0/jobs HTTP/1.1
+            GET /jobs HTTP/1.1
             Content-Type: application/json
             Host: localhost:5000
 
@@ -115,17 +115,17 @@ def get_jobs():
     return jsonify({"jobs": filter_jobs(JOB_DB)}), 200
 
 
-@app.route('/api/v1.0/k8sjobs', methods=['GET'])
+@app.route('/k8sjobs', methods=['GET'])
 def get_k8sjobs():
     """Get current Kubernetes job list."""
     return jsonify({"jobs": k8s.get_jobs()}), 200
 
 
-@app.route('/api/v1.0/jobs', methods=['POST'])
+@app.route('/jobs', methods=['POST'])
 def create_job():
     """Create a new job.
 
-    .. http:post:: /api/v1.0/jobs
+    .. http:post:: /jobs
 
         This resource is expecting JSON data with all the necessary
         information of a new job.
@@ -134,7 +134,7 @@ def create_job():
 
         .. sourcecode:: http
 
-            POST /api/v1.0/jobs HTTP/1.1
+            POST /jobs HTTP/1.1
             Content-Type: application/json
             Host: localhost:5000
 
@@ -206,13 +206,13 @@ def create_job():
         return jsonify({'job': 'Could not be allocated'}), 500
 
 
-@app.route('/api/v1.0/jobs/<job_id>', methods=['GET'])
+@app.route('/jobs/<job_id>', methods=['GET'])
 def get_job(job_id):
     """Get a job.
 
     FIXME --> probably this endpoint should be merged with `get_jobs()`
 
-    .. http:get:: /api/v1.0/jobs
+    .. http:get:: /jobs
 
         Returns a JSON list with all the jobs.
 
@@ -220,7 +220,7 @@ def get_job(job_id):
 
         .. sourcecode:: http
 
-            GET /api/v1.0/jobs HTTP/1.1
+            GET /jobs HTTP/1.1
             Content-Type: application/json
             Host: localhost:5000
 
