@@ -115,12 +115,6 @@ def get_jobs():
     return jsonify({"jobs": filter_jobs(JOB_DB)}), 200
 
 
-@app.route('/k8sjobs', methods=['GET'])
-def get_k8sjobs():
-    """Get current Kubernetes job list."""
-    return jsonify({"jobs": k8s.get_jobs()}), 200
-
-
 @app.route('/jobs', methods=['POST'])
 def create_job():
     """Create a new job.

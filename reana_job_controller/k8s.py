@@ -31,12 +31,6 @@ api = pykube.HTTPClient(pykube.KubeConfig.from_service_account())
 api.session.verify = False
 
 
-def get_jobs():
-    """Get Kubernetes job objects."""
-    return [job.obj for job in pykube.Job.objects(api).
-            filter(namespace=pykube.all)]
-
-
 def add_shared_volume(job, namespace):
     """Add shared CephFS volume to a given job spec.
 
