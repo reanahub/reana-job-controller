@@ -4,8 +4,10 @@
    :numbered:
    :maxdepth: 2
 
-   usage
+   introduction
+   gettingstarted
    restapi
+   contributing
    changes
    license
    authors
