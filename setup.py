@@ -47,6 +47,7 @@ extras_require = {
     'docs': [
         'Sphinx>=1.4.4',
         'sphinx-rtd-theme>=0.1.9',
+        'sphinxcontrib-httpdomain>=1.5.0',
     ],
     'tests': tests_require,
 }

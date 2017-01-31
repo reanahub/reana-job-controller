@@ -43,6 +43,7 @@ extensions = [
     'sphinx.ext.graphviz',
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
+    'sphinxcontrib.httpdomain',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -70,7 +71,8 @@ author = 'info@reana.io'
 
 # Get the version string. Cannot be done with import!
 g = {}
-with open(os.path.join('..', 'reana_job_controller', 'version.py'), 'rt') as fp:
+with open(os.path.join('..', 'reana_job_controller', 'version.py'),
+          'rt') as fp:
     exec(fp.read(), g)
     version = g['__version__']
 
@@ -192,3 +194,6 @@ texinfo_documents = [
      author, 'reana', 'One line description of project.',
      'Miscellaneous'),
 ]
+
+# Mock autodoc imports:
+autodoc_mock_imports = ['k8s', ]

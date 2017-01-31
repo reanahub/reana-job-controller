@@ -136,7 +136,7 @@ def create_job():
             {
                 "docker-img": "busybox",
                 "cmd": "sleep 1000",
-                "cvmfs_mounts": ['atlas-condb', 'atlas'],
+                "cvmfs_mounts": ["atlas-condb", "atlas"],
                 "env-vars": {"DATA": "/data"},
                 "experiment": "atlas"
             }
@@ -207,7 +207,7 @@ def get_job(job_id):
 
     FIXME --> probably this endpoint should be merged with `get_jobs()`
 
-    .. http:get:: /jobs
+    .. http:get:: /jobs/<job_id>
 
         Returns a JSON list with all the jobs.
 
@@ -215,7 +215,7 @@ def get_job(job_id):
 
         .. sourcecode:: http
 
-            GET /jobs HTTP/1.1
+            GET /jobs/cdcf48b1-c2f3-4693-8230-b066e088c6ac HTTP/1.1
             Content-Type: application/json
             Host: localhost:5000
 
