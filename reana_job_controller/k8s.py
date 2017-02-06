@@ -24,11 +24,11 @@
 
 import logging
 import time
-import pykube
-import volume_templates
 
-api = pykube.HTTPClient(pykube.KubeConfig.from_service_account())
-api.session.verify = False
+import pykube
+from flask import current_app as app
+
+import reana_job_controller.volume_templates
 
 
 def add_shared_volume(job, namespace):
@@ -46,8 +46,8 @@ def add_shared_volume(job, namespace):
     job['spec']['template']['spec']['volumes'].append(volume)
 
 
-def create_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
-               shared_file_system):
+def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
+                    shared_file_system):
     """Create Kubernetes job.
 
     :param job_id: Job uuid.
@@ -119,21 +119,22 @@ def create_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
 
     # add better handling
     try:
-        job_obj = pykube.Job(api, job)
+        job_obj = pykube.Job(app.config['PYKUBE_API'], job)
         job_obj.create()
         return job_obj
     except pykube.exceptions.HTTPError:
         return None
 
 
-def watch_jobs(job_db):
+def watch_jobs(job_db, api_client):
     """Open stream connection to k8s apiserver to watch all jobs status.
 
     :param job_db: Dictionary which contains all current jobs.
     """
     while True:
         logging.debug('Starting a new stream request to watch Jobs')
-        stream = pykube.Job.objects(api).filter(namespace=pykube.all).watch()
+        stream = pykube.Job.objects(
+            api_client).filter(namespace=pykube.all).watch()
         for event in stream:
             logging.info('New Job event received')
             job = event.object
@@ -177,14 +178,15 @@ def watch_jobs(job_db):
                 job.delete()
 
 
-def watch_pods(job_db):
+def watch_pods(job_db, api_client):
     """Open stream connection to k8s apiserver to watch all pods status.
 
     :param job_db: Dictionary which contains all current jobs.
     """
     while True:
         logging.info('Starting a new stream request to watch Pods')
-        stream = pykube.Pod.objects(api).filter(namespace=pykube.all).watch()
+        stream = pykube.Pod.objects(
+            api_client).filter(namespace=pykube.all).watch()
         for event in stream:
             logging.info('New Pod event received')
             pod = event.object

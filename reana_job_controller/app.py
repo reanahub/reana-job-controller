@@ -29,7 +29,7 @@ import uuid
 
 from flask import Flask, abort, jsonify, request
 
-import k8s
+from reana_job_controller.k8s import instantiate_job, watch_jobs, watch_pods
 
 app = Flask(__name__)
 app.secret_key = "mega secret key"
@@ -179,13 +179,13 @@ def create_job():
 
     job_id = str(uuid.uuid4())
 
-    job_obj = k8s.create_job(job_id,
-                             request.json['docker-img'],
-                             cmd,
-                             cvmfs_repos,
-                             env_vars,
-                             request.json['experiment'],
-                             shared_file_system=True)
+    job_obj = instantiate_job(job_id,
+                              request.json['docker-img'],
+                              cmd,
+                              cvmfs_repos,
+                              env_vars,
+                              request.json['experiment'],
+                              shared_file_system=True)
 
     if job_obj:
         job = copy.deepcopy(request.json)
@@ -265,11 +265,15 @@ if __name__ == '__main__':
         level=logging.DEBUG,
         format='%(asctime)s - %(threadName)s - %(levelname)s: %(message)s'
     )
-    job_event_reader_thread = threading.Thread(target=k8s.watch_jobs,
-                                               args=(JOB_DB,))
+    app.config.from_object('config')
+
+    job_event_reader_thread = threading.Thread(target=watch_jobs,
+                                               args=(JOB_DB,
+                                                     app.config['PYKUBE_API']))
     job_event_reader_thread.start()
-    pod_event_reader_thread = threading.Thread(target=k8s.watch_pods,
-                                               args=(JOB_DB,))
+    pod_event_reader_thread = threading.Thread(target=watch_pods,
+                                               args=(JOB_DB,
+                                                     app.config['PYKUBE_API']))
     pod_event_reader_thread.start()
     app.run(debug=True, port=5000,
             host='0.0.0.0')

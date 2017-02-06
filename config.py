@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+#
 # This file is part of REANA.
 # Copyright (C) 2017 CERN.
 #
@@ -18,15 +20,10 @@
 # granted to it by virtue of its status as an Intergovernmental Organization or
 # submit itself to any jurisdiction.
 
-include Dockerfile
-include COPYING
-include *.rst
-include *.sh
-include *.py
-include pytest.ini
-recursive-include reana_job_controller *.json
-recursive-include docs *.py
-recursive-include docs *.png
-recursive-include docs *.rst
-recursive-include docs *.txt
-recursive-include tests *.py
+"""Flask application configuration."""
+
+import pykube
+
+# FIXME do not share HTTPClient but only config
+PYKUBE_API = pykube.HTTPClient(pykube.KubeConfig.from_service_account())
+PYKUBE_API.session.verify = False
