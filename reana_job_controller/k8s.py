@@ -28,7 +28,14 @@ import time
 import pykube
 from flask import current_app as app
 
-import reana_job_controller.volume_templates
+from reana_job_controller import volume_templates
+
+
+def create_api_client(config):
+    """Create pykube HTTPClient using config."""
+    api_client = pykube.HTTPClient(config)
+    api_client.session.verify = False
+    return api_client
 
 
 def add_shared_volume(job, namespace):
@@ -119,18 +126,20 @@ def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
 
     # add better handling
     try:
-        job_obj = pykube.Job(app.config['PYKUBE_API'], job)
+        job_obj = pykube.Job(app.config['PYKUBE_CLIENT'], job)
         job_obj.create()
         return job_obj
     except pykube.exceptions.HTTPError:
         return None
 
 
-def watch_jobs(job_db, api_client):
+def watch_jobs(job_db, config):
     """Open stream connection to k8s apiserver to watch all jobs status.
 
     :param job_db: Dictionary which contains all current jobs.
+    :param config: configuration to connect to k8s apiserver.
     """
+    api_client = create_api_client(config)
     while True:
         logging.debug('Starting a new stream request to watch Jobs')
         stream = pykube.Job.objects(
@@ -178,11 +187,13 @@ def watch_jobs(job_db, api_client):
                 job.delete()
 
 
-def watch_pods(job_db, api_client):
+def watch_pods(job_db, config):
     """Open stream connection to k8s apiserver to watch all pods status.
 
     :param job_db: Dictionary which contains all current jobs.
+    :param config: configuration to connect to k8s apiserver.
     """
+    api_client = create_api_client(config)
     while True:
         logging.info('Starting a new stream request to watch Pods')
         stream = pykube.Pod.objects(

@@ -24,6 +24,4 @@
 
 import pykube
 
-# FIXME do not share HTTPClient but only config
-PYKUBE_API = pykube.HTTPClient(pykube.KubeConfig.from_service_account())
-PYKUBE_API.session.verify = False
+PYKUBE_API = pykube.KubeConfig.from_service_account()
