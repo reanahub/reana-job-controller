@@ -22,7 +22,6 @@ include Dockerfile
 include COPYING
 include *.rst
 include *.sh
-include *.py
 include pytest.ini
 recursive-include reana_job_controller *.json
 recursive-include docs *.py
