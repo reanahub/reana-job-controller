@@ -23,17 +23,18 @@
 """Volume template generation."""
 
 import json
+import yaml
+import os
+import pkg_resources
 from string import Template
 
-CEPH_SECRET_NAME = 'ceph-secret'
+k8s_shareddata_config = yaml.load(open(os.environ.get(
+    'REANA_SHAREDDATA_CONFIG',
+    pkg_resources.resource_filename('reana_job_controller','resources/shareddata_config.yml')
+)))
 
-CEPHFS_PATHS = {
-    'alice': '/k8s/alice',
-    'atlas': '/k8s/atlas',
-    'cms': '/k8s/cms',
-    'lhcb': '/k8s/lhcb',
-    'recast': '/k8s/recast'
-}
+CEPHFS_PATHS = {x['scopename']:x['path'] for x in k8s_shareddata_config['shared_data']}
+
 
 CVMFS_REPOSITORIES = {
     'alice': 'alice.cern.ch',
@@ -50,23 +51,6 @@ CVMFS_REPOSITORIES = {
 }
 
 CEPHFS_MOUNT_PATH = '/data'
-
-k8s_cephfs_template = Template("""{
-    "name": "cephfs-$experiment",
-    "cephfs": {
-        "monitors": [
-            "128.142.36.227:6790",
-            "128.142.39.77:6790",
-            "128.142.39.144:6790"
-        ],
-        "path": "$path",
-        "user": "k8s",
-        "secretRef": {
-            "name": "$secret_name",
-            "readOnly": false
-        }
-    }
-}""")
 
 k8s_cvmfs_template = Template("""{
     "name": "cvmfs-$experiment",
@@ -96,10 +80,13 @@ def get_k8s_cephfs_volume(experiment):
     :param experiment: Experiment name.
     :returns: k8s CephFS volume spec as a dictionary.
     """
+    template = Template(json.dumps(k8s_shareddata_config['shared_data_k8s_template']))
+
     return json.loads(
-        k8s_cephfs_template.substitute(experiment=experiment,
-                                       path=CEPHFS_PATHS[experiment],
-                                       secret_name=CEPH_SECRET_NAME)
+        template.substitute(
+            experiment=experiment,
+            path=CEPHFS_PATHS[experiment]
+       )
     )
 
 

@@ -23,7 +23,8 @@ include COPYING
 include *.rst
 include *.sh
 include pytest.ini
-recursive-include reana_job_controller *.json
+recursive-include reana_job_controller/resources *.json
+recursive-include reana_job_controller/resources *.yaml
 recursive-include docs *.py
 recursive-include docs *.png
 recursive-include docs *.rst
