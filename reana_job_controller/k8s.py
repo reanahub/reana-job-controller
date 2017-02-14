@@ -53,9 +53,9 @@ def add_shared_volume(job, namespace):
     job['spec']['template']['spec']['volumes'].append(volume)
 
 
-def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
-                    shared_file_system):
-    """Create Kubernetes job.
+def prepare_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
+                    shared_file_system, scopesecrets):
+    """Prepares a Kubernetes job Manifest.
 
     :param job_id: Job uuid.
     :param docker_img: Docker image to run the job.
@@ -64,6 +64,7 @@ def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
     :param env_vars: Dictionary representing environment variables
         as {'var_name': 'var_value'}.
     :param namespace: Job's namespace.
+    :param scopesecrets: Boolean whether to attach this scopes' secrets
     :shared_file_system: Boolean which represents whether the job
         should have a shared file system mounted.
     :returns: Kubernetes job object if the job was successfuly created,
@@ -124,14 +125,37 @@ def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
                 ))
             job['spec']['template']['spec']['volumes'].append(volume)
 
+    if scopesecrets:
+        for num, secret in enumerate(volume_templates.get_k8s_secret_volumes(namespace)):
+            secretname = 'secret-{}'.format(num)
+            volume = {
+                'name': secretname,
+                'secret': secret['secret']
+            }
+            mount = {
+                'name': secretname,
+                'mountPath': secret['mountPath']
+            }
+            (job['spec']['template']['spec']['containers'][0]
+                ['volumeMounts'].append(mount))
+            job['spec']['template']['spec']['volumes'].append(volume)
+
+    return job
+
+def instantiate_job(job_manifest):
+    """Creates a Kubernetes Job based on a Manifest
+    
+    :param job_manifest: The Job Manifest
+    :returns: Kubernetes job object if the job was successfuly created,
+        None if not.
+    """
     # add better handling
     try:
-        job_obj = pykube.Job(app.config['PYKUBE_CLIENT'], job)
+        job_obj = pykube.Job(app.config['PYKUBE_CLIENT'], job_manifest)
         job_obj.create()
         return job_obj
     except pykube.exceptions.HTTPError:
         return None
-
 
 def watch_jobs(job_db, config):
     """Open stream connection to k8s apiserver to watch all jobs status.

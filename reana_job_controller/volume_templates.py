@@ -33,6 +33,11 @@ k8s_shareddata_config = yaml.load(open(os.environ.get(
     pkg_resources.resource_filename('reana_job_controller','resources/shareddata_config.yml')
 )))
 
+k8s_scopesecret_config = yaml.load(open(os.environ.get(
+    'REANA_SCOPESECRET_CONFIG',
+    pkg_resources.resource_filename('reana_job_controller','resources/scopesecret_config.yml')
+)))
+
 CEPHFS_PATHS = {x['scopename']:x['path'] for x in k8s_shareddata_config['shared_data']}
 
 
@@ -89,6 +94,14 @@ def get_k8s_cephfs_volume(experiment):
        )
     )
 
+
+def get_k8s_secret_volumes(experiment):
+    """Render k8s Secrets based on experiment
+
+    :param experiment: Experiment name.
+    :returns: k8s volume spec as a dictionary
+    """
+    return k8s_scopesecret_config[experiment]
 
 def get_k8s_cvmfs_volume(experiment, repository):
     """Render k8s CVMFS volume template.
