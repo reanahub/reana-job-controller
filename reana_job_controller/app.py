@@ -29,7 +29,7 @@ import uuid
 
 from flask import Flask, abort, jsonify, request
 
-from reana_job_controller.k8s import (create_api_client, instantiate_job,
+from reana_job_controller.k8s import (create_api_client, prepare_job, instantiate_job,
                                       watch_jobs, watch_pods)
 
 app = Flask(__name__)
@@ -180,7 +180,7 @@ def create_job():
 
     job_id = str(uuid.uuid4())
 
-    job_obj = instantiate_job(job_id,
+    job_manifest = prepare_job(job_id,
                               request.json['docker-img'],
                               cmd,
                               cvmfs_repos,
@@ -188,6 +188,7 @@ def create_job():
                               request.json['experiment'],
                               shared_file_system=True)
 
+    job_obj = instantiate_job(job_manifest)
     if job_obj:
         job = copy.deepcopy(request.json)
         job['job-id'] = job_id
