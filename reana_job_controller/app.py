@@ -186,7 +186,9 @@ def create_job():
                               cvmfs_repos,
                               env_vars,
                               request.json['experiment'],
-                              shared_file_system=True)
+                              shared_file_system=True,
+                              scopesecrets=True
+                              )
 
     job_obj = instantiate_job(job_manifest)
     if job_obj:
