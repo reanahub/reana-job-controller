@@ -1,0 +1,25 @@
+shared_data:
+  - scopename: alice
+    path: /k8s/alice
+  - scopename: atlas
+    path: /k8s/atlas
+  - scopename: cms
+    path: /k8s/cms
+  - scopename: lhcb
+    path: /k8s/lhc
+  - scopename: recast
+    path: /k8s/recast
+
+shared_data_k8s_template:
+  name: cephfs-$experiment
+  cephfs:
+      monitors:
+        - 128.142.36.227:6790
+        - 128.142.39.77:6790
+        - 128.142.39.144:6790
+      path: $path
+      user: k8s
+      secretRef:
+        name: ceph-secret
+        readOnly: false
+      
