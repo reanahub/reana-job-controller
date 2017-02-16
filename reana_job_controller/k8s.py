@@ -24,10 +24,12 @@
 
 import logging
 import time
+import yaml
+import shlex
+import pkg_resources
 
 import pykube
 from flask import current_app as app
-
 from reana_job_controller import volume_templates
 
 
@@ -70,37 +72,14 @@ def prepare_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
     :returns: Kubernetes job object if the job was successfuly created,
         None if not.
     """
-    job = {
-        'kind': 'Job',
-        'apiVersion': 'batch/v1',
-        'metadata': {
-            'name': job_id,
-            'namespace': namespace
-        },
-        'spec': {
-            'autoSelector': True,
-            'template': {
-                'metadata': {
-                    'name': job_id
-                },
-                'spec': {
-                    'containers': [
-                        {
-                            'name': job_id,
-                            'image': docker_img,
-                            'env': [],
-                            'volumeMounts': []
-                        },
-                    ],
-                    'volumes': [],
-                    'restartPolicy': 'OnFailure'
-                }
-            }
-        }
-    }
+    job = yaml.load(pkg_resources.resource_stream('reana_job_controller','resources/job_template.yml'))
+    job['metadata']['name'] = job_id
+    job['metadata']['namespace'] = namespace
+    job['spec']['template']['metadata']['name'] = job_id
+    job['spec']['template']['spec']['containers'][0]['name'] = job_id
+    job['spec']['template']['spec']['containers'][0]['image'] = docker_img
 
     if cmd:
-        import shlex
         (job['spec']['template']['spec']['containers']
          [0]['command']) = shlex.split(cmd)
 
@@ -261,12 +240,16 @@ def watch_pods(job_db, config):
                     job_db[job_name]['restart_count'] = restarts
 
                     if restarts >= job_db[job_name]['max_restart_count'] and \
-                       exit_code == 1:
+                       exit_code > 0:
 
                         logging.info(
-                            'Job {} reached max restarts...'.format(job_name)
+                            'Job {} failed with code {} and reached max restarts ({})'.format(
+                                job_name,
+                                exit_code,
+                                restarts
+                                )
                         )
-
+                        
                         logging.info(
                             'Getting {} logs'.format(pod.name)
                         )
