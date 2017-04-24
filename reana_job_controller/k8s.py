@@ -23,11 +23,11 @@
 """Kubernetes wrapper."""
 
 import logging
+import os
 import time
 
 import pykube
 from flask import current_app as app
-
 from reana_job_controller import volume_templates
 
 
@@ -38,15 +38,20 @@ def create_api_client(config):
     return api_client
 
 
-def add_shared_volume(job, namespace):
+def add_shared_volume(job):
     """Add shared CephFS volume to a given job spec.
 
     :param job: Kubernetes job spec.
-    :param namespace: Job's namespace FIXME namespace is already
-        inside job spec.
     """
-    volume = volume_templates.get_k8s_cephfs_volume(namespace)
-    mount_path = volume_templates.CEPHFS_MOUNT_PATH
+    storage_backend = os.getenv('REANA_STORAGE_BACKEND', 'LOCAL')
+    if storage_backend == 'CEPHFS':
+        volume = volume_templates.get_k8s_cephfs_volume(
+            job['metadata']['namespace'])
+    else:
+        volume = volume_templates.get_k8s_hostpath_volume(
+            job['metadata']['namespace'])
+    mount_path = volume_templates.REANA_STORAGE_MOUNT_PATH
+
     job['spec']['template']['spec']['containers'][0]['volumeMounts'].append(
         {'name': volume['name'], 'mountPath': mount_path}
     )
@@ -110,7 +115,7 @@ def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
             )
 
     if shared_file_system:
-        add_shared_volume(job, namespace)
+        add_shared_volume(job)
 
     if cvmfs_repos:
         for num, repo in enumerate(cvmfs_repos):

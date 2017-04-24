@@ -25,14 +25,14 @@
 import json
 from string import Template
 
-CEPH_SECRET_NAME = 'ceph-secret'
+CEPHFS_SECRET_NAME = 'ceph-secret'
 
-CEPHFS_PATHS = {
-    'alice': '/k8s/alice',
-    'atlas': '/k8s/atlas',
-    'cms': '/k8s/cms',
-    'lhcb': '/k8s/lhcb',
-    'recast': '/k8s/recast'
+REANA_STORAGE_PATHS = {
+    'alice': '/reana/alice',
+    'atlas': '/reana/atlas',
+    'cms': '/reana/cms',
+    'lhcb': '/reana/lhcb',
+    'recast': '/reana/recast'
 }
 
 CVMFS_REPOSITORIES = {
@@ -49,10 +49,10 @@ CVMFS_REPOSITORIES = {
     'geant4': 'geant4.cern.ch'
 }
 
-CEPHFS_MOUNT_PATH = '/data'
+REANA_STORAGE_MOUNT_PATH = '/data'
 
-k8s_cephfs_template = Template("""{
-    "name": "cephfs-$experiment",
+K8S_CEPHFS_TEMPLATE = Template("""{
+    "name": "$experiment-shared-volume",
     "cephfs": {
         "monitors": [
             "128.142.36.227:6790",
@@ -68,13 +68,20 @@ k8s_cephfs_template = Template("""{
     }
 }""")
 
-k8s_cvmfs_template = Template("""{
+K8S_CVMFS_TEMPLATE = Template("""{
     "name": "cvmfs-$experiment",
     "flexVolume": {
         "driver": "cern/cvmfs",
         "options": {
             "repository": "$repository"
         }
+    }
+}""")
+
+K8S_HOSTPATH_TEMPLATE = Template("""{
+    "name": "$experiment-shared-volume",
+    "hostPath": {
+        "path": "$path"
     }
 }""")
 
@@ -97,9 +104,9 @@ def get_k8s_cephfs_volume(experiment):
     :returns: k8s CephFS volume spec as a dictionary.
     """
     return json.loads(
-        k8s_cephfs_template.substitute(experiment=experiment,
-                                       path=CEPHFS_PATHS[experiment],
-                                       secret_name=CEPH_SECRET_NAME)
+        K8S_CEPHFS_TEMPLATE.substitute(experiment=experiment,
+                                       path=REANA_STORAGE_PATHS[experiment],
+                                       secret_name=CEPHFS_SECRET_NAME)
     )
 
 
@@ -110,7 +117,19 @@ def get_k8s_cvmfs_volume(experiment, repository):
     :returns: k8s CVMFS volume spec as a dictionary.
     """
     if repository in CVMFS_REPOSITORIES:
-        return json.loads(k8s_cvmfs_template.substitute(experiment=experiment,
+        return json.loads(K8S_CVMFS_TEMPLATE.substitute(experiment=experiment,
                                                         repository=repository))
     else:
         raise ValueError('The provided repository doesn\'t exist')
+
+
+def get_k8s_hostpath_volume(experiment):
+    """Render k8s HostPath volume template.
+
+    :param experiment: Experiment name.
+    :returns: k8s HostPath spec as a dictionary.
+    """
+    return json.loads(
+        K8S_HOSTPATH_TEMPLATE.substitute(experiment=experiment,
+                                         path=REANA_STORAGE_PATHS[experiment])
+    )
