@@ -23,7 +23,10 @@
 pydocstyle reana_job_controller && \
 isort -rc -c -df **/*.py && \
 check-manifest --ignore ".travis-*" && \
-sphinx-build -qnNW docs docs/_build/html && \
+FLASK_APP=reana_job_controller/app.py flask openapi create openapi.json  && \
+diff -q openapi.json docs/openapi.json && \
+sphinx-build -qnN docs docs/_build/ && \
 python setup.py test && \
-sphinx-build -qnNW -b doctest docs docs/_build/doctest && \
+sphinx-build -qnN -b doctest docs docs/_build/doctest && \
+rm openapi.json && \
 docker build -t reanahub/reana-job-controller .

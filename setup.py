@@ -41,6 +41,7 @@ tests_require = [
     'pytest-cov>=1.8.0',
     'pytest-pep8>=1.0.6',
     'pytest>=2.8.0',
+    'swagger_spec_validator>=2.1.0',
 ]
 
 extras_require = {
@@ -48,6 +49,7 @@ extras_require = {
         'Sphinx>=1.4.4',
         'sphinx-rtd-theme>=0.1.9',
         'sphinxcontrib-httpdomain>=1.5.0',
+        'sphinxcontrib-openapi>=0.3.0'
     ],
     'tests': tests_require,
 }
@@ -63,8 +65,10 @@ setup_requires = [
 ]
 
 install_requires = [
-    'Flask==0.10.1',
+    'Flask>=0.11',
     'pykube>=0.14.0',
+    'apispec>=0.21.0',
+    'marshmallow>=2.13',
 ]
 
 packages = find_packages()
@@ -87,6 +91,11 @@ setup(
     url='https://github.com/reanahub/reana-job-controller',
     packages=['reana_job_controller', ],
     zip_safe=False,
+    entry_points={
+        'flask.commands': [
+            'openapi = reana_job_controller.cli:openapi',
+        ],
+    },
     extras_require=extras_require,
     install_requires=install_requires,
     setup_requires=setup_requires,

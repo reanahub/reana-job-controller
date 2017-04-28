@@ -28,13 +28,17 @@ import threading
 import uuid
 
 from flask import Flask, abort, jsonify, request
-
 from reana_job_controller.k8s import (create_api_client, instantiate_job,
                                       watch_jobs, watch_pods)
+from reana_job_controller.schemas import Job, JobRequest
+from reana_job_controller.spec import build_openapi_spec
 
 app = Flask(__name__)
 app.secret_key = "mega secret key"
 JOB_DB = {}
+
+job_request_schema = JobRequest()
+job_schema = Job()
 
 
 def filter_jobs(job_db):
@@ -55,211 +59,207 @@ def filter_jobs(job_db):
 
 
 @app.route('/jobs', methods=['GET'])
-def get_jobs():
+def get_jobs():  # noqa
     """Get all jobs.
 
-    .. http:get:: /jobs
-
-        Returns a JSON list with all the jobs.
-
-        **Request**:
-
-        .. sourcecode:: http
-
-            GET /jobs HTTP/1.1
-            Content-Type: application/json
-            Host: localhost:5000
-
-        :reqheader Content-Type: application/json
-
-        **Responses**:
-
-        .. sourcecode:: http
-
-            HTTP/1.0 200 OK
-            Content-Length: 80
-            Content-Type: application/json
-
-            {
-              "jobs": {
-                "1612a779-f3fa-4344-8819-3d12fa9b9d90": {
-                  "cmd": "sleep 1000",
-                  "cvmfs_mounts": [
-                    "atlas-condb",
-                    "atlas"
-                  ],
-                  "docker-img": "busybox",
-                  "experiment": "atlas",
-                  "job-id": "1612a779-f3fa-4344-8819-3d12fa9b9d90",
-                  "max_restart_count": 3,
-                  "restart_count": 0,
-                  "status": "succeeded"
-                },
-                "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20": {
-                  "cmd": "sleep 1000",
-                  "cvmfs_mounts": [
-                    "atlas-condb",
-                    "atlas"
-                  ],
-                  "docker-img": "busybox",
-                  "experiment": "atlas",
-                  "job-id": "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20",
-                  "max_restart_count": 3,
-                  "restart_count": 0,
-                  "status": "started"
+    ---
+    get:
+      summary: Returns list of all active jobs.
+      description: >-
+        This resource is not expecting parameters and it will return a list
+        representing all active jobs in JSON format.
+      produces:
+       - application/json
+      responses:
+        200:
+          description: >-
+            Request succeeded. The response contains the list of all active
+            jobs.
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Job'
+          examples:
+            application/json:
+              {
+                "jobs": {
+                  "1612a779-f3fa-4344-8819-3d12fa9b9d90": {
+                    "cmd": "sleep 1000",
+                    "cvmfs_mounts": [
+                      "atlas-condb",
+                      "atlas"
+                    ],
+                    "docker_img": "busybox",
+                    "experiment": "atlas",
+                    "job_id": "1612a779-f3fa-4344-8819-3d12fa9b9d90",
+                    "max_restart_count": 3,
+                    "restart_count": 0,
+                    "status": "succeeded"
+                  },
+                  "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20": {
+                    "cmd": "sleep 1000",
+                    "cvmfs_mounts": [
+                      "atlas-condb",
+                      "atlas"
+                    ],
+                    "docker_img": "busybox",
+                    "experiment": "atlas",
+                    "job_id": "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20",
+                    "max_restart_count": 3,
+                    "restart_count": 0,
+                    "status": "started"
+                  }
                 }
               }
-            }
-
-        :resheader Content-Type: application/json
-        :statuscode 200: no error - the list has been returned.
     """
+    # FIXME do Marshmallow validation after fixing the structure
+    # of job list. Now it has the ID as key, it should be a plain
+    # list of jobs so it can be validated with Marshmallow.
+
     return jsonify({"jobs": filter_jobs(JOB_DB)}), 200
 
 
 @app.route('/jobs', methods=['POST'])
-def create_job():
+def create_job():  # noqa
     """Create a new job.
 
-    .. http:post:: /jobs
-
-        This resource is expecting JSON data with all the necessary
-        information of a new job.
-
-        **Request**:
-
-        .. sourcecode:: http
-
-            POST /jobs HTTP/1.1
-            Content-Type: application/json
-            Host: localhost:5000
-
-            {
-                "docker-img": "busybox",
-                "cmd": "sleep 1000",
-                "cvmfs_mounts": ["atlas-condb", "atlas"],
-                "env-vars": {"DATA": "/data"},
-                "experiment": "atlas"
-            }
-
-        :reqheader Content-Type: application/json
-        :json body: JSON with the information of the job.
-
-        **Responses**:
-
-        .. sourcecode:: http
-
-            HTTP/1.0 200 OK
-            Content-Length: 80
-            Content-Type: application/json
-
-            {
-              "job-id": "cdcf48b1-c2f3-4693-8230-b066e088c6ac"
-            }
-
-        :resheader Content-Type: application/json
-        :statuscode 201: no error - the job was created
-        :statuscode 400: invalid request - problably a malformed JSON
-        :statuscode 500: internal error - probably the job could not be
-            created
+    ---
+    post:
+      summary: Creates a new job.
+      description: >-
+        This resource is expecting JSON data with all the necessary information
+        of a new job.
+      operationId: create_job
+      consumes:
+       - application/json
+      produces:
+       - application/json
+      parameters:
+       - name: job
+         in: body
+         description: Information needed to instantiate a Job
+         required: true
+         schema:
+           $ref: '#/definitions/JobRequest'
+      responses:
+        201:
+          description: Request succeeded. The job has been launched.
+          schema:
+            type: object
+            properties:
+              job_id:
+                type: string
+          examples:
+            application/json:
+              {
+                "job_id": "cdcf48b1-c2f3-4693-8230-b066e088c6ac"
+              }
+        400:
+          description: >-
+            Request failed. The incoming data specification seems malformed.
+        500:
+          description: >-
+            Request failed. Internal controller error. The job could probably
+            not have been allocated.
     """
-    if not request.json \
-       or not ('experiment') in request.json\
-       or not ('docker-img' in request.json):
-        print(request.json)
-        abort(400)
 
-    cmd = request.json['cmd'] if 'cmd' in request.json else None
-    env_vars = (request.json['env-vars']
-                if 'env-vars' in request.json else {})
+    json_data = request.get_json()
+    if not json_data:
+        return jsonify({'message': 'Empty request'}), 400
 
-    if request.json.get('cvmfs_mounts'):
-        cvmfs_repos = request.json.get('cvmfs_mounts')
-    else:
-        cvmfs_repos = []
+    # Validate and deserialize input
+    job_request, errors = job_request_schema.load(json_data)
 
-    job_id = str(uuid.uuid4())
+    if errors:
+        return jsonify(errors), 400
 
-    job_obj = instantiate_job(job_id,
-                              request.json['docker-img'],
-                              cmd,
-                              cvmfs_repos,
-                              env_vars,
-                              request.json['experiment'],
-                              shared_file_system=True)
+    job_obj = instantiate_job(job_request['job_id'],
+                              job_request['docker_img'],
+                              job_request['cmd'],
+                              job_request['cvmfs_mounts'],
+                              job_request['env_vars'],
+                              job_request['experiment'],
+                              job_request['shared_file_system'])
 
     if job_obj:
-        job = copy.deepcopy(request.json)
-        job['job-id'] = job_id
+        job = copy.deepcopy(job_request)
         job['status'] = 'started'
         job['restart_count'] = 0
         job['max_restart_count'] = 3
         job['obj'] = job_obj
         job['deleted'] = False
-        JOB_DB[job_id] = job
-        return jsonify({'job-id': job_id}), 201
+        JOB_DB[job['job_id']] = job
+        return jsonify({'job_id': job['job_id']}), 201
     else:
         return jsonify({'job': 'Could not be allocated'}), 500
 
 
 @app.route('/jobs/<job_id>', methods=['GET'])
-def get_job(job_id):
-    """Get a job.
+def get_job(job_id):  # noqa
+    """Get a Job.
 
-    FIXME --> probably this endpoint should be merged with `get_jobs()`
-
-    .. http:get:: /jobs/<job_id>
-
-        Returns a JSON list with all the jobs.
-
-        **Request**:
-
-        .. sourcecode:: http
-
-            GET /jobs/cdcf48b1-c2f3-4693-8230-b066e088c6ac HTTP/1.1
-            Content-Type: application/json
-            Host: localhost:5000
-
-        :reqheader Content-Type: application/json
-
-        **Responses**:
-
-        .. sourcecode:: http
-
-            HTTP/1.0 200 OK
-            Content-Length: 80
-            Content-Type: application/json
-
-            {
+    ---
+    get:
+      summary: Returns details about a given job.
+      description: >-
+        This resource is expecting the job's UUID as a path parameter. Its
+        information will be served in JSON format.
+      produces:
+       - application/json
+      parameters:
+       - name: job_id
+         in: path
+         description: Required. ID of the job.
+         required: true
+         type: string
+      responses:
+        200:
+          description: >-
+            Request succeeded. The response contains details about the given
+            job ID.
+          schema:
+            $ref: '#/definitions/Job'
+          examples:
+            application/json:
               "job": {
                 "cmd": "sleep 1000",
                 "cvmfs_mounts": [
                   "atlas-condb",
                   "atlas"
                 ],
-                "docker-img": "busybox",
+                "docker_img": "busybox",
                 "experiment": "atlas",
-                "job-id": "cdcf48b1-c2f3-4693-8230-b066e088c6ac",
+                "job_id": "cdcf48b1-c2f3-4693-8230-b066e088c6ac",
                 "max_restart_count": 3,
                 "restart_count": 0,
                 "status": "started"
               }
-            }
-
-        :resheader Content-Type: application/json
-        :statuscode 200: no error - the list has been returned.
-        :statuscode 404: error - the specified job doesn't exist.
+        404:
+          description: Request failed. The given job ID does not seem to exist.
     """
+
     if job_id in JOB_DB:
         job_copy = copy.deepcopy(JOB_DB[job_id])
         del(job_copy['obj'])
         del(job_copy['deleted'])
         if job_copy.get('pod'):
             del(job_copy['pod'])
+
+        # FIXME job_schema.dump(job_copy) no time now to test
+        # since it needs to be run inside the cluster
         return jsonify({'job': job_copy}), 200
     else:
-        abort(404)
+        return jsonify({'message': 'The job {} doesn\'t exist'.
+                                   format(job_id)}), 400
 
+
+@app.route('/apispec', methods=['GET'])
+def get_openapi_spec():
+    """Get OpenAPI Spec.
+
+    FIXME add openapi spec
+    """
+    return jsonify(app.config['OPENAPI_SPEC'])
 
 if __name__ == '__main__':
     logging.basicConfig(
@@ -271,11 +271,17 @@ if __name__ == '__main__':
     job_event_reader_thread = threading.Thread(target=watch_jobs,
                                                args=(JOB_DB,
                                                      app.config['PYKUBE_API']))
+
     job_event_reader_thread.start()
     pod_event_reader_thread = threading.Thread(target=watch_pods,
                                                args=(JOB_DB,
                                                      app.config['PYKUBE_API']))
-    app.config['PYKUBE_CLIENT'] = create_api_client(app.config['PYKUBE_API'])
+    with app.app_context():
+        app.config['OPENAPI_SPEC'] = build_openapi_spec()
+        app.config['PYKUBE_CLIENT'] = create_api_client(
+            app.config['PYKUBE_API'])
+
     pod_event_reader_thread.start()
+
     app.run(debug=True, port=5000,
             host='0.0.0.0')

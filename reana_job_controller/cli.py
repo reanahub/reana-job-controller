@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
 # This file is part of REANA.
 # Copyright (C) 2017 CERN.
 #
@@ -18,15 +21,31 @@
 # granted to it by virtue of its status as an Intergovernmental Organization or
 # submit itself to any jurisdiction.
 
-include Dockerfile
-include COPYING
-include *.rst
-include *.sh
-include pytest.ini
-include docs/openapi.json
-recursive-include reana_job_controller *.json
-recursive-include docs *.py
-recursive-include docs *.png
-recursive-include docs *.rst
-recursive-include docs *.txt
-recursive-include tests *.py
+"""Click command-line interface for REANA Job Controller."""
+
+import io
+import json
+
+import click
+from flask import current_app
+from flask.cli import with_appcontext
+
+from .spec import build_openapi_spec
+
+
+@click.group()
+def openapi():
+    """Openapi management commands."""
+
+
+@openapi.command()
+@click.argument('output', type=click.File('w'))
+@with_appcontext
+def create(output):
+    """Generate OpenAPI file."""
+    spec = build_openapi_spec()
+    output.write(json.dumps(spec, indent=2, sort_keys=True))
+    if not isinstance(output, io.TextIOWrapper):
+        click.echo(
+            click.style('OpenAPI specification written to {}'.format(
+                output.name), fg='green'))

@@ -1,17 +1,6 @@
 REST API
 ========
 
-GET /jobs
----------
+The REANA Job Controller API offers different endpoints to create, manage and monitor jobs.
 
-.. autofunction:: reana_job_controller.app.get_jobs
-
-POST /jobs
-----------
-
-.. autofunction:: reana_job_controller.app.create_job
-
-GET /jobs/<job_id>
-------------------
-
-.. autofunction:: reana_job_controller.app.get_job
+.. openapi:: openapi.json
