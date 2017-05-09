@@ -161,6 +161,7 @@ def watch_jobs(job_db, config):
                     logging.warn(
                         'Job {} Pod still not known'.format(job.name)
                     )
+                pod = job_db[job.name].get('pod')
                 while job.exists():
                     logging.warn(
                         'Waiting for Job {} to be cleaned'.format(
@@ -168,6 +169,10 @@ def watch_jobs(job_db, config):
                         )
                     )
                     time.sleep(5)
+                logging.info(
+                    'Getting {} logs'.format(pod.name)
+                )
+                job_db[job.name]['log'] = pod.logs()
                 logging.info(
                     'Deleting {}\'s pod -> {}'.format(
                         job.name, job_db[job.name]['pod'].name

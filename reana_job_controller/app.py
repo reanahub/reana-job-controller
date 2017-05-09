@@ -84,7 +84,7 @@ def get_jobs():  # noqa
               {
                 "jobs": {
                   "1612a779-f3fa-4344-8819-3d12fa9b9d90": {
-                    "cmd": "sleep 1000",
+                    "cmd": "echo helloworld",
                     "cvmfs_mounts": [
                       "atlas-condb",
                       "atlas"
@@ -92,12 +92,13 @@ def get_jobs():  # noqa
                     "docker_img": "busybox",
                     "experiment": "atlas",
                     "job_id": "1612a779-f3fa-4344-8819-3d12fa9b9d90",
+                    "log": "helloworld\n",
                     "max_restart_count": 3,
                     "restart_count": 0,
                     "status": "succeeded"
                   },
                   "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20": {
-                    "cmd": "sleep 1000",
+                    "cmd": "echo helloworld",
                     "cvmfs_mounts": [
                       "atlas-condb",
                       "atlas"
@@ -105,6 +106,7 @@ def get_jobs():  # noqa
                     "docker_img": "busybox",
                     "experiment": "atlas",
                     "job_id": "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20",
+                    "log": "helloworld\n",
                     "max_restart_count": 3,
                     "restart_count": 0,
                     "status": "started"
@@ -222,7 +224,7 @@ def get_job(job_id):  # noqa
           examples:
             application/json:
               "job": {
-                "cmd": "sleep 1000",
+                "cmd": "echo helloworld",
                 "cvmfs_mounts": [
                   "atlas-condb",
                   "atlas"
@@ -230,6 +232,7 @@ def get_job(job_id):  # noqa
                 "docker_img": "busybox",
                 "experiment": "atlas",
                 "job_id": "cdcf48b1-c2f3-4693-8230-b066e088c6ac",
+                "log": "helloworld\n",
                 "max_restart_count": 3,
                 "restart_count": 0,
                 "status": "started"
