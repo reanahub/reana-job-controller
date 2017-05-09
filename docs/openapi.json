@@ -99,7 +99,7 @@
               "application/json": {
                 "jobs": {
                   "1612a779-f3fa-4344-8819-3d12fa9b9d90": {
-                    "cmd": "sleep 1000",
+                    "cmd": "date",
                     "cvmfs_mounts": [
                       "atlas-condb",
                       "atlas"
@@ -112,7 +112,7 @@
                     "status": "succeeded"
                   },
                   "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20": {
-                    "cmd": "sleep 1000",
+                    "cmd": "date",
                     "cvmfs_mounts": [
                       "atlas-condb",
                       "atlas"
@@ -205,7 +205,7 @@
             "examples": {
               "application/json": {
                 "job": {
-                  "cmd": "sleep 1000",
+                  "cmd": "date",
                   "cvmfs_mounts": [
                     "atlas-condb",
                     "atlas"
@@ -224,10 +224,51 @@
             }
           },
           "404": {
-            "description": "Request failed. The given job ID does not seem to exist."
+            "description": "Request failed. The given job ID does not seem to exist.",
+            "examples": {
+              "application/json": {
+                "message": "The job cdcf48b1-c2f3-4693-8230-b066e088444c doesn't exist"
+              }
+            }
           }
         },
         "summary": "Returns details about a given job."
+      }
+    },
+    "/jobs/{job_id}/logs": {
+      "get": {
+        "description": "This resource is expecting the job's UUID as a path parameter. Its information will be served in JSON format.",
+        "parameters": [
+          {
+            "description": "Required. ID of the job.",
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request succeeded. The response contains the logs for the given job.",
+            "examples": {
+              "application/json": {
+                "log": "Tue May 16 13:52:00 CEST 2017\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Request failed. The given job ID does not seem to exist.",
+            "examples": {
+              "application/json": {
+                "message": "The job cdcf48b1-c2f3-4693-8230-b066e088444c doesn't exist"
+              }
+            }
+          }
+        },
+        "summary": "Returns the logs for a given job."
       }
     }
   },

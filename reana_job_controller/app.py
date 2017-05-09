@@ -41,26 +41,73 @@ job_request_schema = JobRequest()
 job_schema = Job()
 
 
-def filter_jobs(job_db):
-    """Filter unsolicited job_db fields.
+def retrieve_job(job_id):
+    """Retrieve job from DB by id.
 
-    :param job_db: Dictionary which contains all jobs.
-    :returns: A copy of `job_db` without `obj`, `deleted` and `pod`
-        fields.
+    :param job_id: UUID which identifies the job to be retrieved.
+    :returns: Job object identified by `job_id`.
     """
-    job_db_copy = copy.deepcopy(job_db)
-    for job_name in job_db_copy:
-        del(job_db_copy[job_name]['obj'])
-        del(job_db_copy[job_name]['deleted'])
-        if job_db_copy[job_name].get('pod'):
-            del(job_db_copy[job_name]['pod'])
+    job = JOB_DB[job_id]
+    return {
+        "cmd": job['cmd']
+        if job.get('cmd') else '',
+        "cvmfs_mounts": job['cvmfs_mounts']
+        if job.get('cvmfs_mounts') else [],
+        "docker_img": job['docker_img'],
+        "experiment": job['experiment'],
+        "job_id": job['job_id'],
+        "max_restart_count": job['max_restart_count'],
+        "restart_count": job['restart_count'],
+        "status": job['status']
+    }
 
-    return job_db_copy
+
+def retrieve_all_jobs():
+    """Retrieve all jobs in the DB.
+
+    :return: A list with all current job objects.
+    """
+    job_list = []
+    for job_id in JOB_DB:
+        job = JOB_DB[job_id]
+        job_list.append({
+            job_id: {
+                "cmd": job['cmd']
+                if job.get('cmd') else '',
+                "cvmfs_mounts": job['cvmfs_mounts']
+                if job.get('cvmfs_mounts') else [],
+                "docker_img": job['docker_img'],
+                "experiment": job['experiment'],
+                "job_id": job['job_id'],
+                "max_restart_count": job['max_restart_count'],
+                "restart_count": job['restart_count'],
+                "status": job['status']
+            }
+        })
+    return job_list
+
+
+def job_exists(job_id):
+    """Check if the job exists in the DB.
+
+    :param job_id: UUID which identifies the job.
+    :returns: Boolean representing if the job exists.
+    """
+    return job_id in JOB_DB
+
+
+def retrieve_job_logs(job_id):
+    """Retrieve job's logs.
+
+    :param job_id: UUID which identifies the job.
+    :returns: Job's logs.
+    """
+    return JOB_DB[job_id].get('log')
 
 
 @app.route('/jobs', methods=['GET'])
 def get_jobs():  # noqa
-    """Get all jobs.
+    r"""Get all active jobs.
 
     ---
     get:
@@ -84,7 +131,7 @@ def get_jobs():  # noqa
               {
                 "jobs": {
                   "1612a779-f3fa-4344-8819-3d12fa9b9d90": {
-                    "cmd": "echo helloworld",
+                    "cmd": "date",
                     "cvmfs_mounts": [
                       "atlas-condb",
                       "atlas"
@@ -92,13 +139,12 @@ def get_jobs():  # noqa
                     "docker_img": "busybox",
                     "experiment": "atlas",
                     "job_id": "1612a779-f3fa-4344-8819-3d12fa9b9d90",
-                    "log": "helloworld\n",
                     "max_restart_count": 3,
                     "restart_count": 0,
                     "status": "succeeded"
                   },
                   "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20": {
-                    "cmd": "echo helloworld",
+                    "cmd": "date",
                     "cvmfs_mounts": [
                       "atlas-condb",
                       "atlas"
@@ -106,7 +152,6 @@ def get_jobs():  # noqa
                     "docker_img": "busybox",
                     "experiment": "atlas",
                     "job_id": "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20",
-                    "log": "helloworld\n",
                     "max_restart_count": 3,
                     "restart_count": 0,
                     "status": "started"
@@ -118,12 +163,12 @@ def get_jobs():  # noqa
     # of job list. Now it has the ID as key, it should be a plain
     # list of jobs so it can be validated with Marshmallow.
 
-    return jsonify({"jobs": filter_jobs(JOB_DB)}), 200
+    return jsonify({"jobs": retrieve_all_jobs()}), 200
 
 
 @app.route('/jobs', methods=['POST'])
 def create_job():  # noqa
-    """Create a new job.
+    r"""Create a new job.
 
     ---
     post:
@@ -164,7 +209,6 @@ def create_job():  # noqa
             Request failed. Internal controller error. The job could probably
             not have been allocated.
     """
-
     json_data = request.get_json()
     if not json_data:
         return jsonify({'message': 'Empty request'}), 400
@@ -175,7 +219,7 @@ def create_job():  # noqa
     if errors:
         return jsonify(errors), 400
 
-    job_obj = instantiate_job(job_request['job_id'],
+    job_obj = instantiate_job(str(job_request['job_id']),
                               job_request['docker_img'],
                               job_request['cmd'],
                               job_request['cvmfs_mounts'],
@@ -190,7 +234,7 @@ def create_job():  # noqa
         job['max_restart_count'] = 3
         job['obj'] = job_obj
         job['deleted'] = False
-        JOB_DB[job['job_id']] = job
+        JOB_DB[str(job['job_id'])] = job
         return jsonify({'job_id': job['job_id']}), 201
     else:
         return jsonify({'job': 'Could not be allocated'}), 500
@@ -198,7 +242,7 @@ def create_job():  # noqa
 
 @app.route('/jobs/<job_id>', methods=['GET'])
 def get_job(job_id):  # noqa
-    """Get a Job.
+    r"""Get a job.
 
     ---
     get:
@@ -224,7 +268,7 @@ def get_job(job_id):  # noqa
           examples:
             application/json:
               "job": {
-                "cmd": "echo helloworld",
+                "cmd": "date",
                 "cvmfs_mounts": [
                   "atlas-condb",
                   "atlas"
@@ -232,28 +276,62 @@ def get_job(job_id):  # noqa
                 "docker_img": "busybox",
                 "experiment": "atlas",
                 "job_id": "cdcf48b1-c2f3-4693-8230-b066e088c6ac",
-                "log": "helloworld\n",
                 "max_restart_count": 3,
                 "restart_count": 0,
                 "status": "started"
               }
         404:
           description: Request failed. The given job ID does not seem to exist.
+          examples:
+            application/json:
+              "message": >-
+                The job cdcf48b1-c2f3-4693-8230-b066e088444c doesn't exist
     """
-
-    if job_id in JOB_DB:
-        job_copy = copy.deepcopy(JOB_DB[job_id])
-        del(job_copy['obj'])
-        del(job_copy['deleted'])
-        if job_copy.get('pod'):
-            del(job_copy['pod'])
-
-        # FIXME job_schema.dump(job_copy) no time now to test
-        # since it needs to be run inside the cluster
-        return jsonify({'job': job_copy}), 200
+    if job_exists(job_id):
+        return jsonify({'job': retrieve_job(job_id)}), 200
     else:
-        return jsonify({'message': 'The job {} doesn\'t exist'.
-                                   format(job_id)}), 400
+        return jsonify({'message': 'The job {} doesn\'t exist'
+                                   .format(job_id)}), 400
+
+
+@app.route('/jobs/<job_id>/logs', methods=['GET'])
+def get_logs(job_id):  # noqa
+    r"""Job logs.
+
+    ---
+    get:
+      summary: Returns the logs for a given job.
+      description: >-
+        This resource is expecting the job's UUID as a path parameter. Its
+        information will be served in JSON format.
+      produces:
+       - application/json
+      parameters:
+       - name: job_id
+         in: path
+         description: Required. ID of the job.
+         required: true
+         type: string
+      responses:
+        200:
+          description: >-
+            Request succeeded. The response contains the logs for the given
+            job.
+          examples:
+            application/json:
+              "log": "Tue May 16 13:52:00 CEST 2017\n"
+        404:
+          description: Request failed. The given job ID does not seem to exist.
+          examples:
+            application/json:
+              "message": >-
+                The job cdcf48b1-c2f3-4693-8230-b066e088444c doesn't exist
+    """
+    if job_exists(job_id):
+        return retrieve_job_logs(job_id)
+    else:
+        return jsonify({'message': 'The job {} doesn\'t exist'
+                        .format(job_id)}), 400
 
 
 @app.route('/apispec', methods=['GET'])
@@ -269,7 +347,13 @@ if __name__ == '__main__':
         level=logging.DEBUG,
         format='%(asctime)s - %(threadName)s - %(levelname)s: %(message)s'
     )
+
     app.config.from_object('config')
+
+    with app.app_context():
+        app.config['OPENAPI_SPEC'] = build_openapi_spec()
+        app.config['PYKUBE_CLIENT'] = create_api_client(
+            app.config['PYKUBE_API'])
 
     job_event_reader_thread = threading.Thread(target=watch_jobs,
                                                args=(JOB_DB,
@@ -279,10 +363,6 @@ if __name__ == '__main__':
     pod_event_reader_thread = threading.Thread(target=watch_pods,
                                                args=(JOB_DB,
                                                      app.config['PYKUBE_API']))
-    with app.app_context():
-        app.config['OPENAPI_SPEC'] = build_openapi_spec()
-        app.config['PYKUBE_CLIENT'] = create_api_client(
-            app.config['PYKUBE_API'])
 
     pod_event_reader_thread.start()
 
