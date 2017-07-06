@@ -32,7 +32,7 @@ REANA_STORAGE_PATHS = {
     'atlas': '/reana/atlas',
     'cms': '/reana/cms',
     'lhcb': '/reana/lhcb',
-    'recast': '/reana/recast'
+    'default': '/reana/default'
 }
 
 CVMFS_REPOSITORIES = {

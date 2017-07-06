@@ -28,6 +28,7 @@ import threading
 import uuid
 
 from flask import Flask, abort, jsonify, request
+
 from reana_job_controller.k8s import (create_api_client, instantiate_job,
                                       watch_jobs, watch_pods)
 from reana_job_controller.schemas import Job, JobRequest
