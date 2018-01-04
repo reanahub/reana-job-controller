@@ -248,7 +248,7 @@ def watch_pods(job_db, config):
                     job_db[job_name]['restart_count'] = restarts
 
                     if restarts >= job_db[job_name]['max_restart_count'] and \
-                       exit_code == 1:
+                       exit_code != 0:
 
                         logging.info(
                             'Job {} reached max restarts...'.format(job_name)
