@@ -1,5 +1,5 @@
 # This file is part of REANA.
-# Copyright (C) 2017 CERN.
+# Copyright (C) 2017, 2018 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
@@ -18,7 +18,7 @@
 # granted to it by virtue of its status as an Intergovernmental Organization or
 # submit itself to any jurisdiction.
 
-FROM python:3.5
+FROM python:3.6
 ADD . /code
 WORKDIR /code
 RUN pip install -e .[all]
