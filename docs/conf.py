@@ -119,7 +119,7 @@ html_theme = 'alabaster'
 #
 html_theme_options = {
     'logo': 'logo-reana.png',
-    'description': 'REANA Job Controller',
+    'description': 'REANA-Job-Controller',
     'github_user': 'reanahub',
     'github_repo': 'reana-job-controller',
     'github_button': False,
