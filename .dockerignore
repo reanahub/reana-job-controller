@@ -1,5 +1,5 @@
 # This file is part of REANA.
-# Copyright (C) 2017 CERN.
+# Copyright (C) 2018 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
@@ -18,16 +18,14 @@
 # granted to it by virtue of its status as an Intergovernmental Organization or
 # submit itself to any jurisdiction.
 
-include Dockerfile
-include .dockerignore
-include COPYING
-include *.rst
-include *.sh
-include pytest.ini
-include docs/openapi.json
-recursive-include reana_job_controller *.json
-recursive-include docs *.py
-recursive-include docs *.png
-recursive-include docs *.rst
-recursive-include docs *.txt
-recursive-include tests *.py
+# Byte-compiled / optimized / DLL files
+**/__pycache__
+**/*.pyc
+
+eggs
+.eggs
+docs/_build
+.coverage
+.cache
+**/*.egg-info
+**/*.egg
