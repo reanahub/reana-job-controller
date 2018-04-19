@@ -1,6 +1,11 @@
 Changes
 =======
 
+Version 0.2.0 (2018-04-19)
+--------------------------
+
+- Adds dockerignore file to ease developments.
+
 Version 0.1.0 (2018-01-30)
 --------------------------
 

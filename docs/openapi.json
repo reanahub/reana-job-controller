@@ -47,9 +47,11 @@
     "JobRequest": {
       "properties": {
         "cmd": {
+          "default": "",
           "type": "string"
         },
         "cvmfs_mounts": {
+          "default": [],
           "items": {
             "type": "string"
           },
@@ -59,6 +61,7 @@
           "type": "string"
         },
         "env_vars": {
+          "default": {},
           "type": "object"
         },
         "experiment": {
@@ -69,6 +72,7 @@
           "type": "string"
         },
         "shared_file_system": {
+          "default": true,
           "type": "boolean"
         }
       },
