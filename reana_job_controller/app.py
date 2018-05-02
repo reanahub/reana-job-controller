@@ -226,8 +226,8 @@ def create_job():  # noqa
                               job_request['cvmfs_mounts'],
                               job_request['env_vars'],
                               job_request['experiment'],
-                              job_request['shared_file_system'])
-
+                              job_request['shared_file_system'],
+                              job_request.get('job_type'))
     if job_obj:
         job = copy.deepcopy(job_request)
         job['status'] = 'started'
@@ -251,6 +251,7 @@ def get_job(job_id):  # noqa
       description: >-
         This resource is expecting the job's UUID as a path parameter. Its
         information will be served in JSON format.
+      operationId: get_job
       produces:
        - application/json
       parameters:
@@ -289,7 +290,8 @@ def get_job(job_id):  # noqa
                 The job cdcf48b1-c2f3-4693-8230-b066e088444c doesn't exist
     """
     if job_exists(job_id):
-        return jsonify({'job': retrieve_job(job_id)}), 200
+        jobdict = retrieve_job(job_id)
+        return jsonify(jobdict), 200
     else:
         return jsonify({'message': 'The job {} doesn\'t exist'
                                    .format(job_id)}), 400
@@ -305,6 +307,7 @@ def get_logs(job_id):  # noqa
       description: >-
         This resource is expecting the job's UUID as a path parameter. Its
         information will be served in JSON format.
+      operationId: get_logs
       produces:
        - application/json
       parameters:
