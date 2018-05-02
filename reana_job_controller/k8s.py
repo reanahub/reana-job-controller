@@ -27,6 +27,7 @@ import os
 import time
 
 import pykube
+import docker
 from flask import current_app as app
 
 from reana_job_controller import volume_templates
@@ -60,7 +61,7 @@ def add_shared_volume(job):
 
 
 def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
-                    shared_file_system):
+                    shared_file_system, job_type='kube'):
     """Create Kubernetes job.
 
     :param job_id: Job uuid.
@@ -75,6 +76,17 @@ def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
     :returns: Kubernetes job object if the job was successfuly created,
         None if not.
     """
+    if job_type == 'docker':
+        client = docker.from_env()
+        if cmd:
+            import shlex
+            command = shlex.split(cmd)
+        result = client.containers.run(docker_img,
+                                       command=command,
+                                       environment=env_vars,
+                                       detach=True)
+        return result
+
     job = {
         'kind': 'Job',
         'apiVersion': 'batch/v1',

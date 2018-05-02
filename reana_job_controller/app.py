@@ -226,7 +226,8 @@ def create_job():  # noqa
                               job_request['cvmfs_mounts'],
                               job_request['env_vars'],
                               job_request['experiment'],
-                              job_request['shared_file_system'])
+                              job_request['shared_file_system'],
+                              job_request['job_type'])
 
     if job_obj:
         job = copy.deepcopy(job_request)
@@ -367,5 +368,5 @@ if __name__ == '__main__':
 
     pod_event_reader_thread.start()
 
-    app.run(debug=True, port=5000,
+    app.run(debug=True, port=5003,
             host='0.0.0.0')
