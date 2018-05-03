@@ -26,8 +26,8 @@ import logging
 import os
 import time
 
-import pykube
 import docker
+import pykube
 from flask import current_app as app
 
 from reana_job_controller import volume_templates
@@ -83,8 +83,7 @@ def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
             command = shlex.split(cmd)
         result = client.containers.run(docker_img,
                                        command=command,
-                                       environment=env_vars,
-                                       detach=True)
+                                       environment=env_vars)
         return result
 
     job = {

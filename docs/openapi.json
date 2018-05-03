@@ -71,6 +71,9 @@
           "format": "uuid",
           "type": "string"
         },
+        "job_type": {
+          "type": "string"
+        },
         "shared_file_system": {
           "default": true,
           "type": "boolean"
@@ -78,7 +81,8 @@
       },
       "required": [
         "docker_img",
-        "experiment"
+        "experiment",
+        "job_type"
       ],
       "type": "object"
     }
@@ -191,6 +195,7 @@
     "/jobs/{job_id}": {
       "get": {
         "description": "This resource is expecting the job's UUID as a path parameter. Its information will be served in JSON format.",
+        "operationId": "get_job",
         "parameters": [
           {
             "description": "Required. ID of the job.",
@@ -242,6 +247,7 @@
     "/jobs/{job_id}/logs": {
       "get": {
         "description": "This resource is expecting the job's UUID as a path parameter. Its information will be served in JSON format.",
+        "operationId": "get_logs",
         "parameters": [
           {
             "description": "Required. ID of the job.",
