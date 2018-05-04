@@ -227,8 +227,7 @@ def create_job():  # noqa
                               job_request['env_vars'],
                               job_request['experiment'],
                               job_request['shared_file_system'],
-                              job_request['job_type'])
-
+                              job_request.get('job_type'))
     if job_obj:
         job = copy.deepcopy(job_request)
         job['status'] = 'started'

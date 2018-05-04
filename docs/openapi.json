@@ -81,8 +81,7 @@
       },
       "required": [
         "docker_img",
-        "experiment",
-        "job_type"
+        "experiment"
       ],
       "type": "object"
     }
