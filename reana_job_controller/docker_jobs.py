@@ -22,6 +22,8 @@
 
 """Docker job controller."""
 
+import logging
+
 import docker
 
 
@@ -45,7 +47,18 @@ def instantiate_docker_job(job_id, docker_img, cmd, cvmfs_repos, env_vars,
     if cmd:
         import shlex
         command = shlex.split(cmd)
-    result = client.containers.run(docker_img,
-                                   command=command,
-                                   environment=env_vars)
-    return result
+    container = client.containers.run(docker_img,
+                                      command=command,
+                                      environment=env_vars,
+                                      auto_remove=True,
+                                      detach=True)
+    return container
+
+
+def watch_docker_jobs(job_db, config):
+    """Return the status of a docker job."""
+    client = docker.from_env()
+    while True:
+        logging.debug('Watching all running docker jobs.')
+        for log in client.containers.logs(**config):
+            print(log)

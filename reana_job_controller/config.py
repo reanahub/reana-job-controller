@@ -25,3 +25,7 @@
 import pykube
 
 PYKUBE_API = pykube.KubeConfig.from_service_account()
+
+DOCKER_LOGS = {
+    'stream': True
+}

@@ -29,7 +29,8 @@ import uuid
 
 from flask import Flask, abort, jsonify, request
 
-from reana_job_controller.docker_jobs import instantiate_docker_job
+from reana_job_controller.docker_jobs import (instantiate_docker_job,
+                                              watch_docker_jobs)
 from reana_job_controller.k8s import (create_api_client, instantiate_job,
                                       watch_jobs, watch_pods)
 from reana_job_controller.schemas import Job, JobRequest
@@ -356,6 +357,7 @@ def get_openapi_spec():
     """
     return jsonify(app.config['OPENAPI_SPEC'])
 
+
 if __name__ == '__main__':
     logging.basicConfig(
         level=logging.DEBUG,
@@ -379,6 +381,10 @@ if __name__ == '__main__':
                                                      app.config['PYKUBE_API']))
 
     pod_event_reader_thread.start()
+    docker_job_event_reader_thread = threading.Thread(
+        target=watch_docker_jobs,
+        args=(JOB_DB,
+              app.config['DOCKER_LOGS']))
 
     app.run(debug=True, port=5000,
             host='0.0.0.0')
