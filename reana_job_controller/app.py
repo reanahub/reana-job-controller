@@ -29,6 +29,7 @@ import uuid
 
 from flask import Flask, abort, jsonify, request
 
+from reana_job_controller.docker_jobs import instantiate_docker_job
 from reana_job_controller.k8s import (create_api_client, instantiate_job,
                                       watch_jobs, watch_pods)
 from reana_job_controller.schemas import Job, JobRequest
@@ -220,14 +221,23 @@ def create_job():  # noqa
     if errors:
         return jsonify(errors), 400
 
-    job_obj = instantiate_job(str(job_request['job_id']),
-                              job_request['docker_img'],
-                              job_request['cmd'],
-                              job_request['cvmfs_mounts'],
-                              job_request['env_vars'],
-                              job_request['experiment'],
-                              job_request['shared_file_system'],
-                              job_request.get('job_type'))
+    job_type = job_request.get('job_type')
+    if job_type == 'docker':
+        job_obj = instantiate_docker_job(str(job_request['job_id']),
+                                         job_request['docker_img'],
+                                         job_request['cmd'],
+                                         job_request['cvmfs_mounts'],
+                                         job_request['env_vars'],
+                                         job_request['experiment'],
+                                         job_request['shared_file_system'])
+    else:
+        job_obj = instantiate_job(str(job_request['job_id']),
+                                  job_request['docker_img'],
+                                  job_request['cmd'],
+                                  job_request['cvmfs_mounts'],
+                                  job_request['env_vars'],
+                                  job_request['experiment'],
+                                  job_request['shared_file_system'])
     if job_obj:
         job = copy.deepcopy(job_request)
         job['status'] = 'started'

@@ -66,6 +66,7 @@ setup_requires = [
 
 install_requires = [
     'Flask>=0.11',
+    'docker>=3.3.0',
     'pykube>=0.14.0',
     'apispec>=0.21.0',
     'marshmallow>=2.13',
