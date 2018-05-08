@@ -22,6 +22,21 @@
 
 """Flask application configuration."""
 
+import os
+
 import pykube
 
 PYKUBE_API = pykube.KubeConfig.from_service_account()
+
+BROKER_URL = os.getenv('RABBIT_MQ_URL',
+                       'message-broker.default.svc.cluster.local')
+
+BROKER_USER = os.getenv('RABBIT_MQ_USER', 'test')
+
+BROKER_PASS = os.getenv('RABBIT_MQ_PASS', '1234')
+
+BROKER = os.getenv('RABBIT_MQ', 'amqp://{0}:{1}@{2}//'.format(BROKER_USER,
+                                                              BROKER_PASS,
+                                                              BROKER_URL))
+
+BROKER_PORT = os.getenv('RABBIT_MQ_PORT', 5672)

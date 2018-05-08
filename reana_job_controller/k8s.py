@@ -26,10 +26,13 @@ import logging
 import os
 import time
 
+import json
+import pika
 import pykube
 from flask import current_app as app
 
 from reana_job_controller import volume_templates
+from .config import BROKER_USER, BROKER_PASS, BROKER_URL, BROKER_PORT
 
 
 def create_api_client(config):
@@ -145,6 +148,15 @@ def watch_jobs(job_db, config):
     :param job_db: Dictionary which contains all current jobs.
     :param config: configuration to connect to k8s apiserver.
     """
+    broker_credentials = pika.PlainCredentials(BROKER_USER,
+                                               BROKER_PASS)
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(BROKER_URL,
+                                  BROKER_PORT,
+                                  '/',
+                                  broker_credentials))
+    channel = connection.channel()
+    channel.queue_declare(queue='yadage-jobs')
     api_client = create_api_client(config)
     while True:
         logging.debug('Starting a new stream request to watch Jobs')
@@ -181,13 +193,26 @@ def watch_jobs(job_db, config):
                 )
                 job_db[job.name]['pod'].delete()
                 job_db[job.name]['deleted'] = True
-
+                channel.basic_publish(exchange='',
+                                      routing_key='yadage-jobs',
+                                      body=json.dumps({"job_name": job.name,
+                                                       "status": "deleted"}),
+                                      properties=pika.BasicProperties(
+                                          delivery_mode=2,  # msg persistent
+                                      ))
             elif (job.name in unended_jobs and
                   job.obj['status'].get('succeeded')):
                 logging.info(
                     'Job {} successfuly ended. Cleaning...'.format(job.name)
                 )
                 job_db[job.name]['status'] = 'succeeded'
+                channel.basic_publish(exchange='',
+                                      routing_key='yadage-jobs',
+                                      body=json.dumps({"job_name": job.name,
+                                                       "status": "succeeded"}),
+                                      properties=pika.BasicProperties(
+                                          delivery_mode=2,  # msg persistent
+                                      ))
                 job.delete()
 
             # with the current k8s implementation this is never
@@ -195,7 +220,15 @@ def watch_jobs(job_db, config):
             elif job.name in unended_jobs and job.obj['status'].get('failed'):
                 logging.info('Job {} failed. Cleaning...'.format(job.name))
                 job_db[job['metadata']['name']]['status'] = 'failed'
+                channel.basic_publish(exchange='',
+                                      routing_key='yadage-jobs',
+                                      body=json.dumps({"job_name": job.name,
+                                                       "status": "failed"}),
+                                      properties=pika.BasicProperties(
+                                          delivery_mode=2,  # msg persistent
+                                      ))
                 job.delete()
+    connection.close()
 
 
 def watch_pods(job_db, config):
@@ -225,6 +258,7 @@ def watch_pods(job_db, config):
                     'Storing {} as Job {} Pod'.format(pod.name, job_name)
                 )
                 job_db[job_name]['pod'] = pod
+                # TODO: publish pod to the queue
             # Take note of the related Pod
             if job_name in unended_jobs:
                 try:
@@ -246,6 +280,7 @@ def watch_pods(job_db, config):
                     )
 
                     job_db[job_name]['restart_count'] = restarts
+                    # TODO: publish restart count to the Q
 
                     if restarts >= job_db[job_name]['max_restart_count'] and \
                        exit_code != 0:
@@ -262,6 +297,7 @@ def watch_pods(job_db, config):
                             'Cleaning Job {}'.format(job_name)
                         )
                         job_db[job_name]['status'] = 'failed'
+                        # TODO: publish 'failed' to the Q
                         job_db[job_name]['obj'].delete()
 
                 except KeyError as e:

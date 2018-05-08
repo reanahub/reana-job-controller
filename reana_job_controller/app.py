@@ -346,6 +346,7 @@ def get_openapi_spec():
     """
     return jsonify(app.config['OPENAPI_SPEC'])
 
+
 if __name__ == '__main__':
     logging.basicConfig(
         level=logging.DEBUG,
