@@ -23,6 +23,7 @@ include .dockerignore
 include COPYING
 include *.rst
 include *.sh
+include *.txt
 include pytest.ini
 include docs/openapi.json
 recursive-include reana_job_controller *.json

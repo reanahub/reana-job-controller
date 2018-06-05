@@ -22,6 +22,5 @@
 
 """Flask application configuration."""
 
-import pykube
-
-PYKUBE_API = pykube.KubeConfig.from_service_account()
+MAX_JOB_RESTARTS = 3
+"""Number of retries for a job before considering it as failed."""

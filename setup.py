@@ -65,9 +65,9 @@ setup_requires = [
 ]
 
 install_requires = [
-    'Flask>=0.11',
-    'pykube>=0.14.0',
     'apispec>=0.21.0',
+    'Flask>=0.11',
+    'kubernetes>=6.0.0',
     'marshmallow>=2.13',
     'reana-commons>=0.1.0',
 ]

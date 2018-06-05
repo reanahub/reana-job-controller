@@ -22,22 +22,37 @@
 
 """Kubernetes wrapper."""
 
+import json
 import logging
 import os
 import time
+import traceback
 
-import pykube
-from reana_commons.models import Job
-from reana_commons.database import Session
 from flask import current_app as app
+from kubernetes import client
+from kubernetes import config as k8s_config
+from kubernetes import watch
+from kubernetes.client.models.v1_delete_options import V1DeleteOptions
+from reana_commons.database import Session
+from reana_commons.models import Job
 
-from reana_job_controller import volume_templates
+from reana_job_controller import config, volume_templates
 
 
-def create_api_client(config):
-    """Create pykube HTTPClient using config."""
-    api_client = pykube.HTTPClient(config)
-    api_client.session.verify = False
+def create_api_client(api='BatchV1'):
+    """Create pykube HTTPClient using config.
+
+    :param api: String which represents which Kubernetes API to spawn. By
+        default BatchV1.
+    :returns: Kubernetes python client object for a specific API i.e. BatchV1.
+    """
+    k8s_config.load_incluster_config()
+    api_configuration = client.Configuration()
+    api_configuration.verify_ssl = False
+    if api == 'CoreV1':
+        api_client = client.CoreV1Api()
+    else:
+        api_client = client.BatchV1Api()
     return api_client
 
 
@@ -85,6 +100,7 @@ def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
             'namespace': namespace
         },
         'spec': {
+            'backoffLimit': app.config['MAX_JOB_RESTARTS'],
             'autoSelector': True,
             'template': {
                 'metadata': {
@@ -100,7 +116,7 @@ def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
                         },
                     ],
                     'volumes': [],
-                    'restartPolicy': 'OnFailure'
+                    'restartPolicy': 'Never'
                 }
             }
         }
@@ -134,156 +150,82 @@ def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
 
     # add better handling
     try:
-        job_obj = pykube.Job(app.config['PYKUBE_CLIENT'], job)
-        job_obj.create()
-        return job_obj
-    except pykube.exceptions.HTTPError:
-        return None
+        api_response = \
+            app.config['KUBERNETES_CLIENT'].create_namespaced_job(
+                namespace=namespace, body=job)
+        return api_response.to_str()
+    except client.rest.ApiException as e:
+        logging.debug("Error while connecting to Kubernetes API: {}".format(e))
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        logging.debug("Unexpected error: {}".format(e))
 
 
-def watch_jobs(job_db, config):
+def watch_jobs(job_db):
     """Open stream connection to k8s apiserver to watch all jobs status.
 
     :param job_db: Dictionary which contains all current jobs.
     :param config: configuration to connect to k8s apiserver.
     """
-    api_client = create_api_client(config)
+    batchv1_api_client = create_api_client()
+    corev1_api_client = create_api_client('CoreV1')
     while True:
         logging.debug('Starting a new stream request to watch Jobs')
-        stream = pykube.Job.objects(
-            api_client).filter(namespace=pykube.all).watch()
-        for event in stream:
-            logging.info('New Job event received')
-            job = event.object
-            unended_jobs = [j for j in job_db.keys()
-                            if not job_db[j]['deleted']]
-
-            if job.name in unended_jobs and event.type == 'DELETED':
-                while not job_db[job.name].get('pod'):
-                    time.sleep(5)
-                    logging.warn(
-                        'Job {} Pod still not known'.format(job.name)
-                    )
-                pod = job_db[job.name].get('pod')
-                while job.exists():
-                    logging.warn(
-                        'Waiting for Job {} to be cleaned'.format(
-                            job.name
-                        )
-                    )
-                    time.sleep(5)
+        try:
+            w = watch.Watch()
+            for event in w.stream(
+                    batchv1_api_client.list_job_for_all_namespaces,
+                    _request_timeout=60):
                 logging.info(
-                    'Getting {} logs'.format(pod.name)
-                )
-                job_db[job.name]['log'] = pod.logs()
-                logging.info(
-                    'Deleting {}\'s pod -> {}'.format(
-                        job.name, job_db[job.name]['pod'].name
+                    'New Job event received: {0}'.format(event['type']))
+                job = event['object']
+
+                # Taking note of the remaining jobs since deletion might not
+                # happend straight away.
+                remaining_jobs = [j for j in job_db.keys()
+                                  if not job_db[j]['deleted']]
+                if (not job_db.get(job.metadata.name) or
+                        job.metadata.name not in remaining_jobs):
+                    # Ignore jobs not created by this specific instance
+                    # or already deleted jobs.
+                    continue
+                elif job.status.succeeded:
+                    logging.info(
+                        'Job {} succeeded.'.format(
+                            job.metadata.name)
                     )
-                )
-                job_db[job.name]['pod'].delete()
-                job_db[job.name]['deleted'] = True
-            elif (job.name in unended_jobs and
-                  job.obj['status'].get('succeeded')):
-                logging.info(
-                    'Job {} successfuly ended. Cleaning...'.format(job.name)
-                )
-                job_db[job.name]['status'] = 'succeeded'
-                job.delete()
-
-            # with the current k8s implementation this is never
-            # going to happen...
-            elif job.name in unended_jobs and job.obj['status'].get('failed'):
-                logging.info('Job {} failed. Cleaning...'.format(job.name))
-                job_db[job['metadata']['name']]['status'] = 'failed'
-                job.delete()
-
-
-def watch_pods(job_db, config):
-    """Open stream connection to k8s apiserver to watch all pods status.
-
-    :param job_db: Dictionary which contains all current jobs.
-    :param config: configuration to connect to k8s apiserver.
-    """
-    api_client = create_api_client(config)
-    while True:
-        logging.info('Starting a new stream request to watch Pods')
-        stream = pykube.Pod.objects(
-            api_client).filter(namespace=pykube.all).watch()
-        for event in stream:
-            logging.info('New Pod event received')
-            pod = event.object
-            unended_jobs = [j for j in job_db.keys()
-                            if not job_db[j]['deleted'] and
-                            job_db[j]['status'] != 'failed']
-            # FIXME: watch out here, if they change the naming convention at
-            # some point the following line won't work. Get job name from API.
-            job_name = '-'.join(pod.name.split('-')[:-1])
-            # Store existing job pod if not done yet
-            if job_name in job_db:
-                if job_db[job_name].get('pod'):
-                    logging.info('checking the pod logs')
-                    try:
-                        job_db[job_name]['log'] = pod.logs()
-                        logging.info('Storing job logs: {}'.
-                                     format(job_db[job_name]['log']))
-                        Session.query(Job).filter_by(id_=job_name).\
-                            update(dict(logs=job_db[job_name]['log']))
-                        Session.commit()
-
-                    except Exception as e:
-                        logging.debug('Could not retrieve'
-                                      ' logs for object: {}'.
-                                      format(pod))
-                        logging.debug('Exception: {}'.format(str(e)))
+                    job_db[job.metadata.name]['status'] = 'succeeded'
+                elif (job.status.failed and
+                      job.status.failed >= config.MAX_JOB_RESTARTS):
+                    logging.info('Job {} failed.'.format(
+                        job.metadata.name))
+                    job_db[job.metadata.name]['status'] = 'failed'
                 else:
-                    # Store job's pod
-                    logging.info(
-                        'Storing {} as Job {} Pod'.format(pod.name, job_name)
-                    )
-                    job_db[job_name]['pod'] = pod
-
-            # Take note of the related Pod
-            if job_name in unended_jobs:
-                try:
-                    restarts = (pod.obj['status']['containerStatuses'][0]
-                                ['restartCount'])
-                    exit_code = (pod.obj['status']
-                                 ['containerStatuses'][0]
-                                 ['state'].get('terminated', {})
-                                 .get('exitCode'))
-                    logging.info(
-                        pod.obj['status']['containerStatuses'][0]['state'].
-                        get('terminated', {})
-                    )
-
-                    logging.info(
-                        'Updating Pod {} restarts to {}'.format(
-                            pod.name, restarts
-                        )
-                    )
-
-                    job_db[job_name]['restart_count'] = restarts
-
-                    if restarts >= job_db[job_name]['max_restart_count'] and \
-                       exit_code != 0:
-
-                        logging.info(
-                            'Job {} reached max restarts...'.format(job_name)
-                        )
-
-                        logging.info(
-                            'Getting {} logs'.format(pod.name)
-                        )
-                        job_db[job_name]['log'] = pod.logs()
-                        logging.info(
-                            'Cleaning Job {}'.format(job_name)
-                        )
-                        job_db[job_name]['status'] = 'failed'
-                        job_db[job_name]['obj'].delete()
-
-                except KeyError as e:
-                    logging.debug('Skipping event because: {}'.format(e))
-                    logging.debug(
-                        'Event: {}\nObject:\n{}'.format(event.type, pod.obj)
-                    )
+                    continue
+                # Grab logs when job either succeeds or fails.
+                logging.info('Getting last spawned pod for job {}'.format(
+                    job.metadata.name))
+                last_spawned_pod = corev1_api_client.list_namespaced_pod(
+                    job.metadata.namespace,
+                    label_selector='job-name={job_name}'.format(
+                        job_name=job.metadata.name)).items[-1]
+                logging.info('Grabbing pod {} logs...'.format(
+                    last_spawned_pod.metadata.name))
+                job_db[job.metadata.name]['log'] = \
+                    corev1_api_client.read_namespaced_pod_log(
+                        namespace=last_spawned_pod.metadata.namespace,
+                        name=last_spawned_pod.metadata.name)
+                logging.info('Cleaning job {} ...'.format(
+                    job.metadata.name))
+                # Delete all depending pods.
+                delete_options = V1DeleteOptions(
+                    propagation_policy='Foreground')
+                batchv1_api_client.delete_namespaced_job(
+                    job.metadata.name, job.metadata.namespace, delete_options)
+                job_db[job.metadata.name]['deleted'] = True
+        except client.rest.ApiException as e:
+            logging.debug(
+                "Error while connecting to Kubernetes API: {}".format(e))
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            logging.debug("Unexpected error: {}".format(e))

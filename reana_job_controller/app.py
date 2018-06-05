@@ -33,7 +33,7 @@ from reana_commons.database import Session
 from reana_commons.models import Job as JobTable
 
 from reana_job_controller.k8s import (create_api_client, instantiate_job,
-                                      watch_jobs, watch_pods)
+                                      watch_jobs)
 from reana_job_controller.schemas import Job, JobRequest
 from reana_job_controller.spec import build_openapi_spec
 
@@ -237,8 +237,8 @@ def create_job():  # noqa
         job['status'] = 'started'
         job['restart_count'] = 0
         job['max_restart_count'] = 3
-        job['obj'] = job_obj
         job['deleted'] = False
+        job['obj'] = job_obj
         JOB_DB[str(job['job_id'])] = job
 
         job_db_entry = JobTable(
@@ -378,19 +378,12 @@ if __name__ == '__main__':
 
     with app.app_context():
         app.config['OPENAPI_SPEC'] = build_openapi_spec()
-        app.config['PYKUBE_CLIENT'] = create_api_client(
-            app.config['PYKUBE_API'])
+        app.config['KUBERNETES_CLIENT'] = create_api_client()
 
     job_event_reader_thread = threading.Thread(target=watch_jobs,
-                                               args=(JOB_DB,
-                                                     app.config['PYKUBE_API']))
+                                               args=(JOB_DB,))
 
     job_event_reader_thread.start()
-    pod_event_reader_thread = threading.Thread(target=watch_pods,
-                                               args=(JOB_DB,
-                                                     app.config['PYKUBE_API']))
-
-    pod_event_reader_thread.start()
 
     app.run(debug=True, port=5000,
             host='0.0.0.0')
