@@ -23,11 +23,14 @@
 """Rest API endpoint for job management."""
 
 import copy
+import json
 import logging
 import threading
 import uuid
 
 from flask import Flask, abort, jsonify, request
+from reana_commons.database import Session
+from reana_commons.models import Job as JobTable
 
 from reana_job_controller.k8s import (create_api_client, instantiate_job,
                                       watch_jobs, watch_pods)
@@ -220,14 +223,15 @@ def create_job():  # noqa
     if errors:
         return jsonify(errors), 400
 
-    job_obj = instantiate_job(str(job_request['job_id']),
-                              job_request['docker_img'],
-                              job_request['cmd'],
-                              job_request['cvmfs_mounts'],
-                              job_request['env_vars'],
-                              job_request['experiment'],
-                              job_request['shared_file_system'],
-                              job_request.get('job_type'))
+    job_parameters = dict(job_id=str(job_request['job_id']),
+                          docker_img=job_request['docker_img'],
+                          cmd=job_request['cmd'],
+                          cvmfs_repos=job_request['cvmfs_mounts'],
+                          env_vars=job_request['env_vars'],
+                          namespace=job_request['experiment'],
+                          shared_file_system=job_request['shared_file_system'],
+                          job_type=job_request.get('job_type'))
+    job_obj = instantiate_job(**job_parameters)
     if job_obj:
         job = copy.deepcopy(job_request)
         job['status'] = 'started'
@@ -236,6 +240,23 @@ def create_job():  # noqa
         job['obj'] = job_obj
         job['deleted'] = False
         JOB_DB[str(job['job_id'])] = job
+
+        job_db_entry = JobTable(
+            id_=job['job_id'],
+            workflow_uuid=job_request['workflow_uuid'],
+            status=job['status'],
+            job_type=job_request.get('job_type'),
+            cvmfs_mounts=job_request['cvmfs_mounts'],
+            shared_file_system=job_request['shared_file_system'],
+            docker_img=job_request['docker_img'],
+            experiment=job_request['experiment'],
+            cmd=job_request['cmd'],
+            env_vars=json.dumps(job_request['env_vars']),
+            restart_count=job['restart_count'],
+            max_restart_count=job['max_restart_count'],
+            deleted=job['deleted'])
+        Session.add(job_db_entry)
+        Session.commit()
         return jsonify({'job_id': job['job_id']}), 201
     else:
         return jsonify({'job': 'Could not be allocated'}), 500
