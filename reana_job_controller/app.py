@@ -91,6 +91,11 @@ def retrieve_all_jobs():
     return job_list
 
 
+def is_cached(job_parameters):
+    """Check if job result exists in the cache."""
+    Session.query(JobCache).filter_by()
+
+
 def job_exists(job_id):
     """Check if the job exists in the DB.
 
@@ -231,6 +236,9 @@ def create_job():  # noqa
                           namespace=job_request['experiment'],
                           shared_file_system=job_request['shared_file_system'],
                           job_type=job_request.get('job_type'))
+    result = is_cached(job_parameters)
+    if result:
+        return jsonify({'job_id': 'cached', 'result_path': result})
     job_obj = instantiate_job(**job_parameters)
     if job_obj:
         job = copy.deepcopy(job_request)
