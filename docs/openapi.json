@@ -93,6 +93,56 @@
   },
   "parameters": {},
   "paths": {
+    "/job_cache": {
+      "get": {
+        "description": "This resource takes a job specification and the workflow json, and checks if the job to be created, already exists in the cache.",
+        "operationId": "check_if_cached",
+        "parameters": [
+          {
+            "description": "Required. Specification of the job.",
+            "in": "query",
+            "name": "job_spec",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Required. Specification of the workflow.",
+            "in": "query",
+            "name": "workflow_json",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Required. Path to workflow workspace.",
+            "in": "query",
+            "name": "workflow_workspace",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request succeeded. Returns boolean depicting if job is in cache.",
+            "examples": {
+              "application/json": {
+                "cached": true,
+                "result_path": "/reana/default/0000/xe2123d/archive/asd213"
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed. The incoming data specification seems malformed."
+          },
+          "500": {
+            "description": "Request failed. Internal controller error."
+          }
+        },
+        "summary": "Returns boolean depicting if job is in cache."
+      }
+    },
     "/jobs": {
       "get": {
         "description": "This resource is not expecting parameters and it will return a list representing all active jobs in JSON format.",

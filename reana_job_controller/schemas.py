@@ -52,7 +52,6 @@ class JobRequest(Schema):
     env_vars = fields.Dict(missing={})
     shared_file_system = fields.Bool(missing=True)
     job_type = fields.Str(required=False)
-    workflow_uuid = fields.UUID(required=True)
 
     @pre_load
     def make_id(self, data):

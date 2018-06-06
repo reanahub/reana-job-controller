@@ -26,11 +26,13 @@ import copy
 import json
 import logging
 import threading
-import uuid
 
 from flask import Flask, abort, jsonify, request
 from reana_commons.database import Session
 from reana_commons.models import Job as JobTable
+from reana_commons.models import JobCache
+from reana_commons.utils import calculate_job_input_hash, \
+    calculate_hash_of_dir
 
 from reana_job_controller.k8s import (create_api_client, instantiate_job,
                                       watch_jobs)
@@ -91,9 +93,18 @@ def retrieve_all_jobs():
     return job_list
 
 
-def is_cached(job_parameters):
+def is_cached(job_spec, workflow_json, workflow_workspace):
     """Check if job result exists in the cache."""
-    Session.query(JobCache).filter_by()
+    input_hash = calculate_job_input_hash(job_spec, workflow_json)
+    workspace_hash = calculate_hash_of_dir(workflow_workspace.
+                                           replace('data', 'reana/default'))
+    cached_job = Session.query(JobCache).filter_by(
+        input_hash=input_hash,
+        workspace_hash=workspace_hash).first()
+    if cached_job:
+        return cached_job.result_path
+    else:
+        return None
 
 
 def job_exists(job_id):
@@ -112,6 +123,66 @@ def retrieve_job_logs(job_id):
     :returns: Job's logs.
     """
     return JOB_DB[job_id].get('log')
+
+
+@app.route('/job_cache', methods=['GET'])
+def check_if_cached():
+    r"""Check if job is cached.
+
+    ---
+    get:
+      summary: Returns boolean depicting if job is in cache.
+      description: >-
+        This resource takes a job specification and the
+        workflow json, and checks if the job to be created,
+        already exists in the cache.
+      operationId: check_if_cached
+      parameters:
+       - name: job_spec
+         in: query
+         description: Required. Specification of the job.
+         required: true
+         type: string
+       - name: workflow_json
+         in: query
+         description: Required. Specification of the workflow.
+         required: true
+         type: string
+       - name: workflow_workspace
+         in: query
+         description: Required. Path to workflow workspace.
+         required: true
+         type: string
+      produces:
+       - application/json
+      responses:
+        200:
+          description: >-
+            Request succeeded. Returns boolean depicting if job is in
+            cache.
+          examples:
+            application/json:
+              {
+                "cached": True,
+                "result_path": "/reana/default/0000/xe2123d/archive/asd213"
+              }
+        400:
+          description: >-
+            Request failed. The incoming data specification seems malformed.
+        500:
+          description: >-
+            Request failed. Internal controller error.
+    """
+    job_spec = json.loads(request.args['job_spec'])
+    workflow_json = json.loads(request.args['workflow_json'])
+    workflow_workspace = request.args['workflow_workspace']
+    path = is_cached(job_spec, workflow_json, workflow_workspace)
+    if path:
+        return jsonify({"cached": True,
+                        "result_path": path}), 200
+    else:
+        return jsonify({"cached": False,
+                        "result_path": None}), 200
 
 
 @app.route('/jobs', methods=['GET'])
@@ -227,7 +298,6 @@ def create_job():  # noqa
 
     if errors:
         return jsonify(errors), 400
-
     job_parameters = dict(job_id=str(job_request['job_id']),
                           docker_img=job_request['docker_img'],
                           cmd=job_request['cmd'],
@@ -236,9 +306,9 @@ def create_job():  # noqa
                           namespace=job_request['experiment'],
                           shared_file_system=job_request['shared_file_system'],
                           job_type=job_request.get('job_type'))
-    result = is_cached(job_parameters)
-    if result:
-        return jsonify({'job_id': 'cached', 'result_path': result})
+    if is_cached(job_request):
+        restore_from_cache(job_request)
+        return jsonify({'job_id': 'cached'}), 201
     job_obj = instantiate_job(**job_parameters)
     if job_obj:
         job = copy.deepcopy(job_request)
