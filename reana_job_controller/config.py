@@ -22,5 +22,10 @@
 
 """Flask application configuration."""
 
+import os
+
 MAX_JOB_RESTARTS = 3
 """Number of retries for a job before considering it as failed."""
+
+SHARED_VOLUME_PATH_ROOT = os.getenv("SHARED_VOLUME_PATH_ROOT", '/reana')
+"""Root path in the underlying shared file system."""

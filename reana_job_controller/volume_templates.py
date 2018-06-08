@@ -25,14 +25,16 @@
 import json
 from string import Template
 
+from reana_job_controller.config import SHARED_VOLUME_PATH_ROOT
+
 CEPHFS_SECRET_NAME = 'ceph-secret'
 
 REANA_STORAGE_PATHS = {
-    'alice': '/reana/alice',
-    'atlas': '/reana/atlas',
-    'cms': '/reana/cms',
-    'lhcb': '/reana/lhcb',
-    'default': '/reana/default'
+    'alice': '{}/alice'.format(SHARED_VOLUME_PATH_ROOT),
+    'atlas': '{}/atlas'.format(SHARED_VOLUME_PATH_ROOT),
+    'cms': '{}/cms'.format(SHARED_VOLUME_PATH_ROOT),
+    'lhcb': '{}/lhcb'.format(SHARED_VOLUME_PATH_ROOT),
+    'default': '{}/default'.format(SHARED_VOLUME_PATH_ROOT),
 }
 
 CVMFS_REPOSITORIES = {
