@@ -27,6 +27,8 @@ import os
 import time
 
 import pykube
+from reana_commons.models import Job
+from reana_commons.database import Session
 from flask import current_app as app
 
 from reana_job_controller import volume_templates
@@ -127,7 +129,7 @@ def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
             (job['spec']['template']['spec']['containers'][0]
                 ['volumeMounts'].append(
                     {'name': volume['name'], 'mountPath': mount_path}
-                ))
+            ))
             job['spec']['template']['spec']['volumes'].append(volume)
 
     # add better handling
@@ -181,7 +183,6 @@ def watch_jobs(job_db, config):
                 )
                 job_db[job.name]['pod'].delete()
                 job_db[job.name]['deleted'] = True
-
             elif (job.name in unended_jobs and
                   job.obj['status'].get('succeeded')):
                 logging.info(
@@ -219,12 +220,29 @@ def watch_pods(job_db, config):
             # some point the following line won't work. Get job name from API.
             job_name = '-'.join(pod.name.split('-')[:-1])
             # Store existing job pod if not done yet
-            if job_name in job_db and not job_db[job_name].get('pod'):
-                # Store job's pod
-                logging.info(
-                    'Storing {} as Job {} Pod'.format(pod.name, job_name)
-                )
-                job_db[job_name]['pod'] = pod
+            if job_name in job_db:
+                if job_db[job_name].get('pod'):
+                    logging.info('checking the pod logs')
+                    try:
+                        job_db[job_name]['log'] = pod.logs()
+                        logging.info('Storing job logs: {}'.
+                                     format(job_db[job_name]['log']))
+                        Session.query(Job).filter_by(id_=job_name).\
+                            update(dict(logs=job_db[job_name]['log']))
+                        Session.commit()
+
+                    except Exception as e:
+                        logging.debug('Could not retrieve'
+                                      ' logs for object: {}'.
+                                      format(pod))
+                        logging.debug('Exception: {}'.format(str(e)))
+                else:
+                    # Store job's pod
+                    logging.info(
+                        'Storing {} as Job {} Pod'.format(pod.name, job_name)
+                    )
+                    job_db[job_name]['pod'] = pod
+
             # Take note of the related Pod
             if job_name in unended_jobs:
                 try:

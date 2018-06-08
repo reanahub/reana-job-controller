@@ -19,9 +19,22 @@
 # submit itself to any jurisdiction.
 
 FROM python:3.6
+
+ENV TERM=xterm
+RUN apt-get update && \
+    apt-get install -y vim-tiny && \
+    pip install --upgrade pip
+
+RUN pip install -e git://github.com/reanahub/reana-commons.git#egg=reana-commons
+
 ADD . /code
 WORKDIR /code
-RUN pip install -e .[all]
+
+# Debug off by default
+ARG DEBUG=false
+
+RUN if [ "${DEBUG}" = "true" ]; then pip install -r requirements-dev.txt; pip install -e .[all]; else pip install .[all]; fi;
+
 RUN adduser --uid 1000 --disabled-password --gecos '' reanauser && \
     chown -R reanauser:reanauser /code
 USER reanauser

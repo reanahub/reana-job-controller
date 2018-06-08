@@ -69,6 +69,7 @@ install_requires = [
     'pykube>=0.14.0',
     'apispec>=0.21.0',
     'marshmallow>=2.13',
+    'reana-commons>=0.1.0',
 ]
 
 packages = find_packages()
