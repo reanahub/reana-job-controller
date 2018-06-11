@@ -243,7 +243,8 @@ def create_job():  # noqa
 
         job_db_entry = JobTable(
             id_=job['job_id'],
-            workflow_uuid=job_request['workflow_uuid'],
+            workflow_uuid=None,
+            # The workflow_uuid is populated by the workflow-controller
             status=job['status'],
             job_type=job_request.get('job_type'),
             cvmfs_mounts=job_request['cvmfs_mounts'],

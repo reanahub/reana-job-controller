@@ -77,16 +77,11 @@
         "shared_file_system": {
           "default": true,
           "type": "boolean"
-        },
-        "workflow_uuid": {
-          "format": "uuid",
-          "type": "string"
         }
       },
       "required": [
         "docker_img",
-        "experiment",
-        "workflow_uuid"
+        "experiment"
       ],
       "type": "object"
     }
