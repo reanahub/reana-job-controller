@@ -215,6 +215,20 @@ def watch_jobs(job_db):
                     corev1_api_client.read_namespaced_pod_log(
                         namespace=last_spawned_pod.metadata.namespace,
                         name=last_spawned_pod.metadata.name)
+                # Store job logs
+                try:
+                    logging.info('Storing job logs: {}'.
+                                 format(job_db[job.metadata.name]['log']))
+                    Session.query(Job).filter_by(id_=job.metadata.name).\
+                        update(dict(logs=job_db[job.metadata.name]['log']))
+                    Session.commit()
+
+                except Exception as e:
+                    logging.debug('Could not retrieve'
+                                  ' logs for object: {}'.
+                                  format(last_spawned_pod))
+                    logging.debug('Exception: {}'.format(str(e)))
+
                 logging.info('Cleaning job {} ...'.format(
                     job.metadata.name))
                 # Delete all depending pods.
