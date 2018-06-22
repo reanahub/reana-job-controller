@@ -20,7 +20,6 @@
 
 FROM python:3.6
 
-ENV TERM=xterm
 RUN apt-get update && \
     apt-get install -y vim-tiny && \
     pip install --upgrade pip
@@ -38,5 +37,17 @@ RUN if [ "${DEBUG}" = "true" ]; then pip install -r requirements-dev.txt; pip in
 RUN adduser --uid 1000 --disabled-password --gecos '' reanauser && \
     chown -R reanauser:reanauser /code
 USER reanauser
+
+ARG UWSGI_PROCESSES=2
+ENV UWSGI_PROCESSES ${UWSGI_PROCESSES:-2}
+ARG UWSGI_THREADS=2
+ENV UWSGI_THREADS ${UWSGI_THREADS:-2}
+ENV TERM=xterm
+
 EXPOSE 5000
-CMD ["python", "reana_job_controller/app.py"]
+
+CMD uwsgi --module reana_job_controller.app:app \
+    --http-socket 0.0.0.0:5000 --master \
+    --processes ${UWSGI_PROCESSES} \
+    --threads ${UWSGI_THREADS} \
+    --stats /tmp/stats.socket
