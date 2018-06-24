@@ -1,5 +1,5 @@
 ======================
- REANA Job Controller
+ REANA-Job-Controller
 ======================
 
 .. image:: https://img.shields.io/travis/reanahub/reana-job-controller.svg
@@ -23,14 +23,14 @@
 About
 -----
 
-REANA-Job-Controller is a component of the `REANA <http://reanahub.io/>`_
-reusable analysis platform. It takes care of executing and managing jobs on
-compute clouds.
+REANA-Job-Controller is a component of the `REANA <http://www.reana.io/>`_
+reusable and reproducible research data analysis platform. It takes care of
+executing and managing jobs on compute clouds.
 
 Features
 --------
 
-- submit jobs to compute cloud
+- submit jobs to compute clouds
 - enquire about status of running jobs
 
 Useful links
@@ -42,4 +42,5 @@ Useful links
 - `source code <https://github.com/reanahub/reana-job-controller>`_
 
 For more information about the REANA reusable analysis platform, please see the
-general `REANA documentation <http://reana.readthedocs.io/>`_.
+`REANA project <http://www.reana.io>`_ home page and the general `REANA
+documentation <http://reana.readthedocs.io/>`_ pages.
