@@ -70,9 +70,6 @@ install_requires = [
     'kubernetes>=6.0.0',
     'marshmallow>=2.13',
     'reana-commons>=0.1.0',
-    'uwsgi-tools>=1.1.1',
-    'uWSGI>=2.0.17',
-    'uwsgitop>=0.10',
 ]
 
 packages = find_packages()

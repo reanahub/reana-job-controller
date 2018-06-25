@@ -369,21 +369,22 @@ def get_openapi_spec():
     return jsonify(app.config['OPENAPI_SPEC'])
 
 
-app.config.from_object('reana_job_controller.config')
-
-with app.app_context():
-    app.config['OPENAPI_SPEC'] = build_openapi_spec()
-    app.config['KUBERNETES_CLIENT'] = create_api_client()
-
-job_event_reader_thread = threading.Thread(target=watch_jobs,
-                                            args=(JOB_DB,))
-
-job_event_reader_thread.start()
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(threadName)s - %(levelname)s: %(message)s'
-)
-
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(threadName)s - %(levelname)s: %(message)s'
+    )
+
+    app.config.from_object('config')
+
+    with app.app_context():
+        app.config['OPENAPI_SPEC'] = build_openapi_spec()
+        app.config['KUBERNETES_CLIENT'] = create_api_client()
+
+    job_event_reader_thread = threading.Thread(target=watch_jobs,
+                                               args=(JOB_DB,))
+
+    job_event_reader_thread.start()
+
+    app.run(debug=True, port=5000,
+            host='0.0.0.0')
