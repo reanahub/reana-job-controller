@@ -174,8 +174,7 @@ def watch_jobs(job_db):
         try:
             w = watch.Watch()
             for event in w.stream(
-                    batchv1_api_client.list_job_for_all_namespaces,
-                    _request_timeout=60):
+                    batchv1_api_client.list_job_for_all_namespaces):
                 logging.info(
                     'New Job event received: {0}'.format(event['type']))
                 job = event['object']
@@ -233,7 +232,7 @@ def watch_jobs(job_db):
                     job.metadata.name))
                 # Delete all depending pods.
                 delete_options = V1DeleteOptions(
-                    propagation_policy='Foreground')
+                    propagation_policy='Background')
                 batchv1_api_client.delete_namespaced_job(
                     job.metadata.name, job.metadata.namespace, delete_options)
                 job_db[job.metadata.name]['deleted'] = True
