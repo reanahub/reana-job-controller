@@ -31,8 +31,7 @@ from flask import Flask, abort, jsonify, request
 from reana_commons.database import Session
 from reana_commons.models import Job as JobTable
 from reana_commons.models import JobCache
-from reana_commons.utils import calculate_job_input_hash, \
-    calculate_hash_of_dir
+from reana_commons.utils import calculate_hash_of_dir, calculate_job_input_hash
 
 from reana_job_controller.k8s import (create_api_client, instantiate_job,
                                       watch_jobs)
@@ -99,10 +98,11 @@ def is_cached(job_spec, workflow_json, workflow_workspace):
     workspace_hash = calculate_hash_of_dir(workflow_workspace.
                                            replace('data', 'reana/default'))
     cached_job = Session.query(JobCache).filter_by(
-        input_hash=input_hash,
+        parameters=input_hash,
         workspace_hash=workspace_hash).first()
     if cached_job:
-        return cached_job.result_path
+        return {'result_path': cached_job.result_path,
+                'job_id': cached_job.job_id}
     else:
         return None
 
@@ -172,14 +172,16 @@ def check_if_cached():
         500:
           description: >-
             Request failed. Internal controller error.
+
     """
     job_spec = json.loads(request.args['job_spec'])
     workflow_json = json.loads(request.args['workflow_json'])
     workflow_workspace = request.args['workflow_workspace']
-    path = is_cached(job_spec, workflow_json, workflow_workspace)
-    if path:
+    result = is_cached(job_spec, workflow_json, workflow_workspace)
+    if result:
         return jsonify({"cached": True,
-                        "result_path": path}), 200
+                        "result_path": result['result_path'],
+                        "job_id": result['job_id']}), 200
     else:
         return jsonify({"cached": False,
                         "result_path": None}), 200
@@ -306,9 +308,6 @@ def create_job():  # noqa
                           namespace=job_request['experiment'],
                           shared_file_system=job_request['shared_file_system'],
                           job_type=job_request.get('job_type'))
-    if is_cached(job_request):
-        restore_from_cache(job_request)
-        return jsonify({'job_id': 'cached'}), 201
     job_obj = instantiate_job(**job_parameters)
     if job_obj:
         job = copy.deepcopy(job_request)
