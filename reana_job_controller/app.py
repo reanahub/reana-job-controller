@@ -95,8 +95,7 @@ def retrieve_all_jobs():
 def is_cached(job_spec, workflow_json, workflow_workspace):
     """Check if job result exists in the cache."""
     input_hash = calculate_job_input_hash(job_spec, workflow_json)
-    workspace_hash = calculate_hash_of_dir(workflow_workspace.
-                                           replace('data', 'reana/default'))
+    workspace_hash = calculate_hash_of_dir(workflow_workspace)
     cached_job = Session.query(JobCache).filter_by(
         parameters=input_hash,
         workspace_hash=workspace_hash).first()
@@ -177,7 +176,10 @@ def check_if_cached():
     job_spec = json.loads(request.args['job_spec'])
     workflow_json = json.loads(request.args['workflow_json'])
     workflow_workspace = request.args['workflow_workspace']
-    result = is_cached(job_spec, workflow_json, workflow_workspace)
+    # Access the correct directory depending on the experiment.
+    contextualized_workspace = workflow_workspace.replace('data',
+      'reana/{}'.format(job_spec['experiment']))
+    result = is_cached(job_spec, workflow_json, contextualized_workspace)
     if result:
         return jsonify({"cached": True,
                         "result_path": result['result_path'],
