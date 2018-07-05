@@ -96,6 +96,9 @@ def is_cached(job_spec, workflow_json, workflow_workspace):
     """Check if job result exists in the cache."""
     input_hash = calculate_job_input_hash(job_spec, workflow_json)
     workspace_hash = calculate_hash_of_dir(workflow_workspace)
+    if workspace_hash == -1:
+        return None
+
     cached_job = Session.query(JobCache).filter_by(
         parameters=input_hash,
         workspace_hash=workspace_hash).first()
