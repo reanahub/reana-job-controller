@@ -31,7 +31,8 @@ from flask import Flask, abort, jsonify, request
 from reana_commons.database import Session
 from reana_commons.models import Job as JobTable
 from reana_commons.models import JobCache
-from reana_commons.utils import calculate_hash_of_dir, calculate_job_input_hash
+from reana_commons.utils import calculate_hash_of_dir, \
+    calculate_job_input_hash, calculate_file_access_time
 
 from reana_job_controller.k8s import (create_api_client, instantiate_job,
                                       watch_jobs)
@@ -180,8 +181,8 @@ def check_if_cached():
     workflow_json = json.loads(request.args['workflow_json'])
     workflow_workspace = request.args['workflow_workspace']
     # Access the correct directory depending on the experiment.
-    contextualized_workspace = workflow_workspace.replace('data',
-      'reana/{}'.format(job_spec['experiment']))
+    contextualized_workspace = workflow_workspace.replace(
+        'data', 'reana/{}'.format(job_spec['experiment']))
     result = is_cached(job_spec, workflow_json, contextualized_workspace)
     if result:
         return jsonify({"cached": True,
@@ -340,6 +341,14 @@ def create_job():  # noqa
             deleted=job['deleted'])
         Session.add(job_db_entry)
         Session.commit()
+        access_times = calculate_file_access_time(
+            json_data['workflow_workspace'])
+        prepared_job_cache = JobCache()
+        prepared_job_cache.job_id = job['job_id']
+        prepared_job_cache.access_times = access_times
+        Session.add(prepared_job_cache)
+        Session.commit()
+
         return jsonify({'job_id': job['job_id']}), 201
     else:
         return jsonify({'job': 'Could not be allocated'}), 500
