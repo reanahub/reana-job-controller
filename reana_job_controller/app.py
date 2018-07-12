@@ -27,12 +27,13 @@ import json
 import logging
 import threading
 
-from flask import Flask, abort, jsonify, request
+from flask import Flask, jsonify, request
 from reana_commons.database import Session
 from reana_commons.models import Job as JobTable
 from reana_commons.models import JobCache
-from reana_commons.utils import calculate_hash_of_dir, \
-    calculate_job_input_hash, calculate_file_access_time
+from reana_commons.utils import (calculate_file_access_time,
+                                 calculate_hash_of_dir,
+                                 calculate_job_input_hash)
 
 from reana_job_controller.k8s import (create_api_client, instantiate_job,
                                       watch_jobs)
@@ -303,6 +304,8 @@ def create_job():  # noqa
 
     # Validate and deserialize input
     job_request, errors = job_request_schema.load(json_data)
+    json_data['workflow_workspace'] = json_data['workflow_workspace'].replace(
+        'data', 'reana/{}'.format(job_request['experiment']))
 
     if errors:
         return jsonify(errors), 400
