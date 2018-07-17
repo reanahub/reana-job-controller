@@ -29,14 +29,6 @@ from reana_job_controller.config import SHARED_VOLUME_PATH_ROOT
 
 CEPHFS_SECRET_NAME = 'ceph-secret'
 
-REANA_STORAGE_PATHS = {
-    'alice': '{}/alice'.format(SHARED_VOLUME_PATH_ROOT),
-    'atlas': '{}/atlas'.format(SHARED_VOLUME_PATH_ROOT),
-    'cms': '{}/cms'.format(SHARED_VOLUME_PATH_ROOT),
-    'lhcb': '{}/lhcb'.format(SHARED_VOLUME_PATH_ROOT),
-    'default': '{}/default'.format(SHARED_VOLUME_PATH_ROOT),
-}
-
 CVMFS_REPOSITORIES = {
     'alice': 'alice.cern.ch',
     'alice-ocdb': 'alice-ocdb.cern.ch',
@@ -107,7 +99,7 @@ def get_k8s_cephfs_volume(experiment):
     """
     return json.loads(
         K8S_CEPHFS_TEMPLATE.substitute(experiment=experiment,
-                                       path=REANA_STORAGE_PATHS[experiment],
+                                       path=SHARED_VOLUME_PATH_ROOT,
                                        secret_name=CEPHFS_SECRET_NAME)
     )
 
@@ -119,8 +111,8 @@ def get_k8s_cvmfs_volume(experiment, repository):
     :returns: k8s CVMFS volume spec as a dictionary.
     """
     if repository in CVMFS_REPOSITORIES:
-        return json.loads(K8S_CVMFS_TEMPLATE.substitute(experiment=experiment,
-                                                        repository=repository))
+        return json.loads(K8S_CVMFS_TEMPLATE.substitute(
+            experiment=experiment, repository=repository))
     else:
         raise ValueError('The provided repository doesn\'t exist')
 
@@ -133,5 +125,5 @@ def get_k8s_hostpath_volume(experiment):
     """
     return json.loads(
         K8S_HOSTPATH_TEMPLATE.substitute(experiment=experiment,
-                                         path=REANA_STORAGE_PATHS[experiment])
+                                         path=SHARED_VOLUME_PATH_ROOT)
     )
