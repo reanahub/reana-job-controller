@@ -43,8 +43,6 @@ CVMFS_REPOSITORIES = {
     'geant4': 'geant4.cern.ch'
 }
 
-REANA_STORAGE_MOUNT_PATH = '/data'
-
 K8S_CEPHFS_TEMPLATE = Template("""{
     "name": "$experiment-shared-volume",
     "cephfs": {
