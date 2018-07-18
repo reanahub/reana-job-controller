@@ -181,10 +181,7 @@ def check_if_cached():
     job_spec = json.loads(request.args['job_spec'])
     workflow_json = json.loads(request.args['workflow_json'])
     workflow_workspace = request.args['workflow_workspace']
-    # Access the correct directory depending on the experiment.
-    contextualized_workspace = workflow_workspace.replace(
-        'data', 'reana/{}'.format(job_spec['experiment']))
-    result = is_cached(job_spec, workflow_json, contextualized_workspace)
+    result = is_cached(job_spec, workflow_json, workflow_workspace)
     if result:
         return jsonify({"cached": True,
                         "result_path": result['result_path'],
@@ -304,8 +301,6 @@ def create_job():  # noqa
 
     # Validate and deserialize input
     job_request, errors = job_request_schema.load(json_data)
-    json_data['workflow_workspace'] = json_data['workflow_workspace'].replace(
-        'data', 'reana/{}'.format(job_request['experiment']))
 
     if errors:
         return jsonify(errors), 400
