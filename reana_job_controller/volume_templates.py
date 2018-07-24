@@ -25,7 +25,7 @@
 import json
 from string import Template
 
-from reana_job_controller.config import SHARED_VOLUME_PATH_ROOT
+from reana_job_controller.config import SHARED_FS_MAPPING
 
 CEPHFS_SECRET_NAME = 'ceph-secret'
 
@@ -96,9 +96,10 @@ def get_k8s_cephfs_volume(experiment):
     :returns: k8s CephFS volume spec as a dictionary.
     """
     return json.loads(
-        K8S_CEPHFS_TEMPLATE.substitute(experiment=experiment,
-                                       path=SHARED_VOLUME_PATH_ROOT,
-                                       secret_name=CEPHFS_SECRET_NAME)
+        K8S_CEPHFS_TEMPLATE.substitute(
+            experiment=experiment,
+            path=SHARED_FS_MAPPING['MOUNT_SOURCE_PATH'],
+            secret_name=CEPHFS_SECRET_NAME)
     )
 
 
@@ -122,6 +123,7 @@ def get_k8s_hostpath_volume(experiment):
     :returns: k8s HostPath spec as a dictionary.
     """
     return json.loads(
-        K8S_HOSTPATH_TEMPLATE.substitute(experiment=experiment,
-                                         path=SHARED_VOLUME_PATH_ROOT)
+        K8S_HOSTPATH_TEMPLATE.substitute(
+            experiment=experiment,
+            path=SHARED_FS_MAPPING['MOUNT_SOURCE_PATH'])
     )

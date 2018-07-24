@@ -68,7 +68,7 @@ def add_shared_volume(job):
     else:
         volume = volume_templates.get_k8s_hostpath_volume(
             job['metadata']['namespace'])
-    mount_path = config.SHARED_VOLUME_PATH_ROOT
+    mount_path = config.SHARED_FS_MAPPING['MOUNT_DEST_PATH']
 
     job['spec']['template']['spec']['containers'][0]['volumeMounts'].append(
         {'name': volume['name'], 'mountPath': mount_path}
