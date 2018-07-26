@@ -45,7 +45,9 @@ class JobRequest(Schema):
     """Job request model."""
 
     job_id = fields.UUID()
+    job_name = fields.Str(required=True)
     cmd = fields.Str(missing='')
+    prettified_cmd = fields.Str(missing='')
     docker_img = fields.Str(required=True)
     experiment = fields.Str(required=True)
     cvmfs_mounts = fields.List(fields.String(), missing=[])

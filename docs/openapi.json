@@ -71,7 +71,14 @@
           "format": "uuid",
           "type": "string"
         },
+        "job_name": {
+          "type": "string"
+        },
         "job_type": {
+          "type": "string"
+        },
+        "prettified_cmd": {
+          "default": "",
           "type": "string"
         },
         "shared_file_system": {
@@ -81,7 +88,8 @@
       },
       "required": [
         "docker_img",
-        "experiment"
+        "experiment",
+        "job_name"
       ],
       "type": "object"
     }

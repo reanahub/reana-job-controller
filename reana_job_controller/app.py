@@ -336,7 +336,9 @@ def create_job():  # noqa
             env_vars=json.dumps(job_request['env_vars']),
             restart_count=job['restart_count'],
             max_restart_count=job['max_restart_count'],
-            deleted=job['deleted'])
+            deleted=job['deleted'],
+            name=job_request['job_name'],
+            prettified_cmd=job_request['prettified_cmd'])
         Session.add(job_db_entry)
         Session.commit()
         access_times = calculate_file_access_time(
