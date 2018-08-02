@@ -28,12 +28,12 @@ import logging
 import threading
 
 from flask import Flask, jsonify, request
-from reana_commons.database import Session
-from reana_commons.models import Job as JobTable
-from reana_commons.models import JobCache
 from reana_commons.utils import (calculate_file_access_time,
                                  calculate_hash_of_dir,
                                  calculate_job_input_hash)
+from reana_db.database import Session
+from reana_db.models import Job as JobTable
+from reana_db.models import JobCache
 
 from reana_job_controller.k8s import (create_api_client, instantiate_job,
                                       watch_jobs)

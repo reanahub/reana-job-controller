@@ -33,8 +33,8 @@ from kubernetes import client
 from kubernetes import config as k8s_config
 from kubernetes import watch
 from kubernetes.client.models.v1_delete_options import V1DeleteOptions
-from reana_commons.database import Session
-from reana_commons.models import Job
+from reana_db.database import Session
+from reana_db.models import Job
 
 from reana_job_controller import config, volume_templates
 
