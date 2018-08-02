@@ -19,4 +19,5 @@
 # submit itself to any jurisdiction.
 
 -e git+git://github.com/reanahub/reana-commons.git#egg=reana-commons
+-e git+git://github.com/reanahub/reana-db.git@master#egg=reana-db
 -e .[all]
