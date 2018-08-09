@@ -31,8 +31,6 @@ from reana_job_controller.schemas import Job, JobRequest
 
 def build_openapi_spec():
     """Create OpenAPI definition."""
-    # Create OpenAPI specification object
-    # FIXME set `title`, `version` ... as parameters
     spec = APISpec(
         title='reana-job-controller',
         version='0.0.1',

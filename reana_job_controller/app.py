@@ -245,10 +245,6 @@ def get_jobs():  # noqa
                 }
               }
     """
-    # FIXME do Marshmallow validation after fixing the structure
-    # of job list. Now it has the ID as key, it should be a plain
-    # list of jobs so it can be validated with Marshmallow.
-
     return jsonify({"jobs": retrieve_all_jobs()}), 200
 
 
@@ -453,10 +449,7 @@ def get_logs(job_id):  # noqa
 
 @app.route('/apispec', methods=['GET'])
 def get_openapi_spec():
-    """Get OpenAPI Spec.
-
-    FIXME add openapi spec
-    """
+    """Get OpenAPI Spec."""
     return jsonify(app.config['OPENAPI_SPEC'])
 
 

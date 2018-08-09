@@ -1,6 +1,14 @@
 Changes
 =======
 
+Version 0.3.0 (2018-08-10)
+--------------------------
+
+- Adds uwsgi for production deployments.
+- Switches from pykube to official Kubernetes python client.
+- Adds compatibility with latest Kubernetes.
+
+
 Version 0.2.0 (2018-04-19)
 --------------------------
 
