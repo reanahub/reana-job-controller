@@ -40,7 +40,7 @@ from reana_job_controller import config, volume_templates
 
 
 def create_api_client(api='BatchV1'):
-    """Create pykube HTTPClient using config.
+    """Create Kubernetes API client using config.
 
     :param api: String which represents which Kubernetes API to spawn. By
         default BatchV1.
