@@ -5,6 +5,9 @@
 .. image:: https://img.shields.io/travis/reanahub/reana-job-controller.svg
    :target: https://travis-ci.org/reanahub/reana-job-controller
 
+.. image:: https://img.shields.io/pypi/pyversions/reana-job-controller.svg
+   :target: https://pypi.org/pypi/reana-job-controller
+
 .. image:: https://img.shields.io/coveralls/reanahub/reana-job-controller.svg
    :target: https://coveralls.io/r/reanahub/reana-job-controller
 
