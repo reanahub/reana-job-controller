@@ -69,8 +69,8 @@ install_requires = [
     'Flask>=0.11',
     'kubernetes>=6.0.0',
     'marshmallow>=2.13',
-    'reana-commons>=0.3.0',
-    'reana-db>=0.3.0',
+    'reana-commons>=0.3.1,<0.4',
+    'reana-db>=0.3.0,<0.4',
 ]
 
 packages = find_packages()
