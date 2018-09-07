@@ -1,6 +1,11 @@
 Changes
 =======
 
+Version 0.3.1 (2018-09-07)
+--------------------------
+
+- Pins REANA-Commons and REANA-DB dependencies.
+
 Version 0.3.0 (2018-08-10)
 --------------------------
 
