@@ -43,22 +43,13 @@ CVMFS_REPOSITORIES = {
     'geant4': 'geant4.cern.ch'
 }
 
-K8S_CEPHFS_TEMPLATE = Template("""{
-    "name": "$experiment-shared-volume",
-    "cephfs": {
-        "monitors": [
-            "128.142.36.227:6790",
-            "128.142.39.77:6790",
-            "128.142.39.144:6790"
-        ],
-        "path": "$path",
-        "user": "k8s",
-        "secretRef": {
-            "name": "$secret_name",
-            "readOnly": false
-        }
-    }
-}""")
+K8S_CEPHFS_TEMPLATE = """{
+    "name": "reana-shared-volume",
+    "persistentVolumeClaim": {
+        "claimName": "manila-cephfs-pvc"
+    },
+    "readOnly": "false"
+}"""
 
 K8S_CVMFS_TEMPLATE = Template("""{
     "name": "cvmfs-$experiment",
@@ -96,10 +87,7 @@ def get_k8s_cephfs_volume(experiment):
     :returns: k8s CephFS volume spec as a dictionary.
     """
     return json.loads(
-        K8S_CEPHFS_TEMPLATE.substitute(
-            experiment=experiment,
-            path=SHARED_FS_MAPPING['MOUNT_SOURCE_PATH'],
-            secret_name=CEPHFS_SECRET_NAME)
+        K8S_CEPHFS_TEMPLATE
     )
 
 

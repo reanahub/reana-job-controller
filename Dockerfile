@@ -39,8 +39,5 @@ ARG DEBUG=false
 
 RUN if [ "${DEBUG}" = "true" ]; then pip install -r requirements-dev.txt; pip install -e .; else pip install .; fi;
 
-RUN adduser --uid 1000 --disabled-password --gecos '' reanauser && \
-    chown -R reanauser:reanauser /code
-USER reanauser
 EXPOSE 5000
 CMD ["python", "reana_job_controller/app.py"]
