@@ -1,6 +1,13 @@
 Changes
 =======
 
+Version 0.3.2 (2018-09-26)
+--------------------------
+
+- Adapts Kubernetes API adaptor to mount shared volumes on jobs as CEPH
+  ``persistentVolumeClaim``'s (managed by ``reana-cluster``) instead of plain
+  CEPH volumes.
+
 Version 0.3.1 (2018-09-07)
 --------------------------
 
