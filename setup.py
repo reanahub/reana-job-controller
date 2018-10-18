@@ -35,7 +35,8 @@ extras_require = {
         'Sphinx>=1.4.4,<1.6',
         'sphinx-rtd-theme>=0.1.9',
         'sphinxcontrib-httpdomain>=1.5.0',
-        'sphinxcontrib-openapi>=0.3.0'
+        'sphinxcontrib-openapi>=0.3.0',
+        'sphinxcontrib-redoc>=1.5.1',
     ],
     'tests': tests_require,
 }
@@ -55,8 +56,8 @@ install_requires = [
     'Flask>=0.11',
     'kubernetes>=6.0.0',
     'marshmallow>=2.13',
-    'reana-commons>=0.3.1,<0.4',
-    'reana-db>=0.3.0,<0.4',
+    'reana-commons>=0.4.0.dev20181016,<0.5.0',
+    'reana-db>=0.4.0.dev201810181,<0.5.0',
 ]
 
 packages = find_packages()
