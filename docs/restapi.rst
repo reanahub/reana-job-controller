@@ -8,3 +8,4 @@ Detailed REST API documentation can be found `here <_static/api.html>`_.
 
 .. automodule:: reana_job_controller.app
    :members:
+   :exclude-members: get_openapi_spec

@@ -34,7 +34,7 @@ job_request_schema = JobRequest()
 job_schema = Job()
 
 
-def retrieve_job(job_id):
+def _retrieve_job(job_id):
     """Retrieve job from DB by id.
 
     :param job_id: UUID which identifies the job to be retrieved.
@@ -55,7 +55,7 @@ def retrieve_job(job_id):
     }
 
 
-def retrieve_all_jobs():
+def _retrieve_all_jobs():
     """Retrieve all jobs in the DB.
 
     :return: A list with all current job objects.
@@ -80,7 +80,7 @@ def retrieve_all_jobs():
     return job_list
 
 
-def is_cached(job_spec, workflow_json, workflow_workspace):
+def _is_cached(job_spec, workflow_json, workflow_workspace):
     """Check if job result exists in the cache."""
     input_hash = calculate_job_input_hash(job_spec, workflow_json)
     workspace_hash = calculate_hash_of_dir(workflow_workspace)
@@ -97,7 +97,7 @@ def is_cached(job_spec, workflow_json, workflow_workspace):
         return None
 
 
-def job_exists(job_id):
+def _job_exists(job_id):
     """Check if the job exists in the DB.
 
     :param job_id: UUID which identifies the job.
@@ -106,7 +106,7 @@ def job_exists(job_id):
     return job_id in JOB_DB
 
 
-def retrieve_job_logs(job_id):
+def _retrieve_job_logs(job_id):
     """Retrieve job's logs.
 
     :param job_id: UUID which identifies the job.
@@ -167,7 +167,7 @@ def check_if_cached():
     job_spec = json.loads(request.args['job_spec'])
     workflow_json = json.loads(request.args['workflow_json'])
     workflow_workspace = request.args['workflow_workspace']
-    result = is_cached(job_spec, workflow_json, workflow_workspace)
+    result = _is_cached(job_spec, workflow_json, workflow_workspace)
     if result:
         return jsonify({"cached": True,
                         "result_path": result['result_path'],
@@ -187,6 +187,7 @@ def get_jobs():  # noqa
       description: >-
         This resource is not expecting parameters and it will return a list
         representing all active jobs in JSON format.
+      operationId: get_jobs
       produces:
        - application/json
       responses:
@@ -231,7 +232,7 @@ def get_jobs():  # noqa
                 }
               }
     """
-    return jsonify({"jobs": retrieve_all_jobs()}), 200
+    return jsonify({"jobs": _retrieve_all_jobs()}), 200
 
 
 @app.route('/jobs', methods=['POST'])
@@ -384,8 +385,8 @@ def get_job(job_id):  # noqa
               "message": >-
                 The job cdcf48b1-c2f3-4693-8230-b066e088444c doesn't exist
     """
-    if job_exists(job_id):
-        jobdict = retrieve_job(job_id)
+    if _job_exists(job_id):
+        jobdict = _retrieve_job(job_id)
         return jsonify(jobdict), 200
     else:
         return jsonify({'message': 'The job {} doesn\'t exist'
@@ -426,8 +427,8 @@ def get_logs(job_id):  # noqa
               "message": >-
                 The job cdcf48b1-c2f3-4693-8230-b066e088444c doesn't exist
     """
-    if job_exists(job_id):
-        return retrieve_job_logs(job_id)
+    if _job_exists(job_id):
+        return _retrieve_job_logs(job_id)
     else:
         return jsonify({'message': 'The job {} doesn\'t exist'
                         .format(job_id)}), 400

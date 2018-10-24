@@ -154,6 +154,7 @@
     "/jobs": {
       "get": {
         "description": "This resource is not expecting parameters and it will return a list representing all active jobs in JSON format.",
+        "operationId": "get_jobs",
         "produces": [
           "application/json"
         ],
