@@ -21,8 +21,8 @@ from reana_db.database import Session
 from reana_db.models import Job as JobTable
 from reana_db.models import JobCache
 
-from reana_job_controller.k8s import (create_api_client, instantiate_job,
-                                      watch_jobs)
+from reana_job_controller.k8s import (k8s_delete_job, k8s_instantiate_job,
+                                      k8s_watch_jobs)
 from reana_job_controller.schemas import Job, JobRequest
 from reana_job_controller.spec import build_openapi_spec
 
@@ -53,6 +53,15 @@ def _retrieve_job(job_id):
         "restart_count": job['restart_count'],
         "status": job['status']
     }
+
+
+def _retrieve_k8s_job(job_id):
+  """Retrieve the Kubernetes job.
+
+  :param job_id: String which represents the ID of the job.
+  :returns: The :class:`kubernetes.client.models.v1_job.V1Job` object.
+  """
+  return JOB_DB[job_id]['obj']
 
 
 def _retrieve_all_jobs():
@@ -295,7 +304,7 @@ def create_job():  # noqa
                           namespace=job_request['experiment'],
                           shared_file_system=job_request['shared_file_system'],
                           job_type=job_request.get('job_type'))
-    job_obj = instantiate_job(**job_parameters)
+    job_obj = k8s_instantiate_job(**job_parameters)
     if job_obj:
         job = copy.deepcopy(job_request)
         job['status'] = 'started'
@@ -431,7 +440,47 @@ def get_logs(job_id):  # noqa
         return _retrieve_job_logs(job_id)
     else:
         return jsonify({'message': 'The job {} doesn\'t exist'
-                        .format(job_id)}), 400
+                        .format(job_id)}), 404
+
+
+@app.route('/jobs/<job_id>/', methods=['DELETE'])
+def delete_job(job_id):  # noqa
+  r"""Delete a given job.
+
+  ---
+  delete:
+    summary: Deletes a given job.
+    description: >-
+      This resource expects the `job_id` of the job to be deleted.
+    operationId: delete_job
+    consumes:
+     - application/json
+    produces:
+     - application/json
+    parameters:
+     - name: job_id
+       in: path
+       description: Required. ID of the job to be deleted.
+       required: true
+       type: string
+    responses:
+      202:
+        description: >-
+          Request accepted. A request to delete the job has been sent to the
+            computing backend.
+      404:
+        description: Request failed. The given job ID does not seem to exist.
+        examples:
+          application/json:
+            "message": >-
+              The job cdcf48b1-c2f3-4693-8230-b066e088444c doesn't exist
+  """
+  if _job_exists(job_id):
+    k8s_delete_job(_retrieve_k8s_job(job_id))
+    return jsonify({'deleted': 'ok'}), 204
+  else:
+    return jsonify({'message': 'The job {} doesn\'t exist'
+                    .format(job_id)}), 404
 
 
 @app.route('/apispec', methods=['GET'])
@@ -450,9 +499,8 @@ if __name__ == '__main__':
 
     with app.app_context():
         app.config['OPENAPI_SPEC'] = build_openapi_spec()
-        app.config['KUBERNETES_CLIENT'] = create_api_client()
 
-    job_event_reader_thread = threading.Thread(target=watch_jobs,
+    job_event_reader_thread = threading.Thread(target=k8s_watch_jobs,
                                                args=(JOB_DB,))
 
     job_event_reader_thread.start()

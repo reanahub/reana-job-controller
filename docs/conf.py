@@ -256,6 +256,10 @@ def process_docstring(app, what, name, obj, options, lines):
         # adding back description
         lines.append(url)
 
+# Intersphinx configuration
+intersphinx_mapping = {
+    'kubernetes': ('https://kubernetes.readthedocs.io/en/latest/', None),
+}
 
 def setup(app):
     app.connect('autodoc-process-docstring', process_docstring)

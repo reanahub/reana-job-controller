@@ -23,23 +23,8 @@ from reana_db.database import Session
 from reana_db.models import Job
 
 from reana_job_controller import config, volume_templates
-
-
-def create_api_client(api='BatchV1'):
-    """Create Kubernetes API client using config.
-
-    :param api: String which represents which Kubernetes API to spawn. By
-        default BatchV1.
-    :returns: Kubernetes python client object for a specific API i.e. BatchV1.
-    """
-    k8s_config.load_incluster_config()
-    api_configuration = client.Configuration()
-    api_configuration.verify_ssl = False
-    if api == 'CoreV1':
-        api_client = client.CoreV1Api()
-    else:
-        api_client = client.BatchV1Api()
-    return api_client
+from reana_job_controller.api_client import (current_k8s_batchv1_api_client,
+                                             current_k8s_corev1_api_client)
 
 
 def add_shared_volume(job):
@@ -62,8 +47,8 @@ def add_shared_volume(job):
     job['spec']['template']['spec']['volumes'].append(volume)
 
 
-def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
-                    shared_file_system, job_type):
+def k8s_instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
+                        shared_file_system, job_type):
     """Create Kubernetes job.
 
     :param job_id: Job uuid.
@@ -137,7 +122,7 @@ def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
     # add better handling
     try:
         api_response = \
-            app.config['KUBERNETES_CLIENT'].create_namespaced_job(
+            current_k8s_batchv1_api_client.create_namespaced_job(
                 namespace=namespace, body=job)
         return api_response.to_str()
     except client.rest.ApiException as e:
@@ -147,20 +132,18 @@ def instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
         logging.debug("Unexpected error: {}".format(e))
 
 
-def watch_jobs(job_db):
+def k8s_watch_jobs(job_db):
     """Open stream connection to k8s apiserver to watch all jobs status.
 
     :param job_db: Dictionary which contains all current jobs.
     :param config: configuration to connect to k8s apiserver.
     """
-    batchv1_api_client = create_api_client()
-    corev1_api_client = create_api_client('CoreV1')
     while True:
         logging.debug('Starting a new stream request to watch Jobs')
         try:
             w = watch.Watch()
             for event in w.stream(
-                    batchv1_api_client.list_job_for_all_namespaces):
+                    current_k8s_batchv1_api_client.list_job_for_all_namespaces):
                 logging.info(
                     'New Job event received: {0}'.format(event['type']))
                 job = event['object']
@@ -190,14 +173,15 @@ def watch_jobs(job_db):
                 # Grab logs when job either succeeds or fails.
                 logging.info('Getting last spawned pod for job {}'.format(
                     job.metadata.name))
-                last_spawned_pod = corev1_api_client.list_namespaced_pod(
-                    job.metadata.namespace,
-                    label_selector='job-name={job_name}'.format(
+                last_spawned_pod = \
+                    current_k8s_corev1_api_client.list_namespaced_pod(
+                        job.metadata.namespace,
+                        label_selector='job-name={job_name}'.format(
                         job_name=job.metadata.name)).items[-1]
                 logging.info('Grabbing pod {} logs...'.format(
                     last_spawned_pod.metadata.name))
                 job_db[job.metadata.name]['log'] = \
-                    corev1_api_client.read_namespaced_pod_log(
+                    current_k8s_corev1_api_client.read_namespaced_pod_log(
                         namespace=last_spawned_pod.metadata.namespace,
                         name=last_spawned_pod.metadata.name)
                 # Store job logs
@@ -216,11 +200,7 @@ def watch_jobs(job_db):
 
                 logging.info('Cleaning job {} ...'.format(
                     job.metadata.name))
-                # Delete all depending pods.
-                delete_options = V1DeleteOptions(
-                    propagation_policy='Background')
-                batchv1_api_client.delete_namespaced_job(
-                    job.metadata.name, job.metadata.namespace, delete_options)
+                k8s_delete_job(job)
                 job_db[job.metadata.name]['deleted'] = True
         except client.rest.ApiException as e:
             logging.debug(
@@ -228,3 +208,21 @@ def watch_jobs(job_db):
         except Exception as e:
             logging.error(traceback.format_exc())
             logging.debug("Unexpected error: {}".format(e))
+
+
+def k8s_delete_job(job, asynchronous=True):
+    """Delete Kubernetes job.
+
+    :param job: The :class:`kubernetes.client.models.v1_job.V1Job` to be
+        deleted.
+    :param asynchronous: Whether the function waits for the action to be
+        performed or does it asynchronously.
+    """
+    try:
+        propagation_policy = 'Background' if asynchronous else 'Foreground'
+        delete_options = V1DeleteOptions(
+            propagation_policy=propagation_policy)
+        current_k8s_batchv1_api_client.delete_namespaced_job(
+            job.metadata.name, job.metadata.namespace, delete_options)
+    except Exception as e:
+        pass
