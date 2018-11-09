@@ -8,23 +8,21 @@
 
 """Kubernetes wrapper."""
 
-import json
 import logging
 import os
-import time
 import traceback
 
 from flask import current_app as app
-from kubernetes import client
-from kubernetes import config as k8s_config
-from kubernetes import watch
+from kubernetes import client, watch
 from kubernetes.client.models.v1_delete_options import V1DeleteOptions
+from kubernetes.client.rest import ApiException
 from reana_db.database import Session
 from reana_db.models import Job
 
 from reana_job_controller import config, volume_templates
 from reana_job_controller.api_client import (current_k8s_batchv1_api_client,
                                              current_k8s_corev1_api_client)
+from reana_job_controller.errors import ComputingBackendSubmissionError
 
 
 def add_shared_volume(job):
@@ -47,8 +45,8 @@ def add_shared_volume(job):
     job['spec']['template']['spec']['volumes'].append(volume)
 
 
-def k8s_instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
-                        shared_file_system, job_type):
+def k8s_instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars,
+                        namespace, shared_file_system, job_type):
     """Create Kubernetes job.
 
     :param job_id: Job uuid.
@@ -143,7 +141,8 @@ def k8s_watch_jobs(job_db):
         try:
             w = watch.Watch()
             for event in w.stream(
-                    current_k8s_batchv1_api_client.list_job_for_all_namespaces):
+                    current_k8s_batchv1_api_client.list_job_for_all_namespaces
+            ):
                 logging.info(
                     'New Job event received: {0}'.format(event['type']))
                 job = event['object']
@@ -177,7 +176,7 @@ def k8s_watch_jobs(job_db):
                     current_k8s_corev1_api_client.list_namespaced_pod(
                         job.metadata.namespace,
                         label_selector='job-name={job_name}'.format(
-                        job_name=job.metadata.name)).items[-1]
+                            job_name=job.metadata.name)).items[-1]
                 logging.info('Grabbing pod {} logs...'.format(
                     last_spawned_pod.metadata.name))
                 job_db[job.metadata.name]['log'] = \
@@ -188,7 +187,7 @@ def k8s_watch_jobs(job_db):
                 try:
                     logging.info('Storing job logs: {}'.
                                  format(job_db[job.metadata.name]['log']))
-                    Session.query(Job).filter_by(id_=job.metadata.name).\
+                    Session.query(Job).filter_by(id_=job.metadata.name). \
                         update(dict(logs=job_db[job.metadata.name]['log']))
                     Session.commit()
 
@@ -224,5 +223,8 @@ def k8s_delete_job(job, asynchronous=True):
             propagation_policy=propagation_policy)
         current_k8s_batchv1_api_client.delete_namespaced_job(
             job.metadata.name, job.metadata.namespace, delete_options)
-    except Exception as e:
-        pass
+    except ApiException as e:
+        logging.error(
+            'An error has occurred while connecting to Kubernetes API Server'
+            ' \n {}'.format(e))
+        raise ComputingBackendSubmissionError(e.reason)

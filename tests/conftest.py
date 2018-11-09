@@ -10,4 +10,26 @@
 
 from __future__ import absolute_import, print_function
 
+import uuid
+
 import pytest
+from mock import MagicMock
+
+from reana_job_controller.factory import create_app
+
+
+@pytest.fixture()
+def app():
+    """Test application."""
+    app = create_app()
+    with app.app_context():
+        yield app
+
+
+@pytest.fixture()
+def mocked_job():
+    """Mock existing job."""
+    from reana_job_controller.app import JOB_DB  # noqa
+    job_id = str(uuid.uuid4())
+    JOB_DB[job_id] = MagicMock()
+    return job_id

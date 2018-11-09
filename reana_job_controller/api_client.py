@@ -6,10 +6,13 @@
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
 
+"""REANA-Job-Controller API Clients."""
+
+from functools import partial
+
 from kubernetes import client
 from kubernetes import config as k8s_config
 from werkzeug.local import LocalProxy
-from functools import partial
 
 
 def create_api_client(api='BatchV1'):

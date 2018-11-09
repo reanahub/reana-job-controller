@@ -12,6 +12,7 @@ include *.sh
 include *.txt
 include pytest.ini
 include docs/openapi.json
+prune docs/_build
 recursive-include reana_job_controller *.json
 recursive-include docs *.py
 recursive-include docs *.png

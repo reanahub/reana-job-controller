@@ -221,7 +221,7 @@ texinfo_documents = [
      'Miscellaneous'),
 ]
 
-rest_api_modules = ['reana_job_controller.app']
+rest_api_modules = ['reana_job_controller.rest']
 
 
 def get_name(full_module_name):

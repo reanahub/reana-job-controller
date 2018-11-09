@@ -101,6 +101,7 @@
   },
   "parameters": {},
   "paths": {
+    "/apispec": {},
     "/job_cache": {
       "get": {
         "description": "This resource takes a job specification and the workflow json, and checks if the job to be created, already exists in the cache.",
@@ -307,13 +308,13 @@
         "consumes": [
           "application/json"
         ],
-        "description": "This resource is expecting a `job_id` which identifies an existing job to be deleted.",
+        "description": "This resource expects the `job_id` of the job to be deleted.",
         "operationId": "delete_job",
         "parameters": [
           {
             "description": "Required. ID of the job to be deleted.",
             "in": "path",
-            "name": "job",
+            "name": "job_id",
             "required": true,
             "type": "string"
           }
@@ -330,6 +331,14 @@
             "examples": {
               "application/json": {
                 "message": "The job cdcf48b1-c2f3-4693-8230-b066e088444c doesn't exist"
+              }
+            }
+          },
+          "502": {
+            "description": "Request failed. Something went wrong while calling the computing backend.",
+            "examples": {
+              "application/json": {
+                "message": "Connection to computing backend failed: [reason]"
               }
             }
           }
