@@ -16,12 +16,13 @@ import pytest
 from mock import MagicMock
 
 from reana_job_controller.factory import create_app
+from reana_job_controller.job_db import JOB_DB
 
 
 @pytest.fixture()
 def app():
     """Test application."""
-    app = create_app()
+    app = create_app(JOB_DB, watch_jobs=False)
     with app.app_context():
         yield app
 
@@ -29,7 +30,6 @@ def app():
 @pytest.fixture()
 def mocked_job():
     """Mock existing job."""
-    from reana_job_controller.app import JOB_DB  # noqa
     job_id = str(uuid.uuid4())
     JOB_DB[job_id] = MagicMock()
     return job_id

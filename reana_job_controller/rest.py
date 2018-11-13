@@ -12,15 +12,15 @@ import copy
 import json
 
 from flask import Blueprint, current_app, jsonify, request
-from reana_commons.utils import (calculate_file_access_time,
-                                 calculate_hash_of_dir,
-                                 calculate_job_input_hash)
+from reana_commons.utils import calculate_file_access_time
 from reana_db.database import Session
 from reana_db.models import Job as JobTable
 from reana_db.models import JobCache
 
-from reana_job_controller.app import JOB_DB
 from reana_job_controller.errors import ComputingBackendSubmissionError
+from reana_job_controller.job_db import (JOB_DB, job_exists, job_is_cached,
+                                         retrieve_all_jobs, retrieve_job,
+                                         retrieve_job_logs, retrieve_k8s_job)
 from reana_job_controller.k8s import k8s_delete_job, k8s_instantiate_job
 from reana_job_controller.schemas import Job, JobRequest
 
@@ -28,96 +28,6 @@ blueprint = Blueprint('jobs', __name__)
 
 job_request_schema = JobRequest()
 job_schema = Job()
-
-
-def _retrieve_job(job_id):
-    """Retrieve job from DB by id.
-
-    :param job_id: UUID which identifies the job to be retrieved.
-    :returns: Job object identified by `job_id`.
-    """
-    job = JOB_DB[job_id]
-    return {
-        "cmd": job['cmd']
-        if job.get('cmd') else '',
-        "cvmfs_mounts": job['cvmfs_mounts']
-        if job.get('cvmfs_mounts') else [],
-        "docker_img": job['docker_img'],
-        "experiment": job['experiment'],
-        "job_id": job['job_id'],
-        "max_restart_count": job['max_restart_count'],
-        "restart_count": job['restart_count'],
-        "status": job['status']
-    }
-
-
-def _retrieve_k8s_job(job_id):
-    """Retrieve the Kubernetes job.
-
-    :param job_id: String which represents the ID of the job.
-    :returns: The :class:`kubernetes.client.models.v1_job.V1Job` object.
-    """
-    return JOB_DB[job_id]['obj']
-
-
-def _retrieve_all_jobs():
-    """Retrieve all jobs in the DB.
-
-    :return: A list with all current job objects.
-    """
-    job_list = []
-    for job_id in JOB_DB:
-        job = JOB_DB[job_id]
-        job_list.append({
-            job_id: {
-                "cmd": job['cmd']
-                if job.get('cmd') else '',
-                "cvmfs_mounts": job['cvmfs_mounts']
-                if job.get('cvmfs_mounts') else [],
-                "docker_img": job['docker_img'],
-                "experiment": job['experiment'],
-                "job_id": job['job_id'],
-                "max_restart_count": job['max_restart_count'],
-                "restart_count": job['restart_count'],
-                "status": job['status']
-            }
-        })
-    return job_list
-
-
-def _is_cached(job_spec, workflow_json, workflow_workspace):
-    """Check if job result exists in the cache."""
-    input_hash = calculate_job_input_hash(job_spec, workflow_json)
-    workspace_hash = calculate_hash_of_dir(workflow_workspace)
-    if workspace_hash == -1:
-        return None
-
-    cached_job = Session.query(JobCache).filter_by(
-        parameters=input_hash,
-        workspace_hash=workspace_hash).first()
-    if cached_job:
-        return {'result_path': cached_job.result_path,
-                'job_id': cached_job.job_id}
-    else:
-        return None
-
-
-def _job_exists(job_id):
-    """Check if the job exists in the DB.
-
-    :param job_id: UUID which identifies the job.
-    :returns: Boolean representing if the job exists.
-    """
-    return job_id in JOB_DB
-
-
-def _retrieve_job_logs(job_id):
-    """Retrieve job's logs.
-
-    :param job_id: UUID which identifies the job.
-    :returns: Job's logs.
-    """
-    return JOB_DB[job_id].get('log')
 
 
 @blueprint.route('/job_cache', methods=['GET'])
@@ -172,7 +82,7 @@ def check_if_cached():
     job_spec = json.loads(request.args['job_spec'])
     workflow_json = json.loads(request.args['workflow_json'])
     workflow_workspace = request.args['workflow_workspace']
-    result = _is_cached(job_spec, workflow_json, workflow_workspace)
+    result = job_is_cached(job_spec, workflow_json, workflow_workspace)
     if result:
         return jsonify({"cached": True,
                         "result_path": result['result_path'],
@@ -237,7 +147,7 @@ def get_jobs():  # noqa
                 }
               }
     """
-    return jsonify({"jobs": _retrieve_all_jobs()}), 200
+    return jsonify({"jobs": retrieve_all_jobs()}), 200
 
 
 @blueprint.route('/jobs', methods=['POST'])
@@ -390,8 +300,8 @@ def get_job(job_id):  # noqa
               "message": >-
                 The job cdcf48b1-c2f3-4693-8230-b066e088444c doesn't exist
     """
-    if _job_exists(job_id):
-        jobdict = _retrieve_job(job_id)
+    if job_exists(job_id):
+        jobdict = retrieve_job(job_id)
         return jsonify(jobdict), 200
     else:
         return jsonify({'message': 'The job {} doesn\'t exist'
@@ -432,8 +342,8 @@ def get_logs(job_id):  # noqa
               "message": >-
                 The job cdcf48b1-c2f3-4693-8230-b066e088444c doesn't exist
     """
-    if _job_exists(job_id):
-        return _retrieve_job_logs(job_id)
+    if job_exists(job_id):
+        return retrieve_job_logs(job_id)
     else:
         return jsonify({'message': 'The job {} doesn\'t exist'
                         .format(job_id)}), 404
@@ -480,9 +390,9 @@ def delete_job(job_id):  # noqa
                 Connection to computing backend failed:
                 [reason]
     """
-    if _job_exists(job_id):
+    if job_exists(job_id):
         try:
-            k8s_delete_job(_retrieve_k8s_job(job_id))
+            k8s_delete_job(retrieve_k8s_job(job_id))
             return jsonify(), 204
         except ComputingBackendSubmissionError as e:
             return jsonify(

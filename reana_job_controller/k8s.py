@@ -10,6 +10,7 @@
 
 import logging
 import os
+import threading
 import traceback
 
 from flask import current_app as app
@@ -228,3 +229,11 @@ def k8s_delete_job(job, asynchronous=True):
             'An error has occurred while connecting to Kubernetes API Server'
             ' \n {}'.format(e))
         raise ComputingBackendSubmissionError(e.reason)
+
+
+def start_watch_jobs_thread(JOB_DB):
+    """Watch changes on job objects on kubernetes."""
+    job_event_reader_thread = threading.Thread(target=k8s_watch_jobs,
+                                               args=(JOB_DB,))
+    job_event_reader_thread.daemon = True
+    job_event_reader_thread.start()

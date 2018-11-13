@@ -26,4 +26,7 @@ ARG DEBUG=false
 RUN if [ "${DEBUG}" = "true" ]; then pip install -r requirements-dev.txt; pip install -e .; else pip install .; fi;
 
 EXPOSE 5000
-CMD ["python", "reana_job_controller/app.py"]
+
+ENV FLASK_APP reana_job_controller/app.py
+
+CMD ["flask", "run", "-h", "0.0.0.0"]
