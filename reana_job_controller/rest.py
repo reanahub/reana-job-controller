@@ -370,7 +370,7 @@ def delete_job(job_id):  # noqa
          required: true
          type: string
       responses:
-        202:
+        204:
           description: >-
             Request accepted. A request to delete the job has been sent to the
               computing backend.
