@@ -19,7 +19,7 @@ def build_openapi_spec():
     """Create OpenAPI definition."""
     spec = APISpec(
         title='reana-job-controller',
-        version='0.0.1',
+        version='0.4.0',
         info=dict(
             description='REANA Job Controller API'
         ),
