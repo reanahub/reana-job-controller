@@ -59,8 +59,8 @@ def k8s_instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars,
     :param namespace: Job's namespace.
     :shared_file_system: Boolean which represents whether the job
         should have a shared file system mounted.
-    :returns: Kubernetes job object if the job was successfuly created,
-        None if not.
+    :returns: A :class:`kubernetes.client.models.v1_job.V1Job` corresponding
+        to the created job, None if the creation could not take place.
     """
     job = {
         'kind': 'Job',
@@ -123,7 +123,7 @@ def k8s_instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars,
         api_response = \
             current_k8s_batchv1_api_client.create_namespaced_job(
                 namespace=namespace, body=job)
-        return api_response.to_dict()
+        return api_response
     except client.rest.ApiException as e:
         logging.debug("Error while connecting to Kubernetes API: {}".format(e))
     except Exception as e:
@@ -223,10 +223,7 @@ def k8s_delete_job(job, asynchronous=True):
         delete_options = V1DeleteOptions(
             propagation_policy=propagation_policy)
         current_k8s_batchv1_api_client.delete_namespaced_job(
-            job['metadata']['name'],
-            job['metadata']['namespace'],
-            delete_options
-        )
+            job.metadata.name, job.metadata.namespace, delete_options)
     except ApiException as e:
         logging.error(
             'An error has occurred while connecting to Kubernetes API Server'
