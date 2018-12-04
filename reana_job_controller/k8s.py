@@ -33,8 +33,7 @@ def add_shared_volume(job):
     """
     storage_backend = os.getenv('REANA_STORAGE_BACKEND', 'LOCAL')
     if storage_backend == 'CEPHFS':
-        volume = volume_templates.get_k8s_cephfs_volume(
-            job['metadata']['namespace'])
+        volume = volume_templates.get_k8s_cephfs_volume()
     else:
         volume = volume_templates.get_k8s_hostpath_volume(
             job['metadata']['namespace'])
@@ -107,11 +106,10 @@ def k8s_instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars,
         add_shared_volume(job)
 
     if cvmfs_repos:
-        for num, repo in enumerate(cvmfs_repos):
-            volume = volume_templates.get_k8s_cvmfs_volume(namespace, repo)
-            mount_path = volume_templates.get_cvmfs_mount_point(repo)
+        for num, experiment in enumerate(cvmfs_repos):
+            volume = volume_templates.get_k8s_cvmfs_volume(experiment)
+            mount_path = volume_templates.get_cvmfs_mount_point(experiment)
 
-            volume['name'] += '-{}'.format(num)
             (job['spec']['template']['spec']['containers'][0]
                 ['volumeMounts'].append(
                     {'name': volume['name'], 'mountPath': mount_path}

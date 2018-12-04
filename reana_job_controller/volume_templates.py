@@ -38,13 +38,11 @@ K8S_CEPHFS_TEMPLATE = """{
 }"""
 
 K8S_CVMFS_TEMPLATE = Template("""{
-    "name": "cvmfs-$experiment",
-    "flexVolume": {
-        "driver": "cern/cvmfs",
-        "options": {
-            "repository": "$repository"
-        }
-    }
+    "name": "$experiment-cvmfs-volume",
+    "persistentVolumeClaim": {
+        "claimName": "csi-cvmfs-$experiment-pvc"
+    },
+    "readOnly": "true"
 }""")
 
 K8S_HOSTPATH_TEMPLATE = Template("""{
@@ -55,21 +53,20 @@ K8S_HOSTPATH_TEMPLATE = Template("""{
 }""")
 
 
-def get_cvmfs_mount_point(repository_name):
+def get_cvmfs_mount_point(experiment):
     """Generate mount point for a given CVMFS repository.
 
-    :param repository_name: CVMFS repository name.
+    :param experiment: Experiment name.
     :returns: The repository's mount point.
     """
     return '/cvmfs/{repository}'.format(
-        repository=CVMFS_REPOSITORIES[repository_name]
+        repository=CVMFS_REPOSITORIES[experiment]
     )
 
 
-def get_k8s_cephfs_volume(experiment):
-    """Render k8s CephFS volume template.
+def get_k8s_cephfs_volume():
+    """Return k8s CephFS volume template.
 
-    :param experiment: Experiment name.
     :returns: k8s CephFS volume spec as a dictionary.
     """
     return json.loads(
@@ -77,17 +74,14 @@ def get_k8s_cephfs_volume(experiment):
     )
 
 
-def get_k8s_cvmfs_volume(experiment, repository):
+def get_k8s_cvmfs_volume(experiment):
     """Render k8s CVMFS volume template.
 
     :param experiment: Experiment name.
     :returns: k8s CVMFS volume spec as a dictionary.
     """
-    if repository in CVMFS_REPOSITORIES:
-        return json.loads(K8S_CVMFS_TEMPLATE.substitute(
-            experiment=experiment, repository=repository))
-    else:
-        raise ValueError('The provided repository doesn\'t exist')
+    return json.loads(K8S_CVMFS_TEMPLATE.substitute(
+        experiment=experiment))
 
 
 def get_k8s_hostpath_volume(experiment):
