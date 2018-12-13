@@ -17,12 +17,12 @@ from flask import current_app as app
 from kubernetes import client, watch
 from kubernetes.client.models.v1_delete_options import V1DeleteOptions
 from kubernetes.client.rest import ApiException
+from reana_commons.k8s.api_client import (current_k8s_batchv1_api_client,
+                                          current_k8s_corev1_api_client)
 from reana_db.database import Session
 from reana_db.models import Job
 
 from reana_job_controller import config, volume_templates
-from reana_job_controller.api_client import (current_k8s_batchv1_api_client,
-                                             current_k8s_corev1_api_client)
 from reana_job_controller.errors import ComputingBackendSubmissionError
 
 
