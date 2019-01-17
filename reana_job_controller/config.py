@@ -14,10 +14,10 @@ MAX_JOB_RESTARTS = 3
 """Number of retries for a job before considering it as failed."""
 
 SHARED_FS_MAPPING = {
-    'MOUNT_SOURCE_PATH': os.getenv("SHARED_VOLUME_PATH_ROOT", '/reana'),
+    'MOUNT_SOURCE_PATH': os.getenv("SHARED_VOLUME_PATH_ROOT", '/var/reana'),
     # Root path in the underlying shared file system to be mounted inside
     # jobs.
-    'MOUNT_DEST_PATH': os.getenv("SHARED_VOLUME_PATH", '/reana'),
+    'MOUNT_DEST_PATH': os.getenv("SHARED_VOLUME_PATH", '/var/reana'),
     # Mount path for the shared file system volume inside jobs.
 }
 """Mapping from the shared file system backend to the job file system."""
