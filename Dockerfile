@@ -14,8 +14,8 @@ RUN apt-get update && \
 COPY CHANGES.rst README.rst setup.py /code/
 COPY reana_job_controller/version.py /code/reana_job_controller/
 WORKDIR /code
-RUN pip install --no-cache-dir requirements-builder && \
-    requirements-builder -e all -l pypi setup.py | pip install --no-cache-dir -r /dev/stdin && \
+RUN pip install requirements-builder && \
+    requirements-builder -e all -l pypi setup.py | pip install -r /dev/stdin && \
     pip uninstall -y requirements-builder
 
 COPY . /code
