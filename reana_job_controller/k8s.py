@@ -8,6 +8,7 @@
 
 """Kubernetes wrapper."""
 
+import ast
 import logging
 import os
 import threading
@@ -17,6 +18,7 @@ from flask import current_app as app
 from kubernetes import client, watch
 from kubernetes.client.models.v1_delete_options import V1DeleteOptions
 from kubernetes.client.rest import ApiException
+from reana_commons.config import CVMFS_REPOSITORIES
 from reana_commons.k8s.api_client import (current_k8s_batchv1_api_client,
                                           current_k8s_corev1_api_client)
 from reana_db.database import Session
@@ -45,14 +47,14 @@ def add_shared_volume(job):
     job['spec']['template']['spec']['volumes'].append(volume)
 
 
-def k8s_instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars,
+def k8s_instantiate_job(job_id, docker_img, cmd, cvmfs_mounts, env_vars,
                         namespace, shared_file_system, job_type):
     """Create Kubernetes job.
 
     :param job_id: Job uuid.
     :param docker_img: Docker image to run the job.
     :param cmd: Command provided to the docker container.
-    :param cvmfs_repos: List of CVMFS repository names.
+    :param cvmfs_mounts: List of CVMFS volumes to mount in job pod.
     :param env_vars: Dictionary representing environment variables
         as {'var_name': 'var_value'}.
     :param namespace: Job's namespace.
@@ -105,14 +107,20 @@ def k8s_instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars,
     if shared_file_system:
         add_shared_volume(job)
 
-    if cvmfs_repos:
-        for num, experiment in enumerate(cvmfs_repos):
-            volume = volume_templates.get_k8s_cvmfs_volume(experiment)
-            mount_path = volume_templates.get_cvmfs_mount_point(experiment)
+    if cvmfs_mounts != 'false':
+        cvmfs_map = {}
+        for cvmfs_mount_path in ast.literal_eval(cvmfs_mounts):
+            if cvmfs_mount_path in CVMFS_REPOSITORIES:
+                cvmfs_map[
+                    CVMFS_REPOSITORIES[cvmfs_mount_path]] = cvmfs_mount_path
+
+        for name, mount_path in cvmfs_map.items():
+            volume = volume_templates.get_k8s_cvmfs_volume(name)
 
             (job['spec']['template']['spec']['containers'][0]
                 ['volumeMounts'].append(
-                    {'name': volume['name'], 'mountPath': mount_path}
+                    {'name': volume['name'],
+                     'mountPath': '/cvmfs/{}'.format(mount_path)}
             ))
             job['spec']['template']['spec']['volumes'].append(volume)
 

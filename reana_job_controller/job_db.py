@@ -26,7 +26,7 @@ def retrieve_job(job_id):
         "cmd": job['cmd']
         if job.get('cmd') else '',
         "cvmfs_mounts": job['cvmfs_mounts']
-        if job.get('cvmfs_mounts') else [],
+        if job.get('cvmfs_mounts') else '',
         "docker_img": job['docker_img'],
         "experiment": job['experiment'],
         "job_id": job['job_id'],

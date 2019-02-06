@@ -15,20 +15,6 @@ from reana_job_controller.config import SHARED_FS_MAPPING
 
 CEPHFS_SECRET_NAME = 'ceph-secret'
 
-CVMFS_REPOSITORIES = {
-    'alice': 'alice.cern.ch',
-    'alice-ocdb': 'alice-ocdb.cern.ch',
-    'atlas': 'atlas.cern.ch',
-    'atlas-condb': 'atlas-condb.cern.ch',
-    'cms': 'cms.cern.ch',
-    'lhcb': 'lhcb.cern.ch',
-    'na61': 'na61.cern.ch',
-    'boss': 'boss.cern.ch',
-    'grid': 'grid.cern.ch',
-    'sft': 'sft.cern.ch',
-    'geant4': 'geant4.cern.ch'
-}
-
 K8S_CEPHFS_TEMPLATE = """{
     "name": "reana-shared-volume",
     "persistentVolumeClaim": {
@@ -51,17 +37,6 @@ K8S_HOSTPATH_TEMPLATE = Template("""{
         "path": "$path"
     }
 }""")
-
-
-def get_cvmfs_mount_point(experiment):
-    """Generate mount point for a given CVMFS repository.
-
-    :param experiment: Experiment name.
-    :returns: The repository's mount point.
-    """
-    return '/cvmfs/{repository}'.format(
-        repository=CVMFS_REPOSITORIES[experiment]
-    )
 
 
 def get_k8s_cephfs_volume():

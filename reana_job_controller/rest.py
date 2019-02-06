@@ -120,10 +120,7 @@ def get_jobs():  # noqa
                 "jobs": {
                   "1612a779-f3fa-4344-8819-3d12fa9b9d90": {
                     "cmd": "date",
-                    "cvmfs_mounts": [
-                      "atlas-condb",
-                      "atlas"
-                    ],
+                    "cvmfs_mounts": ['atlas.cern.ch', 'atlas-condb.cern.ch'],
                     "docker_img": "busybox",
                     "experiment": "atlas",
                     "job_id": "1612a779-f3fa-4344-8819-3d12fa9b9d90",
@@ -133,10 +130,7 @@ def get_jobs():  # noqa
                   },
                   "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20": {
                     "cmd": "date",
-                    "cvmfs_mounts": [
-                      "atlas-condb",
-                      "atlas"
-                    ],
+                    "cvmfs_mounts": ['atlas.cern.ch', 'atlas-condb.cern.ch'],
                     "docker_img": "busybox",
                     "experiment": "atlas",
                     "job_id": "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20",
@@ -205,7 +199,7 @@ def create_job():  # noqa
     job_parameters = dict(job_id=str(job_request['job_id']),
                           docker_img=job_request['docker_img'],
                           cmd=job_request['cmd'],
-                          cvmfs_repos=job_request['cvmfs_mounts'],
+                          cvmfs_mounts=job_request['cvmfs_mounts'],
                           env_vars=job_request['env_vars'],
                           namespace=job_request['experiment'],
                           shared_file_system=job_request['shared_file_system'],
@@ -282,10 +276,7 @@ def get_job(job_id):  # noqa
             application/json:
               "job": {
                 "cmd": "date",
-                "cvmfs_mounts": [
-                  "atlas-condb",
-                  "atlas"
-                ],
+                "cvmfs_mounts": ['atlas.cern.ch', 'atlas-condb.cern.ch'],
                 "docker_img": "busybox",
                 "experiment": "atlas",
                 "job_id": "cdcf48b1-c2f3-4693-8230-b066e088c6ac",
