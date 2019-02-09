@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018 CERN.
+# Copyright (C) 2017, 2018, 2019 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -53,7 +53,7 @@ setup_requires = [
 ]
 
 install_requires = [
-    'apispec>=0.21.0',
+    'apispec>=0.21.0,<0.40',
     'Flask>=0.11',
     'kubernetes>=6.0.0',
     'marshmallow>=2.13',
