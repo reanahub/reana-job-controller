@@ -7,9 +7,16 @@
 FROM python:3.6
 
 ENV TERM=xterm
+
+# Hardcoded, this needs to be replaced
+# by setting this attribute  
+# in the kubernetes cluster configuration
+ENV VC3USERID=1002
+
 RUN apt-get update && \
     apt-get install -y vim-tiny && \
-    pip install --upgrade pip
+    pip install --upgrade pip && \
+    pip install htcondor
 
 COPY CHANGES.rst README.rst setup.py /code/
 COPY reana_job_controller/version.py /code/reana_job_controller/
