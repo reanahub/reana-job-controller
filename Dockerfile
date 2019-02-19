@@ -14,6 +14,8 @@ ENV TERM=xterm
 ENV VC3USERID=1002
 ENV HTCONDOR_ADDR="<128.135.158.176:9618?addrs=128.135.158.176-9618+[--1]-9618&noUDP&sock=954400_984a_3>"
 
+RUN useradd -u $VC3USERID vc3user
+
 RUN apt-get update && \
     apt-get install -y vim-tiny && \
     pip install --upgrade pip && \
