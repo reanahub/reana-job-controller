@@ -17,7 +17,7 @@ ENV HTCONDOR_ADDR="<128.135.158.176:9618?addrs=128.135.158.176-9618+[--1]-9618&n
 RUN apt-get update && \
     apt-get install -y vim-tiny && \
     pip install --upgrade pip && \
-    pip install htcondor
+    pip install htcondor retrying
 
 COPY CHANGES.rst README.rst setup.py /code/
 COPY reana_job_controller/version.py /code/reana_job_controller/
