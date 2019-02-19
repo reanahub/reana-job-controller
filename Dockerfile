@@ -9,9 +9,10 @@ FROM python:3.6
 ENV TERM=xterm
 
 # Hardcoded, this needs to be replaced
-# by setting this attribute  
+# by setting these attributes  
 # in the kubernetes cluster configuration
 ENV VC3USERID=1002
+ENV HTCONDOR_ADDR="<128.135.158.176:9618?addrs=128.135.158.176-9618+[--1]-9618&noUDP&sock=954400_984a_3>"
 
 RUN apt-get update && \
     apt-get install -y vim-tiny && \
