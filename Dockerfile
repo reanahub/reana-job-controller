@@ -23,6 +23,7 @@ RUN apt-get update && \
 
 COPY CHANGES.rst README.rst setup.py /code/
 COPY reana_job_controller/version.py /code/reana_job_controller/
+COPY reana_job_controller/htcondor_submit.py /code/htcondor_submit.py
 WORKDIR /code
 RUN pip install requirements-builder && \
     requirements-builder -e all -l pypi setup.py | pip install -r /dev/stdin && \
