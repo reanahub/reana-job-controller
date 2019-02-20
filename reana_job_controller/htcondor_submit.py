@@ -37,6 +37,6 @@ def submit(schedd, sub):
 scheddAd = classad.ClassAd()
 scheddAd["MyAddress"] = os.environ.get("HTCONDOR_ADDR", None) 
 schedd = htcondor.Schedd(scheddAd)
-sub = htcondor.Submit({"executable": "/bin/sleep", "arguments": "5m"})
+sub = htcondor.Submit({"executable": "/bin/sleep", "arguments": "5m", "InitialDir": "/tmp"})
 submit(schedd, sub)
 
