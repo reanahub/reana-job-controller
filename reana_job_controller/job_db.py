@@ -44,6 +44,13 @@ def retrieve_k8s_job(job_id):
     """
     return JOB_DB[job_id]['obj']
 
+def retrieve_condor_job(job_id):
+    """Retrieve the Condor job.
+
+    :param job_id: String which represents the ID of the job.
+    :returns: The string of the HTCondor job assigned to the job_id.
+    """
+    return JOB_DB[job_id]['obj']
 
 def retrieve_all_jobs():
     """Retrieve all jobs in the DB.
