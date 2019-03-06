@@ -21,10 +21,11 @@ from kubernetes.client.rest import ApiException
 from reana_commons.config import CVMFS_REPOSITORIES
 from reana_commons.k8s.api_client import (current_k8s_batchv1_api_client,
                                           current_k8s_corev1_api_client)
+from reana_commons.k8s.volumes import get_shared_volume
 from reana_db.database import Session
 from reana_db.models import Job
 
-from reana_job_controller import config, volume_templates
+from reana_job_controller import config
 from reana_job_controller.config import SHARED_VOLUME_PATH_ROOT
 from reana_job_controller.errors import ComputingBackendSubmissionError
 
@@ -35,17 +36,10 @@ def add_shared_volume(job, workflow_workspace):
     :param job: Kubernetes job spec.
     :param workflow_workspace: Absolute path to the job's workflow workspace.
     """
-    storage_backend = os.getenv('REANA_STORAGE_BACKEND', 'LOCAL')
-    if storage_backend == 'CEPHFS':
-        volume = volume_templates.get_k8s_cephfs_volume()
-    else:
-        volume = volume_templates.get_k8s_hostpath_volume()
-    workflow_workspace_relative_to_owner = \
-        os.path.relpath(workflow_workspace, SHARED_VOLUME_PATH_ROOT)
+    volume_mount, volume = get_shared_volume(workflow_workspace,
+                                             SHARED_VOLUME_PATH_ROOT)
     job['spec']['template']['spec']['containers'][0]['volumeMounts'].append(
-        {'name': volume['name'],
-         'mountPath': workflow_workspace,
-         'subPath': workflow_workspace_relative_to_owner}
+        volume_mount
     )
     job['spec']['template']['spec']['volumes'].append(volume)
 
@@ -120,7 +114,7 @@ def k8s_instantiate_job(job_id, workflow_workspace, docker_img, cmd,
                     CVMFS_REPOSITORIES[cvmfs_mount_path]] = cvmfs_mount_path
 
         for repository, mount_path in cvmfs_map.items():
-            volume = volume_templates.get_k8s_cvmfs_volume(repository)
+            volume = get_k8s_cvmfs_volume(repository)
 
             (job['spec']['template']['spec']['containers'][0]
                 ['volumeMounts'].append(
