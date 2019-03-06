@@ -59,6 +59,7 @@ install_requires = [
     'marshmallow>=2.13',
     'reana-commons>=0.5.0.dev20190213,<0.6.0[kubernetes]',
     'reana-db>=0.5.0.dev20190213,<0.6.0',
+    'htcondor',
 ]
 
 packages = find_packages()

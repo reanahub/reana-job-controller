@@ -78,12 +78,16 @@
         "shared_file_system": {
           "default": true,
           "type": "boolean"
+        },
+        "workflow_workspace": {
+          "type": "string"
         }
       },
       "required": [
         "docker_img",
         "experiment",
-        "job_name"
+        "job_name",
+        "workflow_workspace"
       ],
       "type": "object"
     }

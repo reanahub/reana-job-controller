@@ -25,33 +25,38 @@ from reana_db.database import Session
 from reana_db.models import Job
 
 from reana_job_controller import config, volume_templates
+from reana_job_controller.config import SHARED_VOLUME_PATH_ROOT
 from reana_job_controller.errors import ComputingBackendSubmissionError
 
 
-def add_shared_volume(job):
+def add_shared_volume(job, workflow_workspace):
     """Add shared CephFS volume to a given job spec.
 
     :param job: Kubernetes job spec.
+    :param workflow_workspace: Absolute path to the job's workflow workspace.
     """
     storage_backend = os.getenv('REANA_STORAGE_BACKEND', 'LOCAL')
     if storage_backend == 'CEPHFS':
         volume = volume_templates.get_k8s_cephfs_volume()
     else:
-        volume = volume_templates.get_k8s_hostpath_volume(
-            job['metadata']['namespace'])
-    mount_path = config.SHARED_FS_MAPPING['MOUNT_DEST_PATH']
-
+        volume = volume_templates.get_k8s_hostpath_volume()
+    workflow_workspace_relative_to_owner = \
+        os.path.relpath(workflow_workspace, SHARED_VOLUME_PATH_ROOT)
     job['spec']['template']['spec']['containers'][0]['volumeMounts'].append(
-        {'name': volume['name'], 'mountPath': mount_path}
+        {'name': volume['name'],
+         'mountPath': workflow_workspace,
+         'subPath': workflow_workspace_relative_to_owner}
     )
     job['spec']['template']['spec']['volumes'].append(volume)
 
 
-def k8s_instantiate_job(job_id, docker_img, cmd, cvmfs_mounts, env_vars,
-                        namespace, shared_file_system, job_type):
+def k8s_instantiate_job(job_id, workflow_workspace, docker_img, cmd,
+                        cvmfs_mounts, env_vars, shared_file_system, job_type,
+                        namespace='default'):
     """Create Kubernetes job.
 
     :param job_id: Job uuid.
+    :param workflow_workspace: Absolute path to the job's workflow workspace.
     :param docker_img: Docker image to run the job.
     :param cmd: Command provided to the docker container.
     :param cvmfs_mounts: List of CVMFS volumes to mount in job pod.
@@ -105,7 +110,7 @@ def k8s_instantiate_job(job_id, docker_img, cmd, cvmfs_mounts, env_vars,
             )
 
     if shared_file_system:
-        add_shared_volume(job)
+        add_shared_volume(job, workflow_workspace)
 
     if cvmfs_mounts != 'false':
         cvmfs_map = {}
@@ -114,8 +119,8 @@ def k8s_instantiate_job(job_id, docker_img, cmd, cvmfs_mounts, env_vars,
                 cvmfs_map[
                     CVMFS_REPOSITORIES[cvmfs_mount_path]] = cvmfs_mount_path
 
-        for name, mount_path in cvmfs_map.items():
-            volume = volume_templates.get_k8s_cvmfs_volume(name)
+        for repository, mount_path in cvmfs_map.items():
+            volume = volume_templates.get_k8s_cvmfs_volume(repository)
 
             (job['spec']['template']['spec']['containers'][0]
                 ['volumeMounts'].append(

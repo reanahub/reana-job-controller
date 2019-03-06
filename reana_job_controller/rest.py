@@ -194,17 +194,18 @@ def create_job():  # noqa
 
     # Validate and deserialize input
     job_request, errors = job_request_schema.load(json_data)
-
     if errors:
         return jsonify(errors), 400
-    job_parameters = dict(job_id=str(job_request['job_id']),
-                          docker_img=job_request['docker_img'],
-                          cmd=job_request['cmd'],
-                          cvmfs_mounts=job_request['cvmfs_mounts'],
-                          env_vars=job_request['env_vars'],
-                          namespace=job_request['experiment'],
-                          shared_file_system=job_request['shared_file_system'],
-                          job_type=job_request.get('job_type'))
+    job_parameters = dict(
+      job_id=str(job_request['job_id']),
+      workflow_workspace=str(job_request['workflow_workspace']),
+      docker_img=job_request['docker_img'],
+      cmd=job_request['cmd'],
+      cvmfs_mounts=job_request['cvmfs_mounts'],
+      env_vars=job_request['env_vars'],
+      shared_file_system=job_request['shared_file_system'],
+      job_type=job_request.get('job_type'))
+    #job_obj = k8s_instantiate_job(**job_parameters)
     job_obj = condor_instantiate_job(**job_parameters)
     if job_obj:
         job = copy.deepcopy(job_request)
