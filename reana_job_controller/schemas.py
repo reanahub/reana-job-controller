@@ -32,6 +32,7 @@ class JobRequest(Schema):
 
     job_id = fields.UUID()
     job_name = fields.Str(required=True)
+    workflow_workspace = fields.Str(required=True)
     cmd = fields.Str(missing='')
     prettified_cmd = fields.Str(missing='')
     docker_img = fields.Str(required=True)

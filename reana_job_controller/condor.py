@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import time
+import threading
 import traceback
 import htcondor
 import classad
@@ -24,8 +25,19 @@ from reana_db.models import Job
 from reana_job_controller import config, volume_templates
 from reana_job_controller.errors import ComputingBackendSubmissionError
 
-def condor_instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, namespace,
-                    shared_file_system, job_type):
+def get_schedd():
+    """Find and return the HTCondor sched.
+    :returns: htcondor schedd object."""
+
+    # Getting remote scheduler
+    schedd_ad = classad.ClassAd()
+    schedd_ad["MyAddress"] = os.environ.get("HTCONDOR_ADDR", None) 
+    schedd = htcondor.Schedd(schedd_ad)
+    return schedd
+
+def condor_instantiate_job(job_id, workflow_workspace, docker_img, cmd, 
+                           cvmfs_mounts, env_vars, shared_file_system, job_type,
+                           namespace='default'):
     """Create condor job.
 
     :param job_id: Job uuid from reana perspective.
@@ -40,10 +52,7 @@ def condor_instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, names
     :returns: cluster_id of htcondor job.
     """
 
-    # Getting remote scheduler
-    schedd_ad = classad.ClassAd()
-    schedd_ad["MyAddress"] = os.environ.get("HTCONDOR_ADDR", None) 
-    schedd = htcondor.Schedd(schedd_ad)
+    schedd = get_schedd()
     sub = htcondor.Submit()
     sub['executable'] = '/usr/bin/singularity'
     sub['arguments'] = "exec docker://{0} {1}".format(docker_img,cmd)
@@ -52,16 +61,24 @@ def condor_instantiate_job(job_id, docker_img, cmd, cvmfs_repos, env_vars, names
 
     return clusterid
 
-
 def condor_watch_jobs(job_db):
     """Watch currently running HTCondor jobs.
     :param job_db: Dictionary which contains all current jobs.
     """
     while True:
         #logging.debug('Starting a new stream request to watch Condor Jobs')
+        time.sleep(15) # Not implemented yet
 
 
-    pass # not implemented yet
+def condor_delete_job(job, asynchronous=True):
+    """Delete HTCondor job.
+
+    :param job: The :string: HTCondor cluster ID of the job to be removed.
+    :param asynchronous: Place holder for comparison to k8s.
+    """
+
+    schedd = get_schedd()
+    schedd.act(htcondor.JobAction.Remove, 'ClusterID==%d' % job)
 
 def start_watch_jobs_thread(JOB_DB):
     """Watch changes on jobs within HTCondor."""
