@@ -11,12 +11,14 @@
 import json
 import logging
 import os
+import sys
 import time
 import threading
 import traceback
 import htcondor
 import classad
 from subprocess import check_output
+from retrying import retry
 
 from flask import current_app as app
 from reana_db.database import Session
@@ -24,6 +26,33 @@ from reana_db.models import Job
 
 from reana_job_controller import config, volume_templates
 from reana_job_controller.errors import ComputingBackendSubmissionError
+
+
+def detach(f):
+    """Decorator for creating a forked process"""
+
+    def fork(*args, **kwargs):
+        pid = os.fork()
+        if pid == 0:
+            try:
+                os.setuid(int(os.environ.get('VC3USERID')))
+                f(*args, **kwargs)
+            finally:
+                os._exit(0)
+
+    return fork
+
+@retry(stop_max_attempt_number=5)
+@detach
+def submit(schedd, sub):
+    try:
+        with schedd.transaction() as txn:
+            clusterid = sub.queue(txn)
+    except Exception as e:
+        logging.debug("Error submission: {0}".format(e))
+        raise(Exception)
+
+    return clusterid
 
 def get_schedd():
     """Find and return the HTCondor sched.
@@ -56,10 +85,13 @@ def condor_instantiate_job(job_id, workflow_workspace, docker_img, cmd,
     sub = htcondor.Submit()
     sub['executable'] = '/usr/bin/singularity'
     sub['arguments'] = "exec docker://{0} {1}".format(docker_img,cmd)
-    with schedd.transaction() as txn:
-        clusterid = sub.queue(txn,1)
+    sub['InitialDir'] = '/tmp'
+    clusterid = submit(schedd, sub)
+    # with schedd.transaction() as txn:
+    #     clusterid = sub.queue(txn,1)
 
     return clusterid
+
 
 def condor_watch_jobs(job_db):
     """Watch currently running HTCondor jobs.
