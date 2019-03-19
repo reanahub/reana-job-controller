@@ -21,7 +21,7 @@ history = open('CHANGES.rst').read()
 tests_require = [
     'check-manifest>=0.25',
     'coverage>=4.0',
-    'isort>=4.2.15',
+    'isort>=4.2.2,<4.3',
     'mock>=2.0',
     'pydocstyle>=1.0.0',
     'pytest-cache>=1.0',
@@ -55,10 +55,10 @@ setup_requires = [
 install_requires = [
     'apispec>=0.21.0,<0.40',
     'Flask>=0.11',
-    'kubernetes>=6.0.0',
+    'kubernetes>=9.0.0',
     'marshmallow>=2.13',
-    'reana-commons>=0.5.0.dev20190213,<0.6.0[kubernetes]',
-    'reana-db>=0.5.0.dev20190213,<0.6.0',
+    'reana-commons>=0.5.0.dev20190322,<0.6.0[kubernetes]',
+    'reana-db>=0.5.0.dev20190321,<0.6.0',
 ]
 
 packages = find_packages()

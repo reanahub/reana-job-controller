@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018 CERN.
+# Copyright (C) 2017, 2018, 2019 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -21,7 +21,7 @@ from kubernetes.client.rest import ApiException
 from reana_commons.config import CVMFS_REPOSITORIES
 from reana_commons.k8s.api_client import (current_k8s_batchv1_api_client,
                                           current_k8s_corev1_api_client)
-from reana_commons.k8s.volumes import get_shared_volume, get_k8s_cvmfs_volume
+from reana_commons.k8s.volumes import get_k8s_cvmfs_volume, get_shared_volume
 from reana_db.database import Session
 from reana_db.models import Job
 
