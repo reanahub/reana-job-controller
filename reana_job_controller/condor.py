@@ -8,6 +8,7 @@
 
 """HTCondor wrapper. Utilize libfactory's htcondorlib for job submission"""
 
+import re
 import json
 import logging
 import os
@@ -64,6 +65,18 @@ def get_schedd():
     schedd = htcondor.Schedd(schedd_ad)
     return schedd
 
+def get_input_files(workflow_workspace):
+    """Get files from workflow space
+    :param workflow_workspace: Workflow directory
+    """
+    # First, get list of input files
+    input_files = []
+    for root, dirs, files in os.walk(workflow_workspace):
+        for filename in files:
+           input_files.append(os.path.join(root, filename))
+    
+    return ",".join(input_files)
+    
 def condor_instantiate_job(job_id, workflow_workspace, docker_img, cmd, 
                            cvmfs_mounts, env_vars, shared_file_system, job_type,
                            namespace='default'):
@@ -80,11 +93,11 @@ def condor_instantiate_job(job_id, workflow_workspace, docker_img, cmd,
         should have a shared file system mounted.
     :returns: cluster_id of htcondor job.
     """
-
     schedd = get_schedd()
     sub = htcondor.Submit()
-    sub['executable'] = '/usr/bin/singularity'
-    sub['arguments'] = "exec docker://{0} {1}".format(docker_img,cmd)
+    sub['executable'] = '/code/files/job_wrapper.sh'
+    sub['arguments'] = 'exec docker://{0} {1}'.format(docker_img, re.sub(r'^"|"$', '', json.dumps(cmd)))
+    sub['transfer_input_files'] = get_input_files(workflow_workspace)
     sub['InitialDir'] = '/tmp'
     clusterid = submit(schedd, sub)
     # with schedd.transaction() as txn:

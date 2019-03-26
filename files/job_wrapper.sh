@@ -1,9 +1,23 @@
 #! /bin/bash
 
+# Replicate input files directory structure
+# @TODO: This could be executed 
+# in +PreCmd as a separate script.
+populate(){
+    inputlist=$(cat $_CONDOR_JOB_AD  | grep "TransferInput =" | awk '{print $3}'| sed -e 's/^"//' -e 's/"$//')
+    IFS=',' read -r -a inputs <<< "$inputlist"
+    for file in "${inputs[@]}"; do
+        filepath=$(dirname "$file")
+        filename=$(basename "$file")
+        mkdir -p "$_CONDOR_SCRATCH_DIR/$filepath"
+        if [ -e "$filename" ]; then
+            mv "$filename" "$_CONDOR_SCRATCH_DIR/$filepath"
+        fi
+    done
+}
+
 # Discover singularity binary path
 # by trying different methods
-
-
 find_singularity(){
     # Method 1: Find in environment
     singularity_path="$(which singularity 2>/dev/null)"
@@ -23,6 +37,7 @@ find_singularity(){
     return 1
 }
 
+populate
 find_singularity
 if [ $? != 0 ]; then
     echo "[Error]: Singularity could not be found in the sytem." >&2
