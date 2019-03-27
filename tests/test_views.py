@@ -19,7 +19,8 @@ from mock import Mock, patch
 def test_delete_job(app, mocked_job):
     """Test valid job deletion."""
     with app.test_request_context(), app.test_client() as client:
-        with patch('reana_job_controller.k8s.current_k8s_batchv1_api_client',
+        with patch('reana_job_controller.kubernetes_job_manager.'
+                   'current_k8s_batchv1_api_client',
                    Mock()):
             res = client.delete(url_for('jobs.delete_job', job_id=mocked_job))
             assert res.status_code == 204
@@ -29,7 +30,8 @@ def test_delete_unknown_job(app):
     """Test delete non existing job."""
     random_job = uuid.uuid4()
     with app.test_request_context(), app.test_client() as client:
-        with patch('reana_job_controller.k8s.current_k8s_batchv1_api_client',
+        with patch('reana_job_controller.kubernetes_job_manager.'
+                   'current_k8s_batchv1_api_client',
                    Mock()):
             res = client.delete(url_for('jobs.delete_job', job_id=random_job))
             assert res.status_code == 404
@@ -44,7 +46,7 @@ def test_delete_job_failed_backend(app, mocked_job):
     mocked_k8s_client.delete_namespaced_job = \
         Mock(side_effect=ApiException(reason=computing_backend_error_msg))
     with app.test_request_context(), app.test_client() as client:
-        with patch('reana_job_controller.k8s'
+        with patch('reana_job_controller.kubernetes_job_manager'
                    '.current_k8s_batchv1_api_client', mocked_k8s_client):
             res = client.delete(url_for('jobs.delete_job',
                                         job_id=mocked_job))

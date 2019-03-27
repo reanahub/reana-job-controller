@@ -43,6 +43,9 @@
     },
     "JobRequest": {
       "properties": {
+        "backend": {
+          "type": "string"
+        },
         "cmd": {
           "default": "",
           "type": "string"
@@ -68,9 +71,6 @@
         "job_name": {
           "type": "string"
         },
-        "job_type": {
-          "type": "string"
-        },
         "prettified_cmd": {
           "default": "",
           "type": "string"
@@ -78,6 +78,9 @@
         "shared_file_system": {
           "default": true,
           "type": "boolean"
+        },
+        "workflow_uuid": {
+          "type": "string"
         },
         "workflow_workspace": {
           "type": "string"
@@ -87,6 +90,7 @@
         "docker_img",
         "experiment",
         "job_name",
+        "workflow_uuid",
         "workflow_workspace"
       ],
       "type": "object"

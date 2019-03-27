@@ -12,10 +12,9 @@ import json
 import shlex
 
 from reana_commons.utils import calculate_file_access_time
-
 from reana_db.database import Session
-from reana_db.models import JobStatus, Workflow, JobCache
 from reana_db.models import Job as JobTable
+from reana_db.models import JobCache, JobStatus, Workflow
 
 from reana_job_controller.config import MAX_JOB_RESTARTS
 
@@ -48,14 +47,13 @@ class JobManager():
         self.workflow_uuid = workflow_uuid
 
     def execution_hook(fn):
-        """Add before and after execution hooks."""
+        """Add before execution hooks and DB operations."""
         def wrapper(inst, *args, **kwargs):
             inst.before_execution()
-            result = fn(inst, *args, **kwargs)
-            inst.after_execution()
-            inst.create_job_in_db()
+            backend_job_id = fn(inst, *args, **kwargs)
+            inst.create_job_in_db(backend_job_id)
             inst.cache_job()
-            return result
+            return backend_job_id
         return wrapper
 
     def before_execution(self):
@@ -95,18 +93,18 @@ class JobManager():
         """Stop a job."""
         raise NotImplementedError
 
-    def create_job_in_db(self):
+    def create_job_in_db(self, backend_job_id):
         """Create job in db."""
         job_db_entry = JobTable(
-            id_=self.job_id,
+            backend_job_id=backend_job_id,
             workflow_uuid=self.workflow_uuid,
-            status=JobStatus.created,
+            status=JobStatus.created.name,
             backend=self.backend,
-            # cvmfs_mounts=TODO,
-            # shared_file_system=TODO,
+            cvmfs_mounts=self.cvmfs_mounts or '',
+            shared_file_system=self.shared_file_system or False,
             docker_img=self.docker_img,
             cmd=self.cmd,
-            env_vars=json.dump(self.env_vars),
+            env_vars=json.dumps(self.env_vars),
             restart_count=0,
             max_restart_count=MAX_JOB_RESTARTS,
             deleted=False,
@@ -114,6 +112,7 @@ class JobManager():
             prettified_cmd=self.cmd)
         Session.add(job_db_entry)
         Session.commit()
+        self.job_id = str(job_db_entry.id_)
 
     def cache_job(self):
         """Cache a job."""

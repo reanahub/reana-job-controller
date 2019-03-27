@@ -14,5 +14,13 @@ Job backends
 Kubernetes
 ==========
 
-HTCondor
-==========
+Kubernetes jobs management is done via KubernetesJobManager class which
+inherits main job management class - JobManager.
+
+Execute method creates Kubernetes job specification and submits it. This
+method uses ``@JobManager.execution_hook`` decorator to execute specific
+operations defined in before_execution and necessary DB transactions in the
+right order.
+
+Stop static function is responsible for stoping/deleting successfully finished
+or failed job.
