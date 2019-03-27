@@ -10,6 +10,7 @@
 
    introduction
    restapi
+   developerguide
    contributing
    changes
    license
