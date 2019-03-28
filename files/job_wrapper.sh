@@ -37,6 +37,13 @@ find_singularity(){
     return 1
 }
 
+######## Setup environment #############
+# @TODO: This should be done in a prologue
+# in condor via +PreCmd, eventually.
+#############################
+# Export HOME to condor scratch directory
+export SINGULARITY_CACHEDIR=$_CONDOR_SCRATCH_DIR
+
 populate
 find_singularity
 if [ $? != 0 ]; then
@@ -44,4 +51,30 @@ if [ $? != 0 ]; then
     exit 127
 fi
 
-$singularity_path "$@"
+######## Execution ##########
+# exec "$singularity_path" "$@"
+# Note: Double quoted arguments are broken
+# and passed as multiple arguments
+# in bash for some reason, working that
+# around by dumping command to a
+# temporary wrapper file.
+tmpjob=$(mktemp -p .)
+chmod +x $tmpjob 
+echo "$singularity_path" "$@" > $tmpjob
+exec bash $tmpjob
+res=$?
+rm $tmpjob
+
+###### Stageout ###########
+# TODO: This shoul be done in an epilogue
+# via +PostCmd, eventually.
+# Not implemented yet
+# Stage out depending on the protocol
+# E.g.:
+# - file: will be transferred via condor_chirp
+# - xrootd://<redirector:port>//store/user/path:file: will be transferred via XRootD
+# Dependencies could be handled via vc3-builder
+# E.g.: vc3-builder --require xrootd <stageout cmd>
+
+
+exit $res

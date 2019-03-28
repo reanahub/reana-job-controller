@@ -96,7 +96,10 @@ def condor_instantiate_job(job_id, workflow_workspace, docker_img, cmd,
     schedd = get_schedd()
     sub = htcondor.Submit()
     sub['executable'] = '/code/files/job_wrapper.sh'
-    sub['arguments'] = 'exec docker://{0} {1}'.format(docker_img, re.sub(r'^"|"$', '', json.dumps(cmd)))
+    # condor arguments require double quotes to be escaped
+    sub['arguments'] = 'exec --home .{0}:{0} docker://{1} {2}'.format(workflow_workspace, docker_img, re.sub(r'"', '\\"', cmd))
+    sub['Output'] = '/tmp/$(Cluster)-$(Process).out'
+    sub['Error'] = '/tmp/$(Cluster)-$(Process).err'
     sub['transfer_input_files'] = get_input_files(workflow_workspace)
     sub['InitialDir'] = '/tmp'
     clusterid = submit(schedd, sub)
