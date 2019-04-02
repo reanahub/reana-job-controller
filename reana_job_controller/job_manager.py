@@ -103,13 +103,13 @@ class JobManager():
             cvmfs_mounts=self.cvmfs_mounts or '',
             shared_file_system=self.shared_file_system or False,
             docker_img=self.docker_img,
-            cmd=self.cmd,
+            cmd=json.dumps(self.cmd),
             env_vars=json.dumps(self.env_vars),
             restart_count=0,
             max_restart_count=MAX_JOB_RESTARTS,
             deleted=False,
             name=self.job_id,
-            prettified_cmd=self.cmd)
+            prettified_cmd=json.dumps(self.cmd))
         Session.add(job_db_entry)
         Session.commit()
         self.job_id = str(job_db_entry.id_)
