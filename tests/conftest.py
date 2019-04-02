@@ -20,16 +20,24 @@ from reana_job_controller.job_db import JOB_DB
 
 
 @pytest.fixture()
-def app():
-    """Test application."""
-    app = create_app(JOB_DB, watch_jobs=False)
-    with app.app_context():
-        yield app
-
-
-@pytest.fixture()
 def mocked_job():
     """Mock existing job."""
     job_id = str(uuid.uuid4())
     JOB_DB[job_id] = MagicMock()
     return job_id
+
+
+@pytest.fixture(scope="module")
+def base_app(tmp_shared_volume_path):
+    """Flask application fixture."""
+    config_mapping = {
+        "SERVER_NAME": "localhost:5000",
+        "SECRET_KEY": "SECRET_KEY",
+        "TESTING": True,
+        "SHARED_VOLUME_PATH": tmp_shared_volume_path,
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///testdb.db",
+        "SQLALCHEMY_TRACK_MODIFICATIONS": False,
+        "ORGANIZATIONS": ["default"],
+    }
+    app_ = create_app(config_mapping=config_mapping)
+    return app_
