@@ -76,6 +76,7 @@ def get_input_files(workflow_workspace):
            input_files.append(os.path.join(root, filename))
     
     return ",".join(input_files)
+
     
 def condor_instantiate_job(job_id, workflow_workspace, docker_img, cmd, 
                            cvmfs_mounts, env_vars, shared_file_system, job_type,
@@ -102,6 +103,11 @@ def condor_instantiate_job(job_id, workflow_workspace, docker_img, cmd,
     sub['Error'] = '/tmp/$(Cluster)-$(Process).err'
     sub['transfer_input_files'] = get_input_files(workflow_workspace)
     sub['InitialDir'] = '/tmp'
+    sub['+WantIOProxy'] = 'true'
+    job_env = 'reana_workflow_dir={0}'.format(workflow_workspace)
+    for key, value in env_vars.items():
+        job_env += '; {0}={1}'.format(key, value)
+    sub['environment'] = job_env
     clusterid = submit(schedd, sub)
     # with schedd.transaction() as txn:
     #     clusterid = sub.queue(txn,1)

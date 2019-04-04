@@ -61,20 +61,48 @@ fi
 tmpjob=$(mktemp -p .)
 chmod +x $tmpjob 
 echo "$singularity_path" "$@" > $tmpjob
-exec bash $tmpjob
+bash $tmpjob
 res=$?
 rm $tmpjob
+
+if [ $res != 0 ]; then
+    echo "[Error] Execution failed with error code: $res"
+    exit $res
+fi
 
 ###### Stageout ###########
 # TODO: This shoul be done in an epilogue
 # via +PostCmd, eventually.
-# Not implemented yet
+# Not implemented yet.
+# Read files from $reana_workflow_outputs
+# and writes them into $reana_workflow_dir
+# Transfer all files (but not directories) for now.
 # Stage out depending on the protocol
 # E.g.:
 # - file: will be transferred via condor_chirp
 # - xrootd://<redirector:port>//store/user/path:file: will be transferred via XRootD
 # Dependencies could be handled via vc3-builder
 # E.g.: vc3-builder --require xrootd <stageout cmd>
+# Copy via chirp, do not override files.
+if [ "x$reana_workflow_dir" == "x" ]; then
+    echo "[Info]: Nothing to stage out"
+    exit $res
+fi
 
+CONDOR_CHIRP_BIN=$(command -v condor_chirp)
+# Find condor_chirp binary
+if [ $? != 0 ]; then
+    if [ -n "${_CONDOR_CHIRP_CONFIG}" ]; then
+        CONDOR_CHIRP_BIN="$(find $(dirname $_CONDOR_CHIRP_CONFIG)/../../../ -type f -name "condor_chirp" | head -n 1)"
+    fi
+fi
+if [ "x${CONDOR_CHIRP_BIN}" != "x" ]; then
+    for file in $(find "$_CONDOR_SCRATCH_DIR/$reana_workflow_dir" -maxdepth 1 -type f); do
+        "${CONDOR_CHIRP_BIN}" put -mode wcx -perm 644 "$file" "$reana_workflow_dir/$(basename $file)"
+    done
+else
+    echo "[Error] Could not find condor_chirp"
+    exit 255
+fi
 
 exit $res
