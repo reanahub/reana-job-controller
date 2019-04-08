@@ -15,3 +15,6 @@ MAX_JOB_RESTARTS = 3
 
 SHARED_VOLUME_PATH_ROOT = os.getenv('SHARED_VOLUME_PATH_ROOT', '/var/reana')
 """Root path of the shared volume ."""
+
+JOB_BACKENDS = ['Kubernetes']
+"""Supported job backends."""
