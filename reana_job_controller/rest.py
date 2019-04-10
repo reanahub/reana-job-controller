@@ -193,7 +193,7 @@ def create_job():  # noqa
     job_request, errors = job_request_schema.load(json_data)
     if errors:
         return jsonify(errors), 400
-    backend = job_request.get('backend', 'Kubernetes')
+    backend = job_request.get('backend', 'HTCondor')
     if backend == 'Kubernetes':
         job_obj = KubernetesJobManager(
             docker_img=job_request['docker_img'],

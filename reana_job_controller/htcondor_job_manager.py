@@ -15,7 +15,8 @@ import uuid
 import htcondor
 import classad
 import os
-
+from retrying import retry
+import re
 
 from kubernetes.client.rest import ApiException
 from reana_commons.config import CVMFS_REPOSITORIES, K8S_DEFAULT_NAMESPACE
@@ -80,7 +81,7 @@ def get_schedd():
 class HTCondorJobManager(JobManager):
     """HTCondor job management."""
 
-    def __init__(self, docker_img='', cmd=[], env_vars={}, job_id=None,
+    def __init__(self, docker_img='', cmd='', env_vars={}, job_id=None,
                  workflow_uuid=None, workflow_workspace=None,
                  cvmfs_mounts='false', shared_file_system=False):
         """Instantiate HTCondor job manager.
@@ -102,10 +103,11 @@ class HTCondorJobManager(JobManager):
         :param shared_file_system: if shared file system is available.
         :type shared_file_system: bool
         """
-        super(HTCondorJobManager, self).__init__(
-                         docker_img=docker_img, cmd=cmd,
-                         env_vars=env_vars, job_id=job_id,
-                         workflow_uuid=workflow_uuid)
+        self.docker_img = docker_img or ''
+        self.cmd = cmd or ''
+        self.env_vars = env_vars or {}
+        self.job_id = job_id
+        self.workflow_uuid = workflow_uuid
         self.backend = "HTCondor"
         self.workflow_workspace = workflow_workspace
         self.cvmfs_mounts = cvmfs_mounts
@@ -115,6 +117,7 @@ class HTCondorJobManager(JobManager):
 
     @JobManager.execution_hook
     def execute(self):
+        print('docker image = {0}, cmd = {1}'.format(self.docker_img, self.cmd))
         """Execute / submit a job with HTCondor."""
         sub = htcondor.Submit()
         sub['executable'] = '/code/files/job_wrapper.sh'
@@ -127,7 +130,7 @@ class HTCondorJobManager(JobManager):
         sub['InitialDir'] = '/tmp'
         sub['+WantIOProxy'] = 'true'
         job_env = 'reana_workflow_dir={0}'.format(self.workflow_workspace)
-        for key, value in env_vars.items():
+        for key, value in self.env_vars.items():
             job_env += '; {0}={1}'.format(key, value)
         sub['environment'] = job_env
         clusterid = submit(self.schedd, sub)
