@@ -29,7 +29,7 @@ tests_require = [
     'pytest-pep8>=1.0.6',
     'pytest>=3.8.0',
     'swagger_spec_validator>=2.1.0',
-    'pytest-reana>=0.5.0.dev20190404',
+    'pytest-reana>=0.5.0',
 ]
 
 extras_require = {
@@ -58,8 +58,8 @@ install_requires = [
     'Flask>=0.11',
     'kubernetes>=9.0.0',
     'marshmallow>=2.13',
-    'reana-commons>=0.5.0.dev20190402,<0.6.0[kubernetes]',
-    'reana-db>=0.5.0.dev20190402,<0.6.0',
+    'reana-commons[kubernetes]>=0.5.0,<0.6.0',
+    'reana-db>=0.5.0,<0.6.0',
 ]
 
 packages = find_packages()
@@ -99,6 +99,7 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python',
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
