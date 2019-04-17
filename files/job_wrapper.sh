@@ -3,17 +3,25 @@
 # Replicate input files directory structure
 # @TODO: This could be executed 
 # in +PreCmd as a separate script.
+
+# Get static version of parrot.
+# Note: We depend on curl for this.
+# Assumed to be available on HPC worker nodes (might need to transfer a static version otherwise).
+get_parrot(){
+    curl --retry 5 -o parrot_static_run http://download.virtualclusters.org/builder-files/parrot_static_run_v7.0.11
+    if [ -e "parrot_static_run" ]; then
+        chmod +x parrot_static_run
+    else
+        echo "[Error] Could not download parrot"
+        exit 210
+    fi
+}
+
 populate(){
-    inputlist=$(cat $_CONDOR_JOB_AD  | grep "TransferInput =" | awk '{print $3}'| sed -e 's/^"//' -e 's/"$//')
-    IFS=',' read -r -a inputs <<< "$inputlist"
-    for file in "${inputs[@]}"; do
-        filepath=$(dirname "$file")
-        filename=$(basename "$file")
-        mkdir -p "$_CONDOR_SCRATCH_DIR/$filepath"
-        if [ -e "$filename" ]; then
-            mv "$filename" "$_CONDOR_SCRATCH_DIR/$filepath"
-        fi
-    done
+    if [ ! -x "$_CONDOR_SCRATCH_DIR/parrot_static_run" ]; then get_parrot; fi
+    mkdir -p "$_CONDOR_SCRATCH_DIR/$reana_workflow_dir"
+    local parent="$(dirname $reana_workflow_dir)"
+    $_CONDOR_SCRATCH_DIR/parrot_static_run -T 30 cp --no-clobber -r "/chirp/CONDOR/$reana_workflow_dir" "$_CONDOR_SCRATCH_DIR/$parent"
 }
 
 # Discover singularity binary path
@@ -75,34 +83,22 @@ fi
 # via +PostCmd, eventually.
 # Not implemented yet.
 # Read files from $reana_workflow_outputs
-# and writes them into $reana_workflow_dir
-# Transfer all files (but not directories) for now.
+# and write them into $reana_workflow_dir
 # Stage out depending on the protocol
 # E.g.:
 # - file: will be transferred via condor_chirp
 # - xrootd://<redirector:port>//store/user/path:file: will be transferred via XRootD
-# Dependencies could be handled via vc3-builder
-# E.g.: vc3-builder --require xrootd <stageout cmd>
-# Copy via chirp, do not override files.
+# Only chirp transfer supported for now.
+# Use vc3-builder to get a static version
+# of parrot (eventually, a static version
+# of the chirp client only).
 if [ "x$reana_workflow_dir" == "x" ]; then
     echo "[Info]: Nothing to stage out"
     exit $res
 fi
 
-CONDOR_CHIRP_BIN=$(command -v condor_chirp)
-# Find condor_chirp binary
-if [ $? != 0 ]; then
-    if [ -n "${_CONDOR_CHIRP_CONFIG}" ]; then
-        CONDOR_CHIRP_BIN="$(find $(dirname $_CONDOR_CHIRP_CONFIG)/../../../ -type f -name "condor_chirp" | head -n 1)"
-    fi
-fi
-if [ "x${CONDOR_CHIRP_BIN}" != "x" ]; then
-    for file in $(find "$_CONDOR_SCRATCH_DIR/$reana_workflow_dir" -maxdepth 1 -type f); do
-        "${CONDOR_CHIRP_BIN}" put -mode wcx -perm 644 "$file" "$reana_workflow_dir/$(basename $file)"
-    done
-else
-    echo "[Error] Could not find condor_chirp"
-    exit 255
-fi
+parent="$(dirname $reana_workflow_dir)"
+# TODO: Check for parrot exit code and propagate it in case of errors.
+./parrot_static_run -T 30 cp --no-clobber -r "$_CONDOR_SCRATCH_DIR/$reana_workflow_dir" "/chirp/CONDOR/$parent"
 
 exit $res

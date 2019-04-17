@@ -6,7 +6,7 @@
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
 
-"""Kubernetes Job Manager."""
+"""HTCondor Job Manager."""
 
 import ast
 import logging
@@ -17,6 +17,8 @@ import classad
 import os
 from retrying import retry
 import re
+import shutil
+import filecmp
 
 from kubernetes.client.rest import ApiException
 from reana_commons.config import CVMFS_REPOSITORIES, K8S_DEFAULT_NAMESPACE
@@ -32,13 +34,22 @@ from reana_job_controller.job_manager import JobManager
 
 def detach(f):
     """Decorator for creating a forked process"""
-
     def fork(*args, **kwargs):
+        r, w = os.pipe()
         pid = os.fork()
-        if pid == 0:
+        if pid: # parent
+            os.close(w)
+            r = os.fdopen(r)
+            fout = r.read()
+            return fout
+        else: # child
             try:
+                os.close(r)
+                w = os.fdopen(w, 'w')
                 os.setuid(int(os.environ.get('VC3USERID')))
-                f(*args, **kwargs)
+                out = f(*args, **kwargs)
+                w.write(str(out))
+                w.close()
             finally:
                 os._exit(0)
 
@@ -52,7 +63,7 @@ def submit(schedd, sub):
             clusterid = sub.queue(txn)
     except Exception as e:
         logging.debug("Error submission: {0}".format(e))
-        raise(Exception)
+        raise e
 
     return clusterid
 
@@ -77,6 +88,24 @@ def get_schedd():
     schedd_ad["MyAddress"] = os.environ.get("HTCONDOR_ADDR", None) 
     schedd = htcondor.Schedd(schedd_ad)
     return schedd
+
+def get_wrapper(shared_path):
+    """Get wrapper for job. Transfer if it does not exist.
+    :param shared_path: Shared FS directory, e.g.: /var/reana."""
+    
+    wrapper = os.path.join(shared_path, 'wrapper', 'job_wrapper.sh')
+    local_wrapper = '/code/files/job_wrapper.sh'
+    if os.path.exists(wrapper) and filecmp.cmp(local_wrapper, wrapper):
+        return wrapper
+    try:
+        if not os.path.isdir(os.path.dirname(wrapper)):
+            os.mkdir(os.path.dirname(wrapper))
+        shutil.copy('/code/files/job_wrapper.sh', wrapper)
+    except Exception as e:
+        logging.debug("Error transfering wrapper : {0}.".format(e))
+        raise e
+    
+    return wrapper
 
 class HTCondorJobManager(JobManager):
     """HTCondor job management."""
@@ -113,20 +142,20 @@ class HTCondorJobManager(JobManager):
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.schedd = get_schedd()
+        self.wrapper = get_wrapper(SHARED_VOLUME_PATH_ROOT)
 
 
     @JobManager.execution_hook
     def execute(self):
-        print('docker image = {0}, cmd = {1}'.format(self.docker_img, self.cmd))
         """Execute / submit a job with HTCondor."""
         sub = htcondor.Submit()
-        sub['executable'] = '/code/files/job_wrapper.sh'
+        sub['executable'] = self.wrapper
         # condor arguments require double quotes to be escaped
         sub['arguments'] = 'exec --home .{0}:{0} docker://{1} {2}'.format(self.workflow_workspace,
                 self.docker_img, re.sub(r'"', '\\"', self.cmd))
         sub['Output'] = '/tmp/$(Cluster)-$(Process).out'
         sub['Error'] = '/tmp/$(Cluster)-$(Process).err'
-        sub['transfer_input_files'] = get_input_files(self.workflow_workspace)
+        #sub['transfer_input_files'] = get_input_files(self.workflow_workspace)
         sub['InitialDir'] = '/tmp'
         sub['+WantIOProxy'] = 'true'
         job_env = 'reana_workflow_dir={0}'.format(self.workflow_workspace)
@@ -134,8 +163,8 @@ class HTCondorJobManager(JobManager):
             job_env += '; {0}={1}'.format(key, value)
         sub['environment'] = job_env
         clusterid = submit(self.schedd, sub)
-
-        return clusterid
+        logging.warning("Submitting job clusterid: {0}".format(clusterid))
+        return str(clusterid)
 
 
     def stop(self, backend_job_id, asynchronous=True):
