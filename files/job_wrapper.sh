@@ -12,7 +12,7 @@ get_parrot(){
     if [ -e "parrot_static_run" ]; then
         chmod +x parrot_static_run
     else
-        echo "[Error] Could not download parrot"
+        echo "[Error] Could not download parrot" >&2
         exit 210
     fi
 }
@@ -24,25 +24,51 @@ populate(){
     $_CONDOR_SCRATCH_DIR/parrot_static_run -T 30 cp --no-clobber -r "/chirp/CONDOR/$reana_workflow_dir" "$_CONDOR_SCRATCH_DIR/$parent"
 }
 
-# Discover singularity binary path
-# by trying different methods
-find_singularity(){
-    # Method 1: Find in environment
-    singularity_path="$(which singularity 2>/dev/null)"
-    if [ "x$singularity_path" != "x" ]; then return 0; fi
-    
-    # Method 2: Use module, then find in environment
-    alias module 2>/dev/null
-    if [ $? == 0 ];then
-        MODULE_LIST=(singularity tacc-singularity)
-        for var in ${MODULE_LIST[*]}; do
-            module load $var 2>/dev/null
-            singularity_path="$(which singularity 2>/dev/null)"
-            if [ "x$singularity_path" != "x"]; then return 0; fi
-        done
-    fi
+# Discover the container technology available.
+# Currently searching for: Singularity or Shifter.
+# Returns 0: Successful discovery of a container
+#         1: Couldn't find a container
+find_container(){
+    declare -a search_list=("singularity" "shifter")
+    declare -a module_list=(singularity tacc-singularity)
+    declare -A found_list=()
+    local default="singularity"
 
-    return 1
+    for cntr in "${search_list[@]}"; do
+        cntr_path="$(which $cntr 2>/dev/null)"
+        if [[ -x "$cntr_path" ]] # Checking binaries in path
+        then
+            if [ "$(basename "$cntr_path")" == "$default" ]; then 
+                container_path="$cntr_path"
+                return 0
+            else
+                found_list["$cntr"]="$cntr_path"
+            fi
+        fi
+        # Checking if modules are available
+        alias module 2>/dev/null
+        if [ $? == 0 ];then
+            for var in ${MODULE_LIST[*]}; do
+                module load $var 2>/dev/null
+                var_path="$(which $var 2>/dev/null)"
+                if [ "$(basename "$cntr_path")" == "$default" ]; then
+                    container_path="$var_path"
+                    return 0
+                else
+                    found_list["$cntr"]="$var_path"
+                fi
+            done
+        fi
+    done
+
+    # If default wasn't found but a container was found, use that
+    if (( "${#found_list[@]}" >= 1 )); then
+        local keys=(${!found_list[@]})
+        container_path=${found_list[${keys[0]}]}
+        return 0
+    else
+        return 1 # No containers found
+    fi
 }
 
 ######## Setup environment #############
@@ -52,12 +78,12 @@ find_singularity(){
 # Export HOME to condor scratch directory
 export SINGULARITY_CACHEDIR=$_CONDOR_SCRATCH_DIR
 
-populate
-find_singularity
+find_container
 if [ $? != 0 ]; then
-    echo "[Error]: Singularity could not be found in the sytem." >&2
+    echo "[Error]: Container technology could not be found in the sytem." >&2
     exit 127
 fi
+populate
 
 ######## Execution ##########
 # exec "$singularity_path" "$@"
@@ -68,13 +94,13 @@ fi
 # temporary wrapper file.
 tmpjob=$(mktemp -p .)
 chmod +x $tmpjob 
-echo "$singularity_path" "$@" > $tmpjob
+echo "$container_path" "$@" > $tmpjob
 bash $tmpjob
 res=$?
 rm $tmpjob
 
 if [ $res != 0 ]; then
-    echo "[Error] Execution failed with error code: $res"
+    echo "[Error] Execution failed with error code: $res" >&2
     exit $res
 fi
 
