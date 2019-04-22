@@ -24,6 +24,17 @@ populate(){
     $_CONDOR_SCRATCH_DIR/parrot_static_run -T 30 cp --no-clobber -r "/chirp/CONDOR/$reana_workflow_dir" "$_CONDOR_SCRATCH_DIR/$parent"
 }
 
+find_module(){
+    module > /dev/null 2>&1
+    if [ $? == 0 ]; then
+        return 0
+    elif [ -e /etc/profile.d/modules.sh ]; then
+        source /etc/profile.d/modules.sh
+    fi
+    module > /dev/null 2>&1
+    return $?
+}
+
 # Discover the container technology available.
 # Currently searching for: Singularity or Shifter.
 # Returns 0: Successful discovery of a container
@@ -46,7 +57,7 @@ find_container(){
             fi
         fi
         # Checking if modules are available
-        module > /dev/null 2>&1
+        find_module
         if [ $? == 0 ];then
             for var in ${MODULE_LIST[*]}; do
                 module load $var 2>/dev/null
