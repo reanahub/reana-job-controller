@@ -30,7 +30,7 @@ populate(){
 #         1: Couldn't find a container
 find_container(){
     declare -a search_list=("singularity" "shifter")
-    declare -a module_list=(singularity tacc-singularity)
+    declare -a module_list=(singularity tacc-singularity shifter)
     declare -A found_list=()
     local default="singularity"
 
@@ -51,7 +51,7 @@ find_container(){
             for var in ${MODULE_LIST[*]}; do
                 module load $var 2>/dev/null
                 var_path="$(which $var 2>/dev/null)"
-                if [ "$(basename "$cntr_path")" == "$default" ]; then
+                if [ "$(basename "$var_path")" == "$default" ]; then
                     container_path="$var_path"
                     return 0
                 else
