@@ -31,7 +31,7 @@ populate(){
 find_container(){
     declare -a search_list=("singularity" "shifter")
     declare -a module_list=(singularity tacc-singularity shifter)
-    declare -A found_list=()
+    declare -a found_list=()
     local default="singularity"
 
     for cntr in "${search_list[@]}"; do
@@ -42,11 +42,11 @@ find_container(){
                 container_path="$cntr_path"
                 return 0
             else
-                found_list["$cntr"]="$cntr_path"
+                found_list+=("$cntr_path")
             fi
         fi
         # Checking if modules are available
-        alias module 2>/dev/null
+        module > /dev/null 2>&1
         if [ $? == 0 ];then
             for var in ${MODULE_LIST[*]}; do
                 module load $var 2>/dev/null
@@ -55,7 +55,7 @@ find_container(){
                     container_path="$var_path"
                     return 0
                 else
-                    found_list["$cntr"]="$var_path"
+                    found_list+=("$var_path")
                 fi
             done
         fi
@@ -63,8 +63,7 @@ find_container(){
 
     # If default wasn't found but a container was found, use that
     if (( "${#found_list[@]}" >= 1 )); then
-        local keys=(${!found_list[@]})
-        container_path=${found_list[${keys[0]}]}
+        container_path=${found_list[0]}
         return 0
     else
         return 1 # No containers found
