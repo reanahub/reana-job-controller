@@ -11,12 +11,11 @@
 import json
 import shlex
 
+from flask import current_app
 from reana_commons.utils import calculate_file_access_time
 from reana_db.database import Session
 from reana_db.models import Job as JobTable
 from reana_db.models import JobCache, JobStatus, Workflow
-
-from reana_job_controller.config import MAX_JOB_RESTARTS
 
 
 class JobManager():
@@ -106,7 +105,7 @@ class JobManager():
             cmd=json.dumps(self.cmd),
             env_vars=json.dumps(self.env_vars),
             restart_count=0,
-            max_restart_count=MAX_JOB_RESTARTS,
+            max_restart_count=current_app.config['MAX_JOB_RESTARTS'],
             deleted=False,
             name=self.job_id,
             prettified_cmd=json.dumps(self.cmd))

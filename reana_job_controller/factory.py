@@ -27,10 +27,9 @@ def create_app(JOB_DB=None, watch_jobs=True, config_mapping=None):
     )
     app = Flask(__name__)
     app.secret_key = "mega secret key"
+    app.config.from_object(config)
     if config_mapping:
         app.config.from_mapping(config_mapping)
-    else:
-        app.config.from_object(config)
     with app.app_context():
         app.config['OPENAPI_SPEC'] = build_openapi_spec()
 
