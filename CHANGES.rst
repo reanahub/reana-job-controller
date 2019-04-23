@@ -1,6 +1,13 @@
 Changes
 =======
 
+Version 0.5.1 (2019-04-23)
+--------------------------
+
+- Pins ``urllib3`` due to a conflict while installing ``Kubernetes`` Python
+  library.
+- Fixes documenation build badge.
+
 Version 0.5.0 (2019-04-23)
 --------------------------
 

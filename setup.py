@@ -60,6 +60,7 @@ install_requires = [
     'marshmallow>=2.13',
     'reana-commons[kubernetes]>=0.5.0,<0.6.0',
     'reana-db>=0.5.0,<0.6.0',
+    'urllib3<1.25,>=1.21.1',
 ]
 
 packages = find_packages()
