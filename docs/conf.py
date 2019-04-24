@@ -80,7 +80,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'reana'
-copyright = '2017, info@reana.io'
+copyright = '2017-2019, info@reana.io'
 author = 'info@reana.io'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -195,8 +195,8 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'reana.tex', 'reana Documentation',
-     'info@reana.io', 'manual'),
+    # (master_doc, 'reana.tex', 'reana Documentation',
+    #  'info@reana.io', 'manual'),
 ]
 
 
