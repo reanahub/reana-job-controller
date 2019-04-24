@@ -146,7 +146,7 @@ class KubernetesJobManager(JobManager):
             delete_options = V1DeleteOptions(
                 propagation_policy=propagation_policy)
             current_k8s_batchv1_api_client.delete_namespaced_job(
-                backend_job_id, K8S_DEFAULT_NAMESPACE, delete_options)
+                backend_job_id, K8S_DEFAULT_NAMESPACE, body=delete_options)
         except ApiException as e:
             logging.error(
                 'An error has occurred while connecting to Kubernetes API '

@@ -1,6 +1,27 @@
 Changes
 =======
 
+Version 0.5.1 (2019-04-23)
+--------------------------
+
+- Pins ``urllib3`` due to a conflict while installing ``Kubernetes`` Python
+  library.
+- Fixes documenation build badge.
+
+Version 0.5.0 (2019-04-23)
+--------------------------
+
+- Adds a new endpoint to delete jobs (Kubernetes).
+- Introduces new common interface for job management which defines what the
+  compute backends should offer to be compatible with REANA, currently only
+  Kubernetes backend is supported.
+- Fixes security vulnerability which allowed users to access other people's
+  workspaces.
+- Makes CVMFS mounts optional and configurable at repository level.
+- Updates the creation of CVMFS volumes specification, it now uses normal
+  persistent volume claims.
+- Increases stability and improves test coverage.
+
 Version 0.4.0 (2018-11-06)
 --------------------------
 

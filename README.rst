@@ -5,7 +5,7 @@
 .. image:: https://img.shields.io/travis/reanahub/reana-job-controller.svg
    :target: https://travis-ci.org/reanahub/reana-job-controller
 
-.. image:: https://readthedocs.org/projects/docs/badge/?version=latest
+.. image:: https://readthedocs.org/projects/reana-job-controller/badge/?version=latest
    :target: https://reana-job-controller.readthedocs.io/en/latest/?badge=latest
 
 .. image:: https://img.shields.io/coveralls/reanahub/reana-job-controller.svg

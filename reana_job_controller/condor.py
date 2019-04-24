@@ -27,6 +27,7 @@ from reana_db.models import Job
 
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.htcondor_job_manager import HTCondorJobManager
+from reana_job_controller.htcondor_job_manager import get_schedd
 
 condorJobStatus = {
     'Unexpanded': 0,
