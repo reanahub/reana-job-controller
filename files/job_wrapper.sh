@@ -85,8 +85,13 @@ find_container(){
 # @TODO: This should be done in a prologue
 # in condor via +PreCmd, eventually.
 #############################
-# Export HOME to condor scratch directory
-export SINGULARITY_CACHEDIR=$_CONDOR_SCRATCH_DIR
+# Send cache to $SCRATCH or to the condor scratch directory
+# otherwise
+if [ "x$SCRATCH" == "x" ]; then
+    export SINGULARITY_CACHEDIR="$_CONDOR_SCRATCH_DIR"
+else
+    export SINGULARITY_CACHEDIR="$SCRATCH"
+fi
 
 find_container
 if [ $? != 0 ]; then
