@@ -41,9 +41,11 @@ find_module(){
 #         1: Couldn't find a container
 find_container(){
     declare -a search_list=("singularity" "shifter")
-    declare -a module_list=(singularity tacc-singularity shifter)
+    declare -a module_list=("singularity" "tacc-singularity" "shifter")
     declare -a found_list=()
     local default="singularity"
+    find_module
+    module_found=$?
 
     for cntr in "${search_list[@]}"; do
         cntr_path="$(which $cntr 2>/dev/null)"
@@ -57,9 +59,8 @@ find_container(){
             fi
         fi
         # Checking if modules are available
-        find_module
-        if [ $? == 0 ];then
-            for var in ${MODULE_LIST[*]}; do
+        if [ $module_found == 0 ]; then
+            for var in ${module_list[*]}; do
                 module load $var 2>/dev/null
                 var_path="$(which $var 2>/dev/null)"
                 if [ "$(basename "$var_path")" == "$default" ]; then
