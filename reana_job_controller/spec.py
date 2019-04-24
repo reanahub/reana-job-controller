@@ -13,13 +13,14 @@ from apispec import APISpec
 from flask import current_app
 
 from reana_job_controller.schemas import Job, JobRequest
+from reana_job_controller.version import __version__
 
 
 def build_openapi_spec():
     """Create OpenAPI definition."""
     spec = APISpec(
         title='reana-job-controller',
-        version='0.4.0',
+        version=__version__,
         info=dict(
             description='REANA Job Controller API'
         ),
