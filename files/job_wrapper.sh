@@ -4,6 +4,11 @@
 # @TODO: This could be executed 
 # in +PreCmd as a separate script.
 
+# Expected arguments from htcondor_job_manager:
+# $1: workflow_workspace
+# $2: docker_img
+# $3: cmd (to run within container for reana workflow step)
+
 # Get static version of parrot.
 # Note: We depend on curl for this.
 # Assumed to be available on HPC worker nodes (might need to transfer a static version otherwise).
@@ -45,7 +50,7 @@ find_container(){
     declare -a found_list=()
     local default="singularity"
     find_module
-    module_found=$?
+    local module_found=$?
 
     for cntr in "${search_list[@]}"; do
         cntr_path="$(which $cntr 2>/dev/null)"
@@ -82,13 +87,63 @@ find_container(){
     fi
 }
 
+# Setting up cmd line args for singularity
+# Print's stdout the argument line for running singularity utilizing
+# the passed in variables
+# $1: workflow_workspace
+# $2: docker_img
+# $3: cmd (to run within container for reana workflow step)
+setup_singularity(){
+    echo "exec --home .$1:$1 docker://$2 $3"
+}
+
+# Setting up shifter. Pull the img first if not present, then
+# setup the 
+setup_shifter(){
+    # Check for shifterimg
+    if [[ ! $(which shifterimg 2>/dev/null) ]]; then
+        echo "Error: shifterimg not found..." >&2
+        exit 127
+    fi
+    # Check if dockerimg is arleady on resource
+    if [[ ! shifterimg lookup "$2" >/dev/null 2>&1 ]]; then
+        # Pull if not available
+        if [[ ! shifterimg pull "$2" >/dev/null 2>&1 ]]; then
+            echo "Error: Could not pull img: $2" >&2 
+            exit 127
+        fi
+    fi
+    # Put arguments into stdout to collect
+    echo "--image=docker:$2 -- $3"
+
+}
+
+# Setting up the arguments to pass to a container technology.
+# Currently able to setup: Singularity and Shifter.
+# Creates cmd line arguements for containers and pull image if needed (shifter)
+# Global arguments is used as the arguments to a container
+setup_container(){
+    # Need to cleanup to make more automated.
+    # i.e. run through the same list in find_container
+    local container=$(basename "$container_path")
+
+    if [ "$container" == "singularity" ]; then
+        arguments=$(setup_singularity)
+    elif [ "$container" == "shifter" ]; then
+        arguments=$(setup_shifter)
+    else
+        echo "Error: Unrecognized container: $(basename $container_path)" >&2
+        exit 127
+    fi
+}
+
 ######## Setup environment #############
 # @TODO: This should be done in a prologue
 # in condor via +PreCmd, eventually.
 #############################
 # Send cache to $SCRATCH or to the condor scratch directory
 # otherwise
-if [ "x$SCRATCH" == "x" ]; then
+if [ -z "$SCRATCH" ]; then
     export SINGULARITY_CACHEDIR="$_CONDOR_SCRATCH_DIR"
 else
     export SINGULARITY_CACHEDIR="$SCRATCH"
@@ -99,6 +154,7 @@ if [ $? != 0 ]; then
     echo "[Error]: Container technology could not be found in the sytem." >&2
     exit 127
 fi
+setup_container
 populate
 
 ######## Execution ##########
@@ -110,7 +166,7 @@ populate
 # temporary wrapper file.
 tmpjob=$(mktemp -p .)
 chmod +x $tmpjob 
-echo "$container_path" "$@" > $tmpjob
+echo "$container_path" "$arguments" > $tmpjob
 bash $tmpjob
 res=$?
 rm $tmpjob
