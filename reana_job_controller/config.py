@@ -19,9 +19,9 @@ SHARED_VOLUME_PATH_ROOT = os.getenv('SHARED_VOLUME_PATH_ROOT', '/var/reana')
 """Root path of the shared volume ."""
 
 JOB_BACKENDS = {
-    'Kubernetes': KubernetesJobManager
+    'kubernetes': KubernetesJobManager
 }
 """Supported job backends and corresponding management class."""
 
-DEFAULT_JOB_BACKEND = 'Kubernetes'
+DEFAULT_JOB_BACKEND = 'kubernetes'
 """Default compute backend for job submission."""

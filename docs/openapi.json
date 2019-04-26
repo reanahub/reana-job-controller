@@ -319,6 +319,13 @@
             "name": "job_id",
             "required": true,
             "type": "string"
+          },
+          {
+            "description": "Job execution backend.",
+            "in": "query",
+            "name": "backend",
+            "required": false,
+            "type": "string"
           }
         ],
         "produces": [

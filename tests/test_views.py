@@ -11,7 +11,7 @@
 import uuid
 
 import pytest
-from flask import url_for
+from flask import current_app, url_for
 from kubernetes.client.rest import ApiException
 from mock import Mock, patch
 
@@ -22,7 +22,10 @@ def test_delete_job(app, mocked_job):
         with patch('reana_job_controller.kubernetes_job_manager.'
                    'current_k8s_batchv1_api_client',
                    Mock()):
-            res = client.delete(url_for('jobs.delete_job', job_id=mocked_job))
+            res = client.delete(
+                url_for('jobs.delete_job', job_id=mocked_job),
+                query_string={
+                    "backend": current_app.config['DEFAULT_JOB_BACKEND']})
             assert res.status_code == 204
 
 
@@ -33,7 +36,10 @@ def test_delete_unknown_job(app):
         with patch('reana_job_controller.kubernetes_job_manager.'
                    'current_k8s_batchv1_api_client',
                    Mock()):
-            res = client.delete(url_for('jobs.delete_job', job_id=random_job))
+            res = client.delete(
+                url_for('jobs.delete_job', job_id=random_job),
+                query_string={
+                    "backend": current_app.config['DEFAULT_JOB_BACKEND']})
             assert res.status_code == 404
 
 

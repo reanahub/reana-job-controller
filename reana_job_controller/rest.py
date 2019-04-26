@@ -333,6 +333,11 @@ def delete_job(job_id):  # noqa
          description: Required. ID of the job to be deleted.
          required: true
          type: string
+       - name: backend
+         in: query
+         description: Job execution backend.
+         required: false
+         type: string
       responses:
         204:
           description: >-
@@ -356,8 +361,11 @@ def delete_job(job_id):  # noqa
     """
     if job_exists(job_id):
         try:
+            backend = request.args.get(
+                'backend',
+                current_app.config['DEFAULT_JOB_BACKEND'])
             backend_job_id = retrieve_backend_job_id(job_id)
-            KubernetesJobManager.stop(backend_job_id)
+            current_app.config['JOB_BACKENDS'][backend].stop(backend_job_id)
             return jsonify(), 204
         except ComputingBackendSubmissionError as e:
             return jsonify(
