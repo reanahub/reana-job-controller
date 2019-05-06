@@ -27,7 +27,7 @@ from reana_job_controller.job_manager import JobManager
 class KubernetesJobManager(JobManager):
     """Kubernetes job management."""
 
-    def __init__(self, docker_img='', cmd=[], env_vars={}, job_id=None,
+    def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
                  workflow_uuid=None, workflow_workspace=None,
                  cvmfs_mounts='false', shared_file_system=False):
         """Instanciate kubernetes job manager.
