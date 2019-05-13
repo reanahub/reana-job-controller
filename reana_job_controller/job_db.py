@@ -52,6 +52,15 @@ def retrieve_condor_job(job_id):
     """
     return JOB_DB[job_id]['obj']
 
+def retrieve_backend_job_id(job_id):
+    """Retrieve backend job id.
+
+    :param job_id: String which represents the ID of the job.
+    :returns: job_id in a specific backend.
+    """
+    return JOB_DB[job_id]['backend_job_id']
+
+
 def retrieve_all_jobs():
     """Retrieve all jobs in the DB.
 
