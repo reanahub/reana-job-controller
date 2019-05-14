@@ -30,7 +30,6 @@ populate(){
     if [ ! -x "$_CONDOR_SCRATCH_DIR/parrot_static_run" ]; then get_parrot; fi
     mkdir -p "$_CONDOR_SCRATCH_DIR/$REANA_WORKFLOW_DIR"
     local parent="$(dirname $REANA_WORKFLOW_DIR)"
-    sleep 5000
     $_CONDOR_SCRATCH_DIR/parrot_static_run -T 30 cp --no-clobber -r "/chirp/CONDOR/$REANA_WORKFLOW_DIR" "$_CONDOR_SCRATCH_DIR/$parent"
 }
 
@@ -153,7 +152,7 @@ if [ $? != 0 ]; then
     exit 127
 fi
 setup_container
-#populate
+populate
 
 ######## Execution ##########
 # Note: Double quoted arguments are broken
@@ -194,6 +193,6 @@ fi
 
 parent="$(dirname $REANA_WORKFLOW_DIR)"
 # TODO: Check for parrot exit code and propagate it in case of errors.
-#./parrot_static_run -T 30 cp --no-clobber -r "$_CONDOR_SCRATCH_DIR/$REANA_WORKFLOW_DIR" "/chirp/CONDOR/$parent"
+./parrot_static_run -T 30 cp --no-clobber -r "$_CONDOR_SCRATCH_DIR/$REANA_WORKFLOW_DIR" "/chirp/CONDOR/$parent"
 
 exit $res
