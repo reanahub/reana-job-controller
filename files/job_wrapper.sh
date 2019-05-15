@@ -52,7 +52,7 @@ find_container(){
     declare -a search_list=("singularity" "shifter")
     declare -a module_list=("singularity" "tacc-singularity" "shifter")
     declare -a found_list=()
-    local default="singularity"
+    local default="shifter"
     find_module
     local module_found=$?
 
@@ -94,7 +94,7 @@ find_container(){
 # Setting up cmd line args for singularity
 # Print's stdout the argument line for running singularity utilizing
 setup_singularity(){
-    echo "exec --home .$REANA_WORKFLOW_DIR:$REANA_WORKFLOW_DIR docker://$DOCKER_IMG"
+    echo "exec -B $REANA_WORKFLOW_DIR:/reana docker://$DOCKER_IMG"
 }
 
 # Setting up shifter. Pull the docker_img into the shifter image gateway
@@ -112,7 +112,7 @@ setup_shifter(){
         exit 127
     fi
     # Put arguments into stdout to collect
-    echo "--image=docker:$DOCKER_IMG --workdir=$REANA_WORKFLOW_DIR --"
+    echo "--image=docker:$DOCKER_IMG --volume=$REANA_WORKFLOW_DIR:/reana -- "
 }
 
 # Setting up the arguments to pass to a container technology.
@@ -162,7 +162,7 @@ populate
 # temporary wrapper file named tmpjob.
 tmpjob=$(mktemp -p .)
 chmod +x $tmpjob 
-echo "$container_path" "$cntr_arguments" ${@:3} > $tmpjob
+echo "$container_path" "$cntr_arguments" "bash -c \"cd /reana; ${@:3}\"" > $tmpjob
 bash $tmpjob
 res=$?
 rm $tmpjob
