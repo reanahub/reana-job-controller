@@ -30,7 +30,7 @@ populate(){
     if [ ! -x "$_CONDOR_SCRATCH_DIR/parrot_static_run" ]; then get_parrot; fi
     mkdir -p "$_CONDOR_SCRATCH_DIR/$REANA_WORKFLOW_DIR"
     local parent="$(dirname $REANA_WORKFLOW_DIR)"
-    $_CONDOR_SCRATCH_DIR/parrot_static_run -T 30 cp --no-clobber -r "/chirp/CONDOR/$REANA_WORKFLOW_DIR" "$_CONDOR_SCRATCH_DIR/$parent"
+    #$_CONDOR_SCRATCH_DIR/parrot_static_run -T 30 cp --no-clobber -r "/chirp/CONDOR/$REANA_WORKFLOW_DIR" "$_CONDOR_SCRATCH_DIR/$parent"
 }
 
 find_module(){
@@ -50,10 +50,9 @@ find_module(){
 #         1: Couldn't find a container
 find_container(){
     declare -a search_list=("singularity" "shifter")
-    declare -a module_list=("singularity" "tacc-singularity" "shifter")
     declare -a found_list=()
-    local default="shifter"
-    find_module
+    local default="singularity"
+    local cont_found=false
     local module_found=$?
 
     for cntr in "${search_list[@]}"; do
@@ -61,30 +60,37 @@ find_container(){
         if [[ -x "$cntr_path" ]] # Checking binaries in path
         then
             if [ "$(basename "$cntr_path")" == "$default" ]; then 
-                container_path="$cntr_path"
+                CONTAINER_PATH="$cntr_path"
                 return 0
             else
                 found_list+=("$cntr_path")
+                cont_found=true
             fi
         fi
-        # Checking if modules are available
-        if [ $module_found == 0 ]; then
-            for var in ${module_list[*]}; do
-                module load $var 2>/dev/null
-                var_path="$(command -v $var 2>/dev/null)"
-                if [ "$(basename "$var_path")" == "$default" ]; then
-                    container_path="$var_path"
-                    return 0
-                else
-                    found_list+=("$var_path")
-                fi
-            done
-        fi
     done
+    # If VC3 didn't automatically load a module (fail-safe)
+    if [ ! "$cont_found" ]; then
+        for cntr in "${search_list[@]}"; do
+            find_module
+            if [ $module_found == 0 ]; then
+                for var in ${search_list[*]}; do
+                    module load $var 2>/dev/null
+                    var_path="$(command -v $var 2>/dev/null)"
+                    if [ "$(basename "$var_path")" == "$default" ]; then
+                        CONTAINER_PATH="$var_path"
+                        return 0
+                    else
+                        found_list+=("$var_path")
+                        cont_found=true
+                    fi
+                done
+            fi
+        done
+    fi
 
     # If default wasn't found but a container was found, use that
     if (( "${#found_list[@]}" >= 1 )); then
-        container_path=${found_list[0]}
+        CONTAINER_PATH=${found_list[0]}
         return 0
     else
         return 1 # No containers found
@@ -94,7 +100,15 @@ find_container(){
 # Setting up cmd line args for singularity
 # Print's stdout the argument line for running singularity utilizing
 setup_singularity(){
-    echo "exec -B $REANA_WORKFLOW_DIR:/reana docker://$DOCKER_IMG"
+
+    # Send cache to $SCRATCH or to the condor scratch directory
+    # otherwise
+    if [ -z "$SCRATCH" ]; then
+        export SINGULARITY_CACHEDIR="$_CONDOR_SCRATCH_DIR"
+    else
+        export SINGULARITY_CACHEDIR="$SCRATCH"
+    fi
+echo "exec -B $REANA_WORKFLOW_DIR:/reana docker://$DOCKER_IMG"
 }
 
 # Setting up shifter. Pull the docker_img into the shifter image gateway
@@ -111,8 +125,12 @@ setup_shifter(){
         echo "Error: Could not pull img: $DOCKER_IMG" >&2 
         exit 127
     fi
+    # Move directories to avoid https://github.com/NERSC/shifter/issues/250
+    #mv "$REANA_WORKFLOW_DIR" "$HOME"/reana
+
+
     # Put arguments into stdout to collect
-    echo "--image=docker:$DOCKER_IMG --volume=$REANA_WORKFLOW_DIR:/reana -- "
+    echo "--image=docker:${DOCKER_IMG} --volume=${REANA_WORKFLOW_DIR}:/reana -- "
 }
 
 # Setting up the arguments to pass to a container technology.
@@ -122,14 +140,14 @@ setup_shifter(){
 setup_container(){
     # Need to cleanup to make more automated.
     # i.e. run through the same list in find_container
-    local container=$(basename "$container_path")
+    local container=$(basename "$CONTAINER_PATH")
 
     if [ "$container" == "singularity" ]; then
         cntr_arguments=$(setup_singularity)
     elif [ "$container" == "shifter" ]; then
         cntr_arguments=$(setup_shifter)
     else
-        echo "Error: Unrecognized container: $(basename $container_path)" >&2
+        echo "Error: Unrecognized container: $(basename $CONTAINER_PATH)" >&2
         exit 127
     fi
 }
@@ -138,21 +156,14 @@ setup_container(){
 # @TODO: This should be done in a prologue
 # in condor via +PreCmd, eventually.
 #############################
-# Send cache to $SCRATCH or to the condor scratch directory
-# otherwise
-if [ -z "$SCRATCH" ]; then
-    export SINGULARITY_CACHEDIR="$_CONDOR_SCRATCH_DIR"
-else
-    export SINGULARITY_CACHEDIR="$SCRATCH"
-fi
 
 find_container
 if [ $? != 0 ]; then
     echo "[Error]: Container technology could not be found in the sytem." >&2
     exit 127
 fi
-setup_container
 populate
+setup_container
 
 ######## Execution ##########
 # Note: Double quoted arguments are broken
@@ -162,7 +173,7 @@ populate
 # temporary wrapper file named tmpjob.
 tmpjob=$(mktemp -p .)
 chmod +x $tmpjob 
-echo "$container_path" "$cntr_arguments" "bash -c \"cd /reana; ${@:3}\"" > $tmpjob
+echo "$CONTAINER_PATH" "$cntr_arguments" "bash -c \"cd /reana; ${@:3}\"" > $tmpjob
 bash $tmpjob
 res=$?
 rm $tmpjob
