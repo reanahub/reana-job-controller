@@ -30,7 +30,7 @@ populate(){
     if [ ! -x "$_CONDOR_SCRATCH_DIR/parrot_static_run" ]; then get_parrot; fi
     mkdir -p "$_CONDOR_SCRATCH_DIR/$REANA_WORKFLOW_DIR"
     local parent="$(dirname $REANA_WORKFLOW_DIR)"
-    #$_CONDOR_SCRATCH_DIR/parrot_static_run -T 30 cp --no-clobber -r "/chirp/CONDOR/$REANA_WORKFLOW_DIR" "$_CONDOR_SCRATCH_DIR/$parent"
+    $_CONDOR_SCRATCH_DIR/parrot_static_run -T 30 cp --no-clobber -r "/chirp/CONDOR/$REANA_WORKFLOW_DIR" "$_CONDOR_SCRATCH_DIR/$parent"
 }
 
 find_module(){
@@ -53,7 +53,7 @@ find_container(){
     declare -a found_list=()
     local default="singularity"
     local cont_found=false
-    local module_found=$?
+    
 
     for cntr in "${search_list[@]}"; do
         cntr_path="$(command -v $cntr)"
@@ -72,6 +72,7 @@ find_container(){
     if [ ! "$cont_found" ]; then
         for cntr in "${search_list[@]}"; do
             find_module
+            module_found=$?
             if [ $module_found == 0 ]; then
                 for var in ${search_list[*]}; do
                     module load $var 2>/dev/null
@@ -125,9 +126,6 @@ setup_shifter(){
         echo "Error: Could not pull img: $DOCKER_IMG" >&2 
         exit 127
     fi
-    # Move directories to avoid https://github.com/NERSC/shifter/issues/250
-    #mv "$REANA_WORKFLOW_DIR" "$HOME"/reana
-
 
     # Put arguments into stdout to collect
     echo "--image=docker:${DOCKER_IMG} --volume=${REANA_WORKFLOW_DIR}:/reana -- "
