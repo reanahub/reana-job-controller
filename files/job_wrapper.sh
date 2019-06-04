@@ -130,10 +130,8 @@ setup_shifter(){
         echo "Error: Could not pull img: $DOCKER_IMG" >&2 
         exit 127
     fi
-    # remove a "/" for shifter being too specific
-    local reana_mount=$(echo $REANA_WORKFLOW_DIR | cut -c 2-)
 
-    # Put arguments into stdout to collect. There is already a "/" in $RWD
+    # Put arguments into stdout to collect.
     echo "--image=docker:${DOCKER_IMG} --volume=$(pwd -P)/reana:/reana -- "
 }
 
@@ -180,7 +178,6 @@ chmod +x $tmpjob
 echo "$CONTAINER_ENV" "$CONTAINER_PATH" "$CNTR_ARGUMENTS" "${@:3} " > $tmpjob
 bash $tmpjob
 res=$?
-cp $tmpjob /u/sciteam/kankel1/
 rm $tmpjob
 
 if [ $res != 0 ]; then
