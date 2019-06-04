@@ -51,7 +51,7 @@ find_module(){
 find_container(){
     declare -a search_list=("singularity" "shifter")
     declare -a found_list=()
-    local default="singularity"
+    local default="shifter"
     local cont_found=false
     
 
@@ -101,20 +101,24 @@ find_container(){
 # Setting up cmd line args for singularity
 # Print's stdout the argument line for running singularity utilizing
 setup_singularity(){
+    # TODO: Cleanup calling of this function
 
     # Send cache to $SCRATCH or to the condor scratch directory
     # otherwise
     if [ -z "$SCRATCH" ]; then
-        export SINGULARITY_CACHEDIR="$_CONDOR_SCRATCH_DIR"
+        CONTAINER_ENV="SINGULARITY_CACHEDIR=\"\$_CONDOR_SCRATCH_DIR\""
     else
-        export SINGULARITY_CACHEDIR="$SCRATCH"
+        CONTAINER_ENV="SINGULARITY_CACHEDIR=\"\$SCRATCH\""
     fi
-echo "exec -B $REANA_WORKFLOW_DIR:/reana docker://$DOCKER_IMG"
+
+    CNTR_ARGUMENTS="exec -B ./$REANA_WORKFLOW_DIR:$REANA_WORKFLOW_DIR docker://$DOCKER_IMG"
+
 }
 
 # Setting up shifter. Pull the docker_img into the shifter image gateway
 # and dump required arguments into stdout to be collected by a function call
 setup_shifter(){
+    #TODO: Cleanup calling of this function
     # Check for shifterimg
     if [[ ! $(command -v shifterimg 2>/dev/null) ]]; then
         echo "Error: shifterimg not found..." >&2
@@ -126,9 +130,11 @@ setup_shifter(){
         echo "Error: Could not pull img: $DOCKER_IMG" >&2 
         exit 127
     fi
+    # remove a "/" for shifter being too specific
+    local reana_mount=$(echo $REANA_WORKFLOW_DIR | cut -c 2-)
 
-    # Put arguments into stdout to collect
-    echo "--image=docker:${DOCKER_IMG} --volume=${REANA_WORKFLOW_DIR}:/reana -- "
+    # Put arguments into stdout to collect. There is already a "/" in $RWD
+    echo "--image=docker:${DOCKER_IMG} --volume=$(pwd -P)/reana:/reana -- "
 }
 
 # Setting up the arguments to pass to a container technology.
@@ -141,9 +147,9 @@ setup_container(){
     local container=$(basename "$CONTAINER_PATH")
 
     if [ "$container" == "singularity" ]; then
-        cntr_arguments=$(setup_singularity)
+        setup_singularity 
     elif [ "$container" == "shifter" ]; then
-        cntr_arguments=$(setup_shifter)
+        CNTR_ARGUMENTS=$(setup_shifter)
     else
         echo "Error: Unrecognized container: $(basename $CONTAINER_PATH)" >&2
         exit 127
@@ -171,9 +177,10 @@ setup_container
 # temporary wrapper file named tmpjob.
 tmpjob=$(mktemp -p .)
 chmod +x $tmpjob 
-echo "$CONTAINER_PATH" "$cntr_arguments" "bash -c \"cd /reana; ${@:3}\"" > $tmpjob
+echo "$CONTAINER_ENV" "$CONTAINER_PATH" "$CNTR_ARGUMENTS" "${@:3} " > $tmpjob
 bash $tmpjob
 res=$?
+cp $tmpjob /u/sciteam/kankel1/
 rm $tmpjob
 
 if [ $res != 0 ]; then
