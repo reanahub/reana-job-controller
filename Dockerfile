@@ -19,7 +19,7 @@ RUN useradd -u $VC3USERID vc3user
 RUN apt-get update && \
     apt-get install -y vim-tiny && \
     pip install --upgrade pip && \
-    pip install htcondor retrying
+    pip install htcondor==8.9.1 retrying
 
 COPY CHANGES.rst README.rst setup.py /code/
 COPY reana_job_controller/version.py /code/reana_job_controller/
