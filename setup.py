@@ -58,7 +58,7 @@ install_requires = [
     'Flask>=0.11',
     'kubernetes>=9.0.0',
     'marshmallow>=2.13',
-    'reana-commons[kubernetes]>=0.5.0,<0.6.0',
+    'reana-commons[kubernetes]>=0.6.0.dev20190604,<0.7.0',
     'reana-db>=0.5.0,<0.6.0',
     'urllib3<1.25,>=1.21.1',
 ]
