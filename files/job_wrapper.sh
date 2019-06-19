@@ -175,7 +175,11 @@ setup_container
 # temporary wrapper file named tmpjob.
 tmpjob=$(mktemp -p .)
 chmod +x $tmpjob 
-echo "$CONTAINER_ENV" "$CONTAINER_PATH" "$CNTR_ARGUMENTS" "${@:3} " > $tmpjob
+if command -v aprun; then
+    echo -n "aprun -b -n 1 -- " > $tmpjob
+fi
+
+echo "$CONTAINER_ENV" "$CONTAINER_PATH" "$CNTR_ARGUMENTS" "${@:3} " >> $tmpjob
 bash $tmpjob
 res=$?
 rm $tmpjob
