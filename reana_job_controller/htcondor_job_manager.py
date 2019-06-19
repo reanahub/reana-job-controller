@@ -151,8 +151,10 @@ class HTCondorJobManager(JobManager):
         sub = htcondor.Submit()
         sub['executable'] = self.wrapper
         # condor arguments require double quotes to be escaped
-        sub['arguments'] = 'exec --home .{0}:{0} docker://{1} {2}'.format(self.workflow_workspace,
-                self.docker_img, re.sub(r'"', '\\"', self.cmd))
+        #sub['arguments'] = 'exec --home .{0}:{0} docker://{1} {2}'.format(self.workflow_workspace,
+        #        self.docker_img, re.sub(r'"', '\\"', self.cmd))
+        sub['arguments'] = "{0} {1} {2}".format(self.workflow_workspace,self.docker_img,
+                re.sub(r'"', '\\"', self.cmd))
         sub['Output'] = '/tmp/$(Cluster)-$(Process).out'
         sub['Error'] = '/tmp/$(Cluster)-$(Process).err'
         #sub['transfer_input_files'] = get_input_files(self.workflow_workspace)
