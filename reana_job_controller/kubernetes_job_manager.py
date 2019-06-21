@@ -10,6 +10,7 @@
 
 import ast
 import logging
+import os
 import traceback
 import uuid
 
@@ -18,7 +19,9 @@ from kubernetes.client.models.v1_delete_options import V1DeleteOptions
 from kubernetes.client.rest import ApiException
 from reana_commons.config import CVMFS_REPOSITORIES, K8S_DEFAULT_NAMESPACE
 from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
+from reana_commons.k8s.secrets import REANAUserSecretsStore
 from reana_commons.k8s.volumes import get_k8s_cvmfs_volume, get_shared_volume
+from reana_db.models import User
 
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
@@ -92,6 +95,40 @@ class KubernetesJobManager(JobManager):
                 }
             }
         }
+        user_id = os.getenv('REANA_USER_ID')
+        secrets_store = REANAUserSecretsStore(user_id)
+        user_secrets = secrets_store.get_secrets()
+
+        for secret in user_secrets:
+            name = secret['name']
+            if secret['type'] == 'env':
+                job['spec']['template']['spec']['containers'][0]['env'].append(
+                    {
+                        'name': name,
+                        'valueFrom': {
+                            'secretKeyRef': {
+                                'name': user_id,
+                                'key': name
+                            }
+                        }
+                    })
+
+        job['spec']['template']['spec']['volumes'].append(
+            {
+                'name': user_id,
+                'secret': {
+                    'secretName': user_id
+                }
+            }
+        )
+        job['spec']['template']['spec']['containers'][0][
+            'volumeMounts'] \
+            .append(
+            {
+                'name': user_id,
+                'mountPath': "/etc/reana/secrets",
+                'readOnly': True
+            })
 
         if self.env_vars:
             for var, value in self.env_vars.items():
