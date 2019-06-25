@@ -17,6 +17,7 @@ compute backends. Currently it is only implemented for Kubernetes.
 
 .. image:: /_static/reana-job-manager.png
 
+
 Kubernetes
 ~~~~~~~~~~
 
@@ -30,3 +31,16 @@ right order.
 
 Stop static function is responsible for stoping/deleting successfully finished
 or failed jobs.
+
+HTCondor
+~~~~~~~~
+
+To build Job Controller Docker image with HTCondor dependencies use build
+argument ``HTCONDORCERN=1``.
+
+.. code-block:: console
+
+    # using reana pacakge
+    $ reana-dev docker-build -t htcondorcern -c . -b HTCONDORCERN=1
+    # or native Docker command
+    $ docker build -t htcondorcern --build-arg HTCONDORCERN=1 .
