@@ -43,11 +43,11 @@
     },
     "JobRequest": {
       "properties": {
-        "backend": {
-          "type": "string"
-        },
         "cmd": {
           "default": "",
+          "type": "string"
+        },
+        "compute_backend": {
           "type": "string"
         },
         "cvmfs_mounts": {
@@ -321,9 +321,9 @@
             "type": "string"
           },
           {
-            "description": "Job execution backend.",
+            "description": "Job compute backend.",
             "in": "query",
-            "name": "backend",
+            "name": "compute_backend",
             "required": false,
             "type": "string"
           }
@@ -333,7 +333,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Request accepted. A request to delete the job has been sent to the\n  computing backend."
+            "description": "Request accepted. A request to delete the job has been sent to the\n  compute backend."
           },
           "404": {
             "description": "Request failed. The given job ID does not seem to exist.",
@@ -344,10 +344,10 @@
             }
           },
           "502": {
-            "description": "Request failed. Something went wrong while calling the computing backend.",
+            "description": "Request failed. Something went wrong while calling the compute backend.",
             "examples": {
               "application/json": {
-                "message": "Connection to computing backend failed: [reason]"
+                "message": "Connection to compute backend failed: [reason]"
               }
             }
           }

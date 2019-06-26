@@ -11,22 +11,15 @@
 import base64
 import logging
 import os
-import pathlib
 import re
-import time
-import traceback
-import uuid
+import subprocess
+from shutil import copyfile
 
-import fs
-from flask import current_app
-from kubernetes import client
-from kubernetes.client.rest import ApiException
-from reana_commons.config import K8S_DEFAULT_NAMESPACE
-from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
-from reana_commons.k8s.volumes import get_shared_volume
-from reana_commons.utils import format_cmd
+import classad
+import htcondor
 from reana_db.database import Session
 from reana_db.models import Workflow
+from retrying import retry
 
 from reana_job_controller.job_manager import JobManager
 
@@ -34,9 +27,12 @@ from reana_job_controller.job_manager import JobManager
 class HTCondorJobManagerCERN(JobManager):
     """CERN HTCondor job management."""
 
+    MAX_JOB_RESTARTS = 3
+
     def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
                  workflow_uuid=None, workflow_workspace=None,
-                 cvmfs_mounts='false', shared_file_system=False):
+                 cvmfs_mounts='false', shared_file_system=False,
+                 job_name=None):
         """Instanciate HTCondor job manager.
 
         :param docker_img: Docker image.
@@ -55,192 +51,97 @@ class HTCondorJobManagerCERN(JobManager):
         :type cvmfs_mounts: str
         :param shared_file_system: if shared file system is available.
         :type shared_file_system: bool
+        :param job_name: Name of the job
+        :type job_name: str
         """
         super(HTCondorJobManagerCERN, self).__init__(
             docker_img=docker_img, cmd=cmd,
             env_vars=env_vars, job_id=job_id,
-            workflow_uuid=workflow_uuid)
-        self.backend = "HTCondor"
+            workflow_uuid=workflow_uuid,
+            job_name=job_name)
+        self.compute_backend = "HTCondor"
         self.workflow_workspace = workflow_workspace
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.workflow = self._get_workflow()
-        self.keytab_file, self.cern_username = self._find_keytab()
+        self.cern_user = os.environ.get('CERN_USER')
 
     @JobManager.execution_hook
     def execute(self):
-        """Execute a kubernetes job responsible for HTCondor job submission."""
-        submission_file = 'job_{}.sub'.format(time.time())
-        check_cmd_exit_code = \
-            'if [ $? -ne 0 ]; then echo "command failed"; exit 1; fi;'
-        self._dump_condor_submission_file(submission_file)
-        add_user_cmd = \
-            'useradd -Ms /bin/bash $CONDOR_USER;{}'.format(check_cmd_exit_code)
-        cp_job_wrapper_cmd = \
-            'cp /job_wrapper.sh {};{}'.format(self.workflow_workspace,
-                                              check_cmd_exit_code)
-        chown_worksapce_cmd = \
-            'sudo chown -R $CONDOR_USER {};{}'.format(self.workflow_workspace,
-                                                      check_cmd_exit_code)
-        go_to_workspace_cmd = 'cd {};{}'.format(self.workflow_workspace,
-                                                check_cmd_exit_code)
-        authentication_cmd = \
-            'kinit -V -kt {} {}; {}'.format(self.keytab_file,
-                                            self.cern_username,
-                                            check_cmd_exit_code)
-        htcondor_job_submission_cmd = \
-            ('job_id=$(condor_submit INPUTS={} -spool -terse {} | '
-             'cut -f 1 -d " " ); {}'.format(self._get_input_files(),
-                                            submission_file,
-                                            check_cmd_exit_code))
-        get_htcondor_job_status_cmd = \
-            'job_status="eval condor_q $job_id -format %d JobStatus";'
-        htcondor_job_tracking_cmd = \
-            ('while [[ $($job_status) != "4" ]];'
-             ' do echo "JOB $job_id is still running"; sleep 30; done;')
-        add_user_cmd = 'useradd -Ms /bin/bash $CONDOR_USER;'
-        get_htcondor_job_output_cmd = 'condor_transfer_data $job_id;'
-        htcondor_job_wrapper_cmd = \
-            ["{}{}{} sudo -u $CONDOR_USER /bin/bash -c '{}{}{}{}{}{}'".format(
-                add_user_cmd,
-                cp_job_wrapper_cmd,
-                chown_worksapce_cmd,
-                go_to_workspace_cmd,
-                authentication_cmd,
-                htcondor_job_submission_cmd,
-                get_htcondor_job_status_cmd,
-                htcondor_job_tracking_cmd,
-                get_htcondor_job_output_cmd
-            )]
-        submission_job = self._create_job_spec(
-            command=htcondor_job_wrapper_cmd,
-            env_vars=[{'name': 'CONDOR_USER',
-                      'value': self.cern_username}])
-        try:
-            self._clean_workspace()
-            api_response = \
-                current_k8s_batchv1_api_client.create_namespaced_job(
-                    namespace=K8S_DEFAULT_NAMESPACE,
-                    body=submission_job)
-            return api_response.metadata.labels['job-name']
-        except ApiException as e:
-            logging.debug("Error while connecting to Kubernetes"
-                          " API: {}".format(e))
-        except Exception as e:
-            logging.error(traceback.format_exc())
-            logging.debug("Unexpected error: {}".format(e))
+        """Execute / submit a job with HTCondor."""
+        os.chdir(self.workflow_workspace)
+        job_ad = classad.ClassAd()
+        job_ad['JobDescription'] = \
+            self.workflow.get_full_workflow_name() + '_' + self.job_name
+        job_ad['JobMaxRetries'] = 3
+        job_ad['OnExitRemove'] = classad.ExprTree(
+            'NumJobCompletions > JobMaxRetries || ExitCode == 0')
+        job_ad['DockerImage'] = self.docker_img
+        job_ad['WantDocker'] = True
+        job_ad['Cmd'] = './job_wrapper.sh'
+        job_ad['Arguments'] = self._format_arguments()
+        job_ad['Environment'] = self._format_env_vars()
+        job_ad['Out'] = classad.ExprTree(
+            'strcat("reana_job.", ClusterId, ".", ProcId, ".out")')
+        job_ad['Err'] = classad.ExprTree(
+            'strcat("reana_job.", ClusterId, ".", ProcId, ".err")')
+        job_ad['log'] = classad.ExprTree(
+            'strcat("reana_job.", ClusterId, ".err")')
+        job_ad['ShouldTransferFiles'] = 'YES'
+        job_ad['WhenToTransferOutput'] = 'ON_EXIT'
+        job_ad['TransferInput'] = self._get_input_files()
+        job_ad['TransferOutput'] = '.'
+        job_ad['PeriodicRelease'] = classad.ExprTree('(HoldReasonCode == 35)')
+        job_ad['MaxRunTime'] = 3600
+        job_ad['Requirements'] = classad.ExprTree(
+            'TARGET.HasDocker && (OpSysAndVer =?= "CentOS7")')
+        clusterid = self._submit(job_ad)
+        logging.warning("Submitting job clusterid: {0}".format(clusterid))
+        return clusterid
 
-    def _create_job_spec(self, name=None, command=None, image=None,
-                         env_vars=None):
-        """Create a spec of kubernetes job for condor job submission.
-
-        :param name: Name of the job.
-        :type name: str
-        :param image: Docker image to use for condor job submission.
-        :type image: str
-        :param command: List of commands to run on the given job.
-        :type command: list
-        :param env_vars: List of environment variables (dictionaries) to
-            set on execution container.
-        :type list: list
-        """
-        name = name or self._generate_htcondor_submitter_name()
-        image = image or current_app.config['HTCONDOR_SUBMISSION_JOB_IMG']
-        command = command or []
-        env_vars = env_vars or []
-        command = format_cmd(command)
-        workflow_metadata = client.V1ObjectMeta(name=name)
-        job = client.V1Job()
-        job.api_version = 'batch/v1'
-        job.kind = 'Job'
-        job.metadata = workflow_metadata
-        spec = client.V1JobSpec(
-            template=client.V1PodTemplateSpec())
-        spec.template.metadata = workflow_metadata
-        container = client.V1Container(name=name,
-                                       image=image,
-                                       image_pull_policy='IfNotPresent',
-                                       env=[],
-                                       volume_mounts=[],
-                                       command=['/bin/bash'],
-                                       args=['-c'] + command
-                                       )
-        container.env.extend(env_vars)
-        volume_mount, volume = get_shared_volume(
-            self.workflow_workspace,
-            current_app.config['SHARED_VOLUME_PATH_ROOT'])
-        container.volume_mounts = [volume_mount]
-        spec.template.spec = client.V1PodSpec(containers=[container])
-        spec.template.spec.volumes = [volume]
-        job.spec = spec
-        job.spec.template.spec.restart_policy = 'Never'
-        job.spec.ttl_seconds_after_finished = \
-            current_app.config['HTCONDOR_SUBMITTER_POD_CLEANUP_THRESHOLD']
-        job.spec.active_deadline_seconds = \
-            current_app.config['HTCONDOR_SUBMITTER_POD_MAX_LIFETIME']
-        job.spec.backoff_limit = 0
-        return job
-
-    def _dump_condor_submission_file(self, submission_file_name):
-        """Dump condor submission file to workspace.
-
-        :param submission_file_name: Name of the condor job submission file
-        :type submission_file_name: str
-        """
-        job_template = """
-        max_retries   = 3
-        universe      = docker
-        docker_image  = {docker_img}
-        executable    = job_wrapper.sh
-        arguments     = {arguments}
-        environment   = {env_vars}
-        output        = reana_job.$(ClusterId).$(ProcId).out
-        error         = reana_job.$(ClusterId).$(ProcId).err
-        log           = reana_job.$(ClusterId).log
-        should_transfer_files = YES
-        if defined INPUTS
-            transfer_input_files = $(INPUTS)
-        else
-            transfer_input_files  = {input_files}
-        endif
-        transfer_output_files = ./
-        periodic_release = (HoldReasonCode == 35)
-        queue
-        """.format(docker_img=self.docker_img,
-                   env_vars=self._format_env_vars(),
-                   arguments=self._format_arguments(),
-                   input_files=self.workflow_workspace + '/',
-                   # output_files=self._get_output_files()
-                   )
-        submission_file = \
-            os.path.join(self.workflow_workspace, submission_file_name)
-        f = open(submission_file, "w")
-        f.write(job_template)
-        f.close()
+    def _replace_absolut_paths_with_relative(self, base_64_enconded_cmd):
+        """."""
+        relative_paths_command = None
+        decoded_cmd = \
+            base64.b64decode(base_64_enconded_cmd).decode('utf-8')
+        if self.workflow_workspace in decoded_cmd:
+            decoded_cmd = \
+                decoded_cmd.replace(self.workflow_workspace + '/', '')
+            relative_paths_command = \
+                base64.b64encode(
+                    decoded_cmd.encode('utf-8')).decode('utf-8')
+        return relative_paths_command
 
     def _format_arguments(self):
-        """Format HTCondor job execution arguments."""
-        if self.workflow.type_ == 'serial' or self.workflow.type_ == 'cwl':
-            arguments = re.sub(r'"', '\\"', " ".join(self.cmd[2].split()[3:]))
-        elif self.workflow.type_ == 'yadage':
-            base_64_encoded_cmd = self.cmd[2].split('|')[0].split()[1]
-            decoded_cmd = base64.b64decode(base_64_encoded_cmd).decode('utf-8')
-            if self.workflow_workspace in decoded_cmd:
-                decoded_cmd = \
-                    decoded_cmd.replace(self.workflow_workspace + '/', '')
-            base_64_encoded_cmd = \
-                base64.b64encode(decoded_cmd.encode('utf-8')).decode('utf-8')
-            arguments = 'echo {}|base64 -d|bash'.format(base_64_encoded_cmd)
-        return "{}".format(arguments)
+        r"""Format HTCondor job execution arguments.
 
-    def _get_output_files(self):
-        """Return expected output path of a workflow."""
-        workflow = Session.query(Workflow).filter_by(id_=self.workflow_uuid).\
-            one_or_none()
-        output_dirs = set()
-        for path in workflow.reana_specification['outputs']['files']:
-            output_dirs.add(str(pathlib.Path(path).parents[0]))
-        return ' '.join(output_dirs)
+        input  - ['bash', '-c',
+                  'cd /var/reana/users/00000000-0000-0000-0000-000000000000/
+                       workflows/e4691f78-25aa-4f90-9c3d-6873a97bdf16 ;
+                   python "code/helloworld.py" --inputfile "data/names.txt"
+                           --outputfile "results/greetings.txt" --sleeptime 0']
+        output - python \"code/helloworld.py\" --inputfile \"data/names.txt\"
+                 --outputfile \"results/greetings.txt\" --sleeptime 0
+        """
+        if self.workflow.type_ == 'serial':
+            arguments = re.sub(r'"', '\"', " ".join(self.cmd[2].split()[3:]))
+        elif self.workflow.type_ == 'cwl':
+            arguments = self.cmd[2].replace(self.workflow_workspace,
+                                            '$_CONDOR_JOB_IWD')
+        elif self.workflow.type_ == 'yadage':
+            if 'base64' in ' '.join(self.cmd):
+                base_64_encoded_cmd = self.cmd[2].split('|')[0].split()[1]
+                base_64_encoded_cmd = \
+                    self._replace_absolut_paths_with_relative(
+                        base_64_encoded_cmd) or base_64_encoded_cmd
+                arguments = \
+                    'echo {}|base64 -d|bash'.format(base_64_encoded_cmd)
+            else:
+                if self.workflow_workspace in self.cmd[2]:
+                    arguments = \
+                        self.cmd[2].replace(self.workflow_workspace + '/', '')
+                    arguments = re.sub(r'"', '\"', arguments)
+        return "{}".format(arguments)
 
     def _format_env_vars(self):
         """Return job env vars in job description format."""
@@ -248,10 +149,6 @@ class HTCondorJobManagerCERN(JobManager):
         for key, value in self.env_vars:
             job_env += " {0}={1}".format(key, value)
         return job_env
-
-    def _generate_htcondor_submitter_name(self):
-        """Generate the name for HTCondor sumbmission job."""
-        return 'htcondor-submitter-' + str(uuid.uuid4())
 
     def _get_workflow(self):
         """Get workflow from db."""
@@ -262,39 +159,116 @@ class HTCondorJobManagerCERN(JobManager):
         else:
             pass
 
-    def _clean_workspace(self):
-        """Delete condor files."""
-        files_to_delete = ['.job.ad', '.machine.ad', '.chirp.config']
-        for file in files_to_delete:
-            with fs.open_fs(self.workflow_workspace) as workspace:
-                try:
-                    workspace.remove(file)
-                except fs.errors.FileExpected:
-                    pass
-                except fs.errors.ResourceNotFound:
-                    pass
-
     def _get_input_files(self):
         """Get files and dirs from workflow space."""
         input_files = []
+        self._copy_wrapper_file()
         forbidden_files = \
-            ['.job.ad', '.machine.ad', '.chirp.config', self.keytab_file]
+            ['.job.ad', '.machine.ad', '.chirp.config']
+        skip_extensions = ('.err', '.log', '.out')
         for item in os.listdir(self.workflow_workspace):
-            if item not in forbidden_files:
+            if item not in forbidden_files and \
+               not item.endswith(skip_extensions):
                 input_files.append(item)
 
         return ",".join(input_files)
 
-    def _find_keytab(self):
-        """Return keytab filename and CERN username."""
-        workspace = fs.open_fs(self.workflow_workspace)
-        keytab_file = ''
-        cern_username = ''
-        for file in workspace.glob("*.keytab"):
-            keytab_file = file.info.name
-            cern_username = file.info.stem
-            break
-        if not keytab_file:
-            msg = '*.keytab file was not found'
-            raise Exception(msg)
-        return keytab_file, cern_username
+    def _copy_wrapper_file(self):
+        """Copy job wrapper file to workspace."""
+        try:
+            copyfile('/etc/job_wrapper.sh',
+                     os.path.join(self.workflow_workspace + '/' +
+                                  'job_wrapper.sh'))
+        except Exception as e:
+            logging.error("Failed to copy job wrapper file: {0}".format(e),
+                          exc_info=True)
+            raise e
+
+    @retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
+    def _submit(self, job_ad):
+        """Execute submission transaction."""
+        try:
+            ads = []
+            schedd = HTCondorJobManagerCERN._get_schedd()
+            clusterid = schedd.submit(job_ad, 1, True, ads)
+            schedd.spool(ads)
+        except Exception as e:
+            logging.error("Submission failed: {0}".format(e), exc_info=True)
+            raise e
+        return clusterid
+
+    @retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
+    def _get_schedd():
+        """Find and return the HTCondor sched."""
+        try:
+            schedd = htcondor.Schedd()
+        except Exception as e:
+            logging.error("Can't locate schedd: {0}".format(e), exc_info=True)
+            sleep(10)
+        return schedd
+
+    def autheticate():
+        """Create kerberos ticket from mounted keytab_file."""
+        cern_user = os.environ.get('CERN_USER')
+        keytab_file = os.environ.get('HTCONDORCERN_KEYTAB')
+        cmd = \
+            'kinit -kt /etc/reana/secrets/{} {}@CERN.CH'.format(keytab_file,
+                                                                cern_user)
+        if cern_user:
+            try:
+                subprocess.check_output(cmd, shell=True)
+            except subprocess.CalledProcessError as err:
+                logging.error("Authentication failed: {}".format(err),
+                              exc_info=True)
+        else:
+            msg = 'CERN_USER is not set.'
+            logging.error(msg, exc_info=True)
+
+    def stop(backend_job_id):
+        """Stop HTCondor job execution."""
+        try:
+            schedd = HTCondorJobManagerCERN._get_schedd()
+            schedd.act(
+                htcondor.JobAction.Remove,
+                'ClusterId=={}'.format(backend_job_id))
+        except Exception as e:
+            logging.error(e, exc_info=True)
+
+    @retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
+    def spool_output(backend_job_id):
+        """Transfer job output."""
+        schedd = HTCondorJobManagerCERN._get_schedd()
+        schedd.retrieve("ClusterId == {}".format(backend_job_id))
+
+    def get_logs(backend_job_id, workspace):
+        """Return job logs if log files are present."""
+        stderr_file = \
+            os.path.join(workspace,
+                         'reana_job.' + str(backend_job_id) + '.0.err')
+        stdout_file = \
+            os.path.join(workspace,
+                         'reana_job.' + str(backend_job_id) + '.0.out')
+        log_files = [stderr_file, stdout_file]
+        job_log = ''
+        try:
+            for file in log_files:
+                with open(file, "r") as log_file:
+                    job_log += log_file.read()
+            return job_log
+        except Exception as e:
+            msg = 'Job logs of {} were not found. {}'.format(backend_job_id, e)
+            logging.error(msg, exc_info=True)
+            return msg
+
+    def find_job_in_history(backend_job_id):
+        """Return job if present in condor history."""
+        schedd = HTCondorJobManagerCERN._get_schedd()
+        ads = ['ClusterId', 'JobStatus', 'ExitCode', 'RemoveReason']
+        condor_it = schedd.history('ClusterId == {0}'.format(
+            backend_job_id), ads, match=1)
+        try:
+            condor_job = next(condor_it)
+            return condor_job
+        except Exception:
+            # Did not match to any job in the history  yet
+            return None

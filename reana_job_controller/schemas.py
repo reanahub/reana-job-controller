@@ -41,7 +41,7 @@ class JobRequest(Schema):
     cvmfs_mounts = fields.String(missing='')
     env_vars = fields.Dict(missing={})
     shared_file_system = fields.Bool(missing=True)
-    backend = fields.Str(required=False)
+    compute_backend = fields.Str(required=False)
 
     @pre_load
     def make_id(self, data):

@@ -6,7 +6,7 @@ Developer guide
 This developer guide is meant for software developers who would like to
 understand REANA-Job-Controller source code and contribute to it.
 
-Job backends
+Compute backends
 ------------
 
 REANA-Job-Controller offers an abstract interface to submit jobs to different

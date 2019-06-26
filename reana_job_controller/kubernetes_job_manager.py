@@ -15,13 +15,15 @@ import traceback
 import uuid
 
 from flask import current_app
+from kubernetes import client
 from kubernetes.client.models.v1_delete_options import V1DeleteOptions
 from kubernetes.client.rest import ApiException
-from reana_commons.config import CVMFS_REPOSITORIES, K8S_DEFAULT_NAMESPACE
+from reana_commons.config import (CVMFS_REPOSITORIES, K8S_DEFAULT_NAMESPACE,
+                                  WORKFLOW_RUNTIME_USER_GID,
+                                  WORKFLOW_RUNTIME_USER_UID)
 from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
 from reana_commons.k8s.secrets import REANAUserSecretsStore
 from reana_commons.k8s.volumes import get_k8s_cvmfs_volume, get_shared_volume
-from reana_db.models import User
 
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
@@ -32,7 +34,8 @@ class KubernetesJobManager(JobManager):
 
     def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
                  workflow_uuid=None, workflow_workspace=None,
-                 cvmfs_mounts='false', shared_file_system=False):
+                 cvmfs_mounts='false', shared_file_system=False,
+                 job_name=None):
         """Instanciate kubernetes job manager.
 
         :param docker_img: Docker image.
@@ -51,12 +54,15 @@ class KubernetesJobManager(JobManager):
         :type cvmfs_mounts: str
         :param shared_file_system: if shared file system is available.
         :type shared_file_system: bool
+        :param job_name: Name of the job.
+        :type job_name: str
         """
         super(KubernetesJobManager, self).__init__(
                          docker_img=docker_img, cmd=cmd,
                          env_vars=env_vars, job_id=job_id,
-                         workflow_uuid=workflow_uuid)
-        self.backend = "Kubernetes"
+                         workflow_uuid=workflow_uuid,
+                         job_name=job_name)
+        self.compute_backend = "Kubernetes"
         self.workflow_workspace = workflow_workspace
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
@@ -86,8 +92,8 @@ class KubernetesJobManager(JobManager):
                                 'command': self.cmd,
                                 'name': backend_job_id,
                                 'env': [],
-                                'volumeMounts': []
-                            },
+                                'volumeMounts': [],
+                            }
                         ],
                         'volumes': [],
                         'restartPolicy': 'Never'
@@ -157,6 +163,10 @@ class KubernetesJobManager(JobManager):
                 ))
                 job['spec']['template']['spec']['volumes'].append(volume)
 
+        job['spec']['template']['spec']['securityContext'] = \
+            client.V1PodSecurityContext(
+                run_as_group=WORKFLOW_RUNTIME_USER_GID,
+                run_as_user=WORKFLOW_RUNTIME_USER_UID)
         # add better handling
         try:
             api_response = \

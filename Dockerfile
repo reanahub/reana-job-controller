@@ -12,24 +12,25 @@ RUN apt-get update && \
     pip install --upgrade pip
 
 
-#CERN HTCondor part https://gitlab.cern.ch/batch-team/condorsubmit
+#CERN HTCondor part taken from https://gitlab.cern.ch/batch-team/condorsubmit
 ARG HTCONDORCERN=0
 RUN if [ "${HTCONDORCERN}" -eq 1 ]; then \
-  DEBIAN_FRONTEND=noninteractive apt-get -yq install wget alien gnupg2 \
-                                                                krb5-user \
-                                                                krb5-config \
-                                                                libkrb5-dev \
-                                                                libauthen-krb5-perl \
-                                                                --no-install-recommends; \
+  export DEBIAN_FRONTEND=noninteractive ;\
+  apt-get -yq install wget alien gnupg2 \
+                                 krb5-user \
+                                 krb5-config \
+                                 libkrb5-dev \
+                                 libauthen-krb5-perl \
+                                 --no-install-recommends; \
   wget -O ngbauth-submit.rpm http://linuxsoft.cern.ch/internal/repos/batch7-stable/x86_64/os/Packages/ngbauth-submit-0.23-1.el7.noarch.rpm; \
   wget -O cernbatchsubmit.rpm http://linuxsoft.cern.ch/internal/repos/batch7-stable/x86_64/os/Packages/cernbatchsubmit-0.1.0-1.el7.x86_64.rpm; \
   yes | alien -i cernbatchsubmit.rpm; \
   yes | alien -i ngbauth-submit.rpm; \
-  wget -qO - https://research.cs.wisc.edu/htcondor/debian/HTCondor-Release.gpg.key | apt-key add -; \
+  wget -qO - http://research.cs.wisc.edu/htcondor/debian/HTCondor-Release.gpg.key | apt-key add - :\
   echo "deb http://research.cs.wisc.edu/htcondor/debian/8.8/stretch stretch contrib" >> /etc/apt/sources.list; \
   echo "deb-src http://research.cs.wisc.edu/htcondor/debian/8.8/stretch stretch contrib" >> /etc/apt/sources.list; \
   apt-get update; \
-  apt-get install -y condor --no-install-recommends; \
+  apt-get install -y htcondor --no-install-recommends; \
   apt-get -y remove gnupg2 wget alien; \
 fi;
 
@@ -41,6 +42,8 @@ ADD etc/ngbauth-submit /etc/sysconfig/
 ADD etc/ngauth_batch_crypt_pub.pem /etc/
 ADD etc/cerngridca.crt /usr/local/share/ca-certificates/cerngridca.crt
 ADD etc/cernroot.crt /usr/local/share/ca-certificates/cernroot.crt
+ADD etc/job_wrapper.sh etc/job_wrapper.sh
+RUN chmod +x /etc/job_wrapper.sh
 RUN update-ca-certificates
 
 COPY CHANGES.rst README.rst setup.py /code/
