@@ -47,7 +47,7 @@ COPY CHANGES.rst README.rst setup.py /code/
 COPY reana_job_controller/version.py /code/reana_job_controller/
 WORKDIR /code
 RUN pip install requirements-builder && \
-    requirements-builder -e all -l pypi setup.py | pip install -r /dev/stdin && \
+    requirements-builder -l pypi setup.py | pip install -r /dev/stdin && \
     pip uninstall -y requirements-builder
 
 COPY . /code
