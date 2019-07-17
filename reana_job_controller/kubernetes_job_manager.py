@@ -104,6 +104,7 @@ class KubernetesJobManager(JobManager):
         user_id = os.getenv('REANA_USER_ID')
         secrets_store = REANAUserSecretsStore(user_id)
         user_secrets = secrets_store.get_secrets()
+        file_secrets_items = []
 
         for secret in user_secrets:
             name = secret['name']
@@ -118,12 +119,18 @@ class KubernetesJobManager(JobManager):
                             }
                         }
                     })
+            elif secret['type'] == 'file':
+                file_secrets_items.append({
+                    'key': secret['name'],
+                    'path': secret['name'],
+                })
 
         job['spec']['template']['spec']['volumes'].append(
             {
                 'name': user_id,
                 'secret': {
-                    'secretName': user_id
+                    'secretName': user_id,
+                    'items': file_secrets_items
                 }
             }
         )
