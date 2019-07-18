@@ -16,12 +16,12 @@ import subprocess
 import time
 from shutil import copyfile
 
-import classad
-import htcondor
 from reana_db.database import Session
 from reana_db.models import Workflow
 from retrying import retry
 
+import classad
+import htcondor
 from reana_job_controller.job_manager import JobManager
 
 
