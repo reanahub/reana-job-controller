@@ -103,45 +103,17 @@ class KubernetesJobManager(JobManager):
         }
         user_id = os.getenv('REANA_USER_ID')
         secrets_store = REANAUserSecretsStore(user_id)
-        user_secrets = secrets_store.get_secrets()
-        file_secrets_items = []
-
-        for secret in user_secrets:
-            name = secret['name']
-            if secret['type'] == 'env':
-                job['spec']['template']['spec']['containers'][0]['env'].append(
-                    {
-                        'name': name,
-                        'valueFrom': {
-                            'secretKeyRef': {
-                                'name': user_id,
-                                'key': name
-                            }
-                        }
-                    })
-            elif secret['type'] == 'file':
-                file_secrets_items.append({
-                    'key': secret['name'],
-                    'path': secret['name'],
-                })
+        job['spec']['template']['spec']['containers'][0]['env'].extend(
+            secrets_store.get_env_secrets_as_k8s_spec()
+        )
 
         job['spec']['template']['spec']['volumes'].append(
-            {
-                'name': user_id,
-                'secret': {
-                    'secretName': user_id,
-                    'items': file_secrets_items
-                }
-            }
+            secrets_store.get_file_secrets_volume_as_k8s_specs()
         )
+
         job['spec']['template']['spec']['containers'][0][
             'volumeMounts'] \
-            .append(
-            {
-                'name': user_id,
-                'mountPath': "/etc/reana/secrets",
-                'readOnly': True
-            })
+            .append(secrets_store.get_secrets_volume_mount_as_k8s_spec())
 
         if self.env_vars:
             for var, value in self.env_vars.items():
