@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import subprocess
+import time
 from shutil import copyfile
 
 import classad
@@ -93,8 +94,6 @@ class HTCondorJobManagerCERN(JobManager):
         job_ad['TransferOutput'] = '.'
         job_ad['PeriodicRelease'] = classad.ExprTree('(HoldReasonCode == 35)')
         job_ad['MaxRunTime'] = 3600
-        job_ad['Requirements'] = classad.ExprTree(
-            'TARGET.HasDocker && (OpSysAndVer =?= "CentOS7")')
         clusterid = self._submit(job_ad)
         logging.warning("Submitting job clusterid: {0}".format(clusterid))
         return clusterid
@@ -204,7 +203,7 @@ class HTCondorJobManagerCERN(JobManager):
             schedd = htcondor.Schedd()
         except Exception as e:
             logging.error("Can't locate schedd: {0}".format(e), exc_info=True)
-            sleep(10)
+            time.sleep(10)
         return schedd
 
     def autheticate():
