@@ -29,5 +29,5 @@ COMPUTE_BACKENDS = {
 DEFAULT_COMPUTE_BACKEND = 'kubernetes'
 """Default job compute backend."""
 
-MULTIPLE_COMPUTE_BACKENDS = False
+MULTIPLE_COMPUTE_BACKENDS = os.getenv('MULTIPLE_COMPUTE_BACKENDS', False)
 """Allow multiple job compute backends."""

@@ -194,6 +194,10 @@ def create_job():  # noqa
     compute_backend = job_request.get(
         'compute_backend',
         current_app.config['DEFAULT_COMPUTE_BACKEND'])
+    if not current_app.config['MULTIPLE_COMPUTE_BACKENDS'] and \
+       current_app.config['DEFAULT_COMPUTE_BACKEND'] != compute_backend:
+        msg = 'Job submission to {} is not allowed'.format(compute_backend)
+        return jsonify({'job': msg}), 500
     job_obj = current_app.config['COMPUTE_BACKENDS'][compute_backend](
         docker_img=job_request['docker_img'],
         cmd=job_request['cmd'],

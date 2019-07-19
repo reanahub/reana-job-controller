@@ -13,7 +13,7 @@ RUN apt-get update && \
 
 
 #CERN HTCondor part taken from https://gitlab.cern.ch/batch-team/condorsubmit
-ARG HTCONDORCERN=0
+ARG HTCONDORCERN
 RUN if [ "${HTCONDORCERN}" -eq 1 ]; then \
   export DEBIAN_FRONTEND=noninteractive ;\
   apt-get -yq install wget alien gnupg2 \
@@ -68,6 +68,7 @@ RUN pip check
 
 EXPOSE 5000
 
+ENV MULTIPLE_COMPUTE_BACKENDS $HTCONDORCERN
 ENV FLASK_APP reana_job_controller/app.py
 
 CMD ["flask", "run", "-h", "0.0.0.0"]

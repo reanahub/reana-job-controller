@@ -13,7 +13,6 @@ import threading
 import time
 import traceback
 
-import htcondor
 from kubernetes import client, watch
 from reana_commons.k8s.api_client import (current_k8s_batchv1_api_client,
                                           current_k8s_corev1_api_client)
