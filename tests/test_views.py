@@ -8,6 +8,7 @@
 
 """REST API test for REANA-Job-Controller. """
 
+import json
 import uuid
 
 import pytest
@@ -60,3 +61,18 @@ def test_delete_job_failed_backend(app, mocked_job):
                                         job_id=mocked_job))
             assert res.json == expected_msg
             assert res.status_code == 502
+
+
+def test_create_job_unsupported_backend(app, job_spec):
+    """Test create job with unsupported backend."""
+    fake_backend = 'htcondorcern'
+    expected_msg =  \
+        'Job submission failed. Backend {} is not supported.'.format(
+            fake_backend)
+    job_spec['compute_backend'] = fake_backend
+    with app.test_client() as client:
+        res = client.post(url_for('jobs.create_job'),
+                          content_type='application/json',
+                          data=json.dumps(job_spec))
+        assert res.json == {'job': expected_msg}
+        assert res.status_code == 500

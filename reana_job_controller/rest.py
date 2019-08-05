@@ -10,6 +10,7 @@
 
 import copy
 import json
+import logging
 
 from flask import Blueprint, current_app, jsonify, request
 
@@ -19,6 +20,7 @@ from reana_job_controller.job_db import (JOB_DB, job_exists, job_is_cached,
                                          retrieve_backend_job_id, retrieve_job,
                                          retrieve_job_logs)
 from reana_job_controller.schemas import Job, JobRequest
+from reana_job_controller.utils import update_workflow_logs
 
 blueprint = Blueprint('jobs', __name__)
 
@@ -196,7 +198,10 @@ def create_job():  # noqa
         current_app.config['DEFAULT_COMPUTE_BACKEND'])
     if not current_app.config['MULTIPLE_COMPUTE_BACKENDS'] and \
        current_app.config['DEFAULT_COMPUTE_BACKEND'] != compute_backend:
-        msg = 'Job submission to {} is not allowed'.format(compute_backend)
+        msg = 'Job submission failed. Backend {} is not supported.'.format(
+            compute_backend)
+        logging.error(msg, exc_info=True)
+        update_workflow_logs(job_request['workflow_uuid'], msg)
         return jsonify({'job': msg}), 500
     job_obj = current_app.config['COMPUTE_BACKENDS'][compute_backend](
         docker_img=job_request['docker_img'],
