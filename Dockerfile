@@ -13,9 +13,8 @@ RUN apt-get update && \
 
 
 ARG COMPUTE_BACKENDS=kubernetes
-#CERN HTCondor part taken from https://gitlab.cern.ch/batch-team/condorsubmit
-RUN case $COMPUTE_BACKENDS in \
-    *"htcondorcern"*) \
+# CERN HTCondor part taken from https://gitlab.cern.ch/batch-team/condorsubmit
+RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       export DEBIAN_FRONTEND=noninteractive ;\
       apt-get -yq install wget alien gnupg2 \
                                      krb5-user \
@@ -32,9 +31,11 @@ RUN case $COMPUTE_BACKENDS in \
       apt-get update; \
       apt-get install -y condor --no-install-recommends; \
       apt-get -y remove gnupg2 wget alien; \
-      ;; \
-    *) \
-esac
+    fi
+
+RUN if echo "$COMPUTE_BACKENDS" | grep -q "slurmcern"; then \
+      apt-get install -y openssh-client; \
+    fi
 
 ADD etc/cernsubmit.yaml /etc/condor/
 ADD etc/10_cernsubmit.config /etc/condor/config.d/
