@@ -28,7 +28,10 @@ from reana_job_controller.job_manager import JobManager
 class HTCondorJobManagerCERN(JobManager):
     """CERN HTCondor job management."""
 
-    MAX_JOB_RESTARTS = 3
+    MAX_NUM_RETRIES = 3
+    """Maximum number of tries used for getting schedd, job submission and
+    spooling output.
+    """
 
     def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
                  workflow_uuid=None, workflow_workspace=None,
@@ -44,8 +47,8 @@ class HTCondorJobManagerCERN(JobManager):
         :type env_vars: dict
         :param job_id: Unique job id.
         :type job_id: str
-        :param workflow_id: Unique workflow id.
-        :type workflow_id: str
+        :param workflow_uuid: Unique workflow id.
+        :type workflow_uuid: str
         :param workflow_workspace: Workflow workspace path.
         :type workflow_workspace: str
         :param cvmfs_mounts: list of CVMFS mounts as a string.
@@ -59,9 +62,9 @@ class HTCondorJobManagerCERN(JobManager):
             docker_img=docker_img, cmd=cmd,
             env_vars=env_vars, job_id=job_id,
             workflow_uuid=workflow_uuid,
+            workflow_workspace=workflow_workspace,
             job_name=job_name)
         self.compute_backend = "HTCondor"
-        self.workflow_workspace = workflow_workspace
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.workflow = self._get_workflow()
@@ -145,7 +148,7 @@ class HTCondorJobManagerCERN(JobManager):
     def _format_env_vars(self):
         """Return job env vars in job description format."""
         job_env = ''
-        for key, value in self.env_vars:
+        for key, value in self.env_vars.items():
             job_env += " {0}={1}".format(key, value)
         return job_env
 
@@ -183,7 +186,7 @@ class HTCondorJobManagerCERN(JobManager):
                           exc_info=True)
             raise e
 
-    @retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
+    @retry(stop_max_attempt_number=MAX_NUM_RETRIES)
     def _submit(self, job_ad):
         """Execute submission transaction."""
         try:
@@ -196,7 +199,7 @@ class HTCondorJobManagerCERN(JobManager):
             raise e
         return clusterid
 
-    @retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
+    @retry(stop_max_attempt_number=MAX_NUM_RETRIES)
     def _get_schedd():
         """Find and return the HTCondor sched."""
         try:
@@ -233,7 +236,7 @@ class HTCondorJobManagerCERN(JobManager):
         except Exception as e:
             logging.error(e, exc_info=True)
 
-    @retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
+    @retry(stop_max_attempt_number=MAX_NUM_RETRIES)
     def spool_output(backend_job_id):
         """Transfer job output."""
         schedd = HTCondorJobManagerCERN._get_schedd()

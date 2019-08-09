@@ -60,8 +60,7 @@ def watch_jobs_kubernetes(job_db):
                         ' succeeded.'.format(job_id, kubernetes_job_id)
                     )
                     job_db[job_id]['status'] = 'succeeded'
-                elif (job.status.failed and
-                      job.status.failed >= config.MAX_JOB_RESTARTS):
+                elif job.status.failed:
                     logging.info(
                         'Job job_id: {}, kubernetes_job_id: {} failed.'.format(
                             job_id,

@@ -24,6 +24,7 @@ from reana_commons.config import (CVMFS_REPOSITORIES, K8S_DEFAULT_NAMESPACE,
 from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
 from reana_commons.k8s.secrets import REANAUserSecretsStore
 from reana_commons.k8s.volumes import get_k8s_cvmfs_volume, get_shared_volume
+from retrying import retry
 
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
@@ -31,6 +32,11 @@ from reana_job_controller.job_manager import JobManager
 
 class KubernetesJobManager(JobManager):
     """Kubernetes job management."""
+
+    MAX_NUM_RESUBMISSIONS = 3
+    """Maximum number of job submission/creation tries """
+    MAX_NUM_JOB_RESTARTS = 0
+    """Maximum number of job restarts in case of internal failures."""
 
     def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
                  workflow_uuid=None, workflow_workspace=None,
@@ -46,8 +52,8 @@ class KubernetesJobManager(JobManager):
         :type env_vars: dict
         :param job_id: Unique job id.
         :type job_id: str
-        :param workflow_id: Unique workflow id.
-        :type workflow_id: str
+        :param workflow_uuid: Unique workflow id.
+        :type workflow_uuid: str
         :param workflow_workspace: Workflow workspace path.
         :type workflow_workspace: str
         :param cvmfs_mounts: list of CVMFS mounts as a string.
@@ -61,9 +67,9 @@ class KubernetesJobManager(JobManager):
                          docker_img=docker_img, cmd=cmd,
                          env_vars=env_vars, job_id=job_id,
                          workflow_uuid=workflow_uuid,
+                         workflow_workspace=workflow_workspace,
                          job_name=job_name)
         self.compute_backend = "Kubernetes"
-        self.workflow_workspace = workflow_workspace
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
 
@@ -79,7 +85,7 @@ class KubernetesJobManager(JobManager):
                 'namespace': K8S_DEFAULT_NAMESPACE
             },
             'spec': {
-                'backoffLimit': current_app.config['MAX_JOB_RESTARTS'],
+                'backoffLimit': KubernetesJobManager.MAX_NUM_JOB_RESTARTS,
                 'autoSelector': True,
                 'template': {
                     'metadata': {
@@ -146,13 +152,18 @@ class KubernetesJobManager(JobManager):
             client.V1PodSecurityContext(
                 run_as_group=WORKFLOW_RUNTIME_USER_GID,
                 run_as_user=WORKFLOW_RUNTIME_USER_UID)
-        # add better handling
+        backend_job_id = self._submit()
+        return backend_job_id
+
+    @retry(stop_max_attempt_number=MAX_NUM_RESUBMISSIONS)
+    def _submit(self):
+        """Submit job and return its backend id."""
         try:
             api_response = \
                 current_k8s_batchv1_api_client.create_namespaced_job(
                     namespace=K8S_DEFAULT_NAMESPACE,
                     body=self.job)
-            return backend_job_id
+            return self.job['metadata']['name']
         except ApiException as e:
             logging.error("Error while connecting to Kubernetes"
                           " API: {}".format(e))
