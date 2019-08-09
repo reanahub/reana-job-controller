@@ -35,9 +35,6 @@ JOB_MONITORS = {
 DEFAULT_COMPUTE_BACKEND = 'kubernetes'
 """Default job compute backend."""
 
-MULTIPLE_COMPUTE_BACKENDS = os.getenv('MULTIPLE_COMPUTE_BACKENDS', False)
-"""Allow multiple job compute backends."""
-
 JOB_HOSTPATH_MOUNTS = []
 """List of tuples composed of name and path to create hostPath's inside jobs.
 
@@ -62,3 +59,7 @@ And add the following configuration to REANA-Job-Controller:
 This way all jobs will have ``/mydata`` mounted with the content of
 ``/usr/local/share/mydata`` in the host machine.
 """
+
+SUPPORTED_COMPUTE_BACKENDS = os.getenv('COMPUTE_BACKENDS',
+                                       DEFAULT_COMPUTE_BACKEND).split(",")
+"""List of supported compute backends provided as docker build arg."""

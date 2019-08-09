@@ -196,8 +196,7 @@ def create_job():  # noqa
     compute_backend = job_request.get(
         'compute_backend',
         current_app.config['DEFAULT_COMPUTE_BACKEND'])
-    if not current_app.config['MULTIPLE_COMPUTE_BACKENDS'] and \
-       current_app.config['DEFAULT_COMPUTE_BACKEND'] != compute_backend:
+    if compute_backend not in current_app.config['SUPPORTED_COMPUTE_BACKENDS']:
         msg = 'Job submission failed. Backend {} is not supported.'.format(
             compute_backend)
         logging.error(msg, exc_info=True)
