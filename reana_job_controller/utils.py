@@ -10,8 +10,20 @@
 
 import logging
 
+import paramiko
 from reana_db.database import Session
 from reana_db.models import Workflow
+
+
+def singleton(cls):
+    """Singelton decorator."""
+    instances = {}
+
+    def getinstance():
+        if cls not in instances:
+            instances[cls] = cls()
+        return instances[cls]
+    return getinstance
 
 
 def update_workflow_logs(workflow_uuid, log_message):
@@ -25,3 +37,19 @@ def update_workflow_logs(workflow_uuid, log_message):
     except Exception as e:
         logging.error('Exception while saving logs: {}'.format(str(e)),
                       exc_info=True)
+
+
+@singleton
+class SSHClient():
+    """SSH Client."""
+
+    def __init__(self, hostname, username, password, port):
+        """Initialize ssh client."""
+        self.ssh_client = paramiko.SSHClient()
+        self.ssh_client.set_missing_host_key_policy(
+            paramiko.AutoAddPolicy())
+        self.ssh_client.connect(
+            hostname,
+            username,
+            password,
+            port)

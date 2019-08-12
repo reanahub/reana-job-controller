@@ -24,17 +24,7 @@ from reana_job_controller.htcondorcern_job_manager import \
     HTCondorJobManagerCERN
 from reana_job_controller.job_db import JOB_DB
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
-
-
-def singleton(cls):
-    """Singelton decorator."""
-    instances = {}
-
-    def getinstance():
-        if cls not in instances:
-            instances[cls] = cls()
-        return instances[cls]
-    return getinstance
+from reana_job_controller.utils import singleton
 
 
 @singleton

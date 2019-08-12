@@ -52,6 +52,7 @@ install_requires = [
     'reana-db>=0.6.0.dev20190828,<0.7.0',
     'htcondor==8.9.2',
     'retrying>=1.3.3',
+    'paramiko>=2.6.0'
 ]
 
 packages = find_packages()
