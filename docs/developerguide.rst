@@ -46,9 +46,9 @@ The users should then upload their HTCondor username and keytab secrets using:
 
 .. code-block:: console
 
-    $ reana-client secrets-add --from-literal HTCONDORCERN_USERNAME=johndoe
-                               --from-literal HTCONDORCERN_KEYTAB=.keytab
-                               --from-file ~/.keytab
+    $ reana-client secrets-add --env HTCONDORCERN_USERNAME=johndoe
+                               --env HTCONDORCERN_KEYTAB=.keytab
+                               --file ~/.keytab
 
 see the `reana-client's documentation on secrets <https://reana-client.readthedocs.io/en/latest/userguide.html#adding-secrets>`_.
 
