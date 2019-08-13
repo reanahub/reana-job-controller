@@ -14,11 +14,10 @@ from flask import Flask
 from reana_commons.config import REANA_LOG_FORMAT, REANA_LOG_LEVEL
 
 from reana_job_controller import config
-from reana_job_controller.job_monitor import start_watch_jobs_thread
 from reana_job_controller.spec import build_openapi_spec
 
 
-def create_app(JOB_DB=None, watch_jobs=True, config_mapping=None):
+def create_app(JOB_DB=None, config_mapping=None):
     """Create REANA-Job-Controller application."""
     logging.basicConfig(
         level=REANA_LOG_LEVEL,
@@ -34,8 +33,5 @@ def create_app(JOB_DB=None, watch_jobs=True, config_mapping=None):
 
     from reana_job_controller.rest import blueprint  # noqa
     app.register_blueprint(blueprint, url_prefix='/')
-
-    if watch_jobs:
-        start_watch_jobs_thread(JOB_DB)
 
     return app

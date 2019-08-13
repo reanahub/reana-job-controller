@@ -56,6 +56,5 @@ def base_app(tmp_shared_volume_path):
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
         "ORGANIZATIONS": ["default"],
     }
-    app_ = create_app(config_mapping=config_mapping,
-                      watch_jobs=False)
+    app_ = create_app(config_mapping=config_mapping)
     return app_

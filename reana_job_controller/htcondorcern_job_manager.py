@@ -74,6 +74,7 @@ class HTCondorJobManagerCERN(JobManager):
     def execute(self):
         """Execute / submit a job with HTCondor."""
         os.chdir(self.workflow_workspace)
+        HTCondorJobManagerCERN.autheticate()
         job_ad = classad.ClassAd()
         job_ad['JobDescription'] = \
             self.workflow.get_full_workflow_name() + '_' + self.job_name
