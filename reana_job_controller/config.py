@@ -31,3 +31,28 @@ DEFAULT_COMPUTE_BACKEND = 'kubernetes'
 
 MULTIPLE_COMPUTE_BACKENDS = os.getenv('MULTIPLE_COMPUTE_BACKENDS', False)
 """Allow multiple job compute backends."""
+
+JOB_HOSTPATH_MOUNTS = []
+"""List of tuples composed of name and path to create hostPath's inside jobs.
+
+This configuration should be used only when one knows for sure that the
+specified locations exist in all the cluster nodes.
+
+For example, if you are running REANA on Minikube with a single VM you would
+have to mount in Minikube the volume you want to be attached to every job:
+
+.. code-block::
+
+    $ minikube mount /usr/local/share/mydata:/mydata
+
+And add the following configuration to REANA-Job-Controller:
+
+.. code-block::
+
+    JOB_HOSTPATH_MOUNTS = [
+        ('mydata', '/mydata'),
+    ]
+
+This way all jobs will have ``/mydata`` mounted with the content of
+``/usr/local/share/mydata`` in the host machine.
+"""

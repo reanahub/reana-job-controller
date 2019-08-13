@@ -71,7 +71,7 @@ class KubernetesJobManager(JobManager):
     def execute(self):
         """Execute a job in Kubernetes."""
         backend_job_id = str(uuid.uuid4())
-        job = {
+        self.job = {
             'kind': 'Job',
             'apiVersion': 'batch/v1',
             'metadata': {
@@ -103,26 +103,26 @@ class KubernetesJobManager(JobManager):
         }
         user_id = os.getenv('REANA_USER_ID')
         secrets_store = REANAUserSecretsStore(user_id)
-        job['spec']['template']['spec']['containers'][0]['env'].extend(
+        self.job['spec']['template']['spec']['containers'][0]['env'].extend(
             secrets_store.get_env_secrets_as_k8s_spec()
         )
 
-        job['spec']['template']['spec']['volumes'].append(
+        self.job['spec']['template']['spec']['volumes'].append(
             secrets_store.get_file_secrets_volume_as_k8s_specs()
         )
 
-        job['spec']['template']['spec']['containers'][0][
+        self.job['spec']['template']['spec']['containers'][0][
             'volumeMounts'] \
             .append(secrets_store.get_secrets_volume_mount_as_k8s_spec())
 
         if self.env_vars:
             for var, value in self.env_vars.items():
-                job['spec']['template']['spec']['containers'][0]['env'].append(
-                    {'name': var, 'value': value}
-                )
+                self.job['spec']['template']['spec'][
+                    'containers'][0]['env'].append({'name': var,
+                                                    'value': value})
 
-        if self.shared_file_system:
-            self.add_shared_volume(job)
+        self.add_hostpath_volumes()
+        self.add_shared_volume()
 
         if self.cvmfs_mounts != 'false':
             cvmfs_map = {}
@@ -135,14 +135,14 @@ class KubernetesJobManager(JobManager):
             for repository, mount_path in cvmfs_map.items():
                 volume = get_k8s_cvmfs_volume(repository)
 
-                (job['spec']['template']['spec']['containers'][0]
+                (self.job['spec']['template']['spec']['containers'][0]
                     ['volumeMounts'].append(
                         {'name': volume['name'],
                          'mountPath': '/cvmfs/{}'.format(mount_path)}
                 ))
-                job['spec']['template']['spec']['volumes'].append(volume)
+                self.job['spec']['template']['spec']['volumes'].append(volume)
 
-        job['spec']['template']['spec']['securityContext'] = \
+        self.job['spec']['template']['spec']['securityContext'] = \
             client.V1PodSecurityContext(
                 run_as_group=WORKFLOW_RUNTIME_USER_GID,
                 run_as_user=WORKFLOW_RUNTIME_USER_UID)
@@ -151,10 +151,10 @@ class KubernetesJobManager(JobManager):
             api_response = \
                 current_k8s_batchv1_api_client.create_namespaced_job(
                     namespace=K8S_DEFAULT_NAMESPACE,
-                    body=job)
+                    body=self.job)
             return backend_job_id
         except ApiException as e:
-            logging.debug("Error while connecting to Kubernetes"
+            logging.error("Error while connecting to Kubernetes"
                           " API: {}".format(e))
         except Exception as e:
             logging.error(traceback.format_exc())
@@ -180,14 +180,34 @@ class KubernetesJobManager(JobManager):
                 'Server \n {}'.format(e))
             raise ComputingBackendSubmissionError(e.reason)
 
-    def add_shared_volume(self, job):
-        """Add shared CephFS volume to a given job spec.
+    def add_shared_volume(self):
+        """Add shared CephFS volume to a given job spec."""
+        if self.shared_file_system:
+            volume_mount, volume = get_shared_volume(
+                self.workflow_workspace,
+                current_app.config['SHARED_VOLUME_PATH_ROOT'])
+            self.add_volumes([(volume_mount, volume)])
 
-        :param job: Kubernetes job spec.
+    def add_hostpath_volumes(self):
+        """Add hostPath mounts from configuration to job."""
+        volumes_to_mount = []
+        for name, path in current_app.config['JOB_HOSTPATH_MOUNTS']:
+            volume_mount = {'name': name,
+                            'mountPath': path}
+            volume = {
+                'name': name,
+                'hostPath': {'path': path}}
+            volumes_to_mount.append((volume_mount, volume))
+
+        self.add_volumes(volumes_to_mount)
+
+    def add_volumes(self, volumes):
+        """Add provided volumes to job.
+
+        :param volumes: A list of tuple composed 1st of a Kubernetes
+            volumeMount spec and 2nd of Kubernetes volume spec.
         """
-        volume_mount, volume = get_shared_volume(
-            self.workflow_workspace,
-            current_app.config['SHARED_VOLUME_PATH_ROOT'])
-        job['spec']['template']['spec']['containers'][0][
-            'volumeMounts'].append(volume_mount)
-        job['spec']['template']['spec']['volumes'].append(volume)
+        for volume_mount, volume in volumes:
+            self.job['spec']['template']['spec']['containers'][0][
+                'volumeMounts'].append(volume_mount)
+            self.job['spec']['template']['spec']['volumes'].append(volume)
