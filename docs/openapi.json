@@ -71,6 +71,9 @@
         "job_name": {
           "type": "string"
         },
+        "kerberos": {
+          "type": "boolean"
+        },
         "prettified_cmd": {
           "default": "",
           "type": "string"

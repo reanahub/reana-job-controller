@@ -210,7 +210,8 @@ def create_job():  # noqa
         workflow_workspace=str(job_request['workflow_workspace']),
         cvmfs_mounts=job_request['cvmfs_mounts'],
         shared_file_system=job_request['shared_file_system'],
-        job_name=job_request.get('job_name', '')
+        job_name=job_request.get('job_name', ''),
+        kerberos=job_request.get('kerberos', ''),
     )
     backend_jod_id = job_obj.execute()
     if job_obj:

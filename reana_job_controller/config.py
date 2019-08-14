@@ -63,3 +63,20 @@ This way all jobs will have ``/mydata`` mounted with the content of
 SUPPORTED_COMPUTE_BACKENDS = os.getenv('COMPUTE_BACKENDS',
                                        DEFAULT_COMPUTE_BACKEND).split(",")
 """List of supported compute backends provided as docker build arg."""
+
+KRB5_CONTAINER_IMAGE = os.getenv('KRB5_CONTAINER_IMAGE',
+                                 'reanahub/krb5:latest')
+"""Default docker image of KRB5 sidecar container."""
+
+KRB5_CONTAINER_NAME = 'krb5'
+"""Name of KRB5 sidecar container."""
+
+KRB5_TOKEN_CACHE_LOCATION = '/krb5_cache/'
+"""Directory of Kerberos tokens cache, shared between job & KRB5 container. It
+should match `default_ccache_name` in krb5.conf.
+"""
+
+KRB5_CONFIGMAP_NAME = 'krb5-conf'
+"""Kerberos configMap name. Must be the same as in
+reana_cluster/backends/kubernetes/templates/configmaps/kerberos.yaml.
+"""

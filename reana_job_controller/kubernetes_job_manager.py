@@ -41,7 +41,7 @@ class KubernetesJobManager(JobManager):
     def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
                  workflow_uuid=None, workflow_workspace=None,
                  cvmfs_mounts='false', shared_file_system=False,
-                 job_name=None):
+                 job_name=None, kerberos=False):
         """Instanciate kubernetes job manager.
 
         :param docker_img: Docker image.
@@ -62,6 +62,8 @@ class KubernetesJobManager(JobManager):
         :type shared_file_system: bool
         :param job_name: Name of the job.
         :type job_name: str
+        :param kerberos: Decides if kerberos should be provided for job.
+        :type kerberos: bool
         """
         super(KubernetesJobManager, self).__init__(
                          docker_img=docker_img, cmd=cmd,
@@ -72,6 +74,7 @@ class KubernetesJobManager(JobManager):
         self.compute_backend = "Kubernetes"
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
+        self.kerberos = kerberos
 
     @JobManager.execution_hook
     def execute(self):
@@ -109,17 +112,20 @@ class KubernetesJobManager(JobManager):
         }
         user_id = os.getenv('REANA_USER_ID')
         secrets_store = REANAUserSecretsStore(user_id)
+
+        secret_env_vars = secrets_store.get_env_secrets_as_k8s_spec()
         self.job['spec']['template']['spec']['containers'][0]['env'].extend(
-            secrets_store.get_env_secrets_as_k8s_spec()
+            secret_env_vars
         )
 
         self.job['spec']['template']['spec']['volumes'].append(
             secrets_store.get_file_secrets_volume_as_k8s_specs()
         )
 
-        self.job['spec']['template']['spec']['containers'][0][
-            'volumeMounts'] \
-            .append(secrets_store.get_secrets_volume_mount_as_k8s_spec())
+        secrets_volume_mount = \
+            secrets_store.get_secrets_volume_mount_as_k8s_spec()
+        self.job['spec']['template']['spec']['containers'][0]['volumeMounts'] \
+            .append(secrets_volume_mount)
 
         if self.env_vars:
             for var, value in self.env_vars.items():
@@ -152,6 +158,10 @@ class KubernetesJobManager(JobManager):
             client.V1PodSecurityContext(
                 run_as_group=WORKFLOW_RUNTIME_USER_GID,
                 run_as_user=WORKFLOW_RUNTIME_USER_UID)
+
+        if self.kerberos:
+            self._add_krb5_sidecar_container(secrets_volume_mount)
+
         backend_job_id = self._submit()
         return backend_job_id
 
@@ -222,3 +232,43 @@ class KubernetesJobManager(JobManager):
             self.job['spec']['template']['spec']['containers'][0][
                 'volumeMounts'].append(volume_mount)
             self.job['spec']['template']['spec']['volumes'].append(volume)
+
+    def _add_krb5_sidecar_container(self, secrets_volume_mount):
+        """Add  sidecar container for a job."""
+        krb5_config_map_name = current_app.config['KRB5_CONFIGMAP_NAME']
+        ticket_cache_volume = {
+            'name': 'krb5-cache',
+            'emptyDir': {}
+        }
+        krb5_config_volume = {
+            'name': 'krb5-conf',
+            'configMap': {'name': krb5_config_map_name}
+        }
+        volume_mounts = [
+            {
+                'name': ticket_cache_volume['name'],
+                'mountPath': current_app.config['KRB5_TOKEN_CACHE_LOCATION']
+            },
+            {
+                'name': krb5_config_volume['name'],
+                'mountPath': '/etc/krb5.conf',
+                'subPath': 'krb5.conf'
+            }
+        ]
+        keytab_file = os.environ.get('HTCONDORCERN_KEYTAB')
+        cern_user = os.environ.get('CERN_USER')
+        krb5_container = {
+            'image': current_app.config['KRB5_CONTAINER_IMAGE'],
+            'command': ['kinit', '-kt',
+                        '/etc/reana/secrets/{}'.format(keytab_file),
+                        '{}@CERN.CH'.format(cern_user)],
+            'name': current_app.config['KRB5_CONTAINER_NAME'],
+            'imagePullPolicy': 'IfNotPresent',
+            'volumeMounts': [secrets_volume_mount] + volume_mounts,
+        }
+        self.job['spec']['template']['spec']['volumes'].extend(
+            [ticket_cache_volume, krb5_config_volume])
+        self.job['spec']['template']['spec']['containers'][0][
+            'volumeMounts'].extend(volume_mounts)
+        self.job['spec']['template']['spec']['containers'].append(
+            krb5_container)
