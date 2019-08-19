@@ -10,6 +10,7 @@
 
 import copy
 import json
+import logging
 
 from flask import Blueprint, current_app, jsonify, request
 
@@ -18,9 +19,8 @@ from reana_job_controller.job_db import (JOB_DB, job_exists, job_is_cached,
                                          retrieve_all_jobs,
                                          retrieve_backend_job_id, retrieve_job,
                                          retrieve_job_logs)
-from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
-from reana_job_controller.htcondor_job_manager import HTCondorJobManager
 from reana_job_controller.schemas import Job, JobRequest
+from reana_job_controller.utils import update_workflow_logs
 
 blueprint = Blueprint('jobs', __name__)
 
@@ -193,28 +193,26 @@ def create_job():  # noqa
     job_request, errors = job_request_schema.load(json_data)
     if errors:
         return jsonify(errors), 400
-    backend = job_request.get('backend', 'HTCondor')
-    if backend == 'Kubernetes':
-        job_obj = KubernetesJobManager(
-            docker_img=job_request['docker_img'],
-            cmd=job_request['cmd'],
-            env_vars=job_request['env_vars'],
-            workflow_uuid=job_request['workflow_uuid'],
-            workflow_workspace=str(job_request['workflow_workspace']),
-            cvmfs_mounts=job_request['cvmfs_mounts'],
-            shared_file_system=job_request['shared_file_system']
-        )
-    elif backend =='HTCondor':
-        job_obj = HTCondorJobManager(
-            docker_img=job_request['docker_img'],
-            cmd=job_request['cmd'],
-            env_vars=job_request['env_vars'],
-            workflow_uuid=job_request['workflow_uuid'],
-            workflow_workspace=str(job_request['workflow_workspace']),
-            cvmfs_mounts=job_request['cvmfs_mounts'],
-            shared_file_system=job_request['shared_file_system']
-        )
-
+    compute_backend = job_request.get(
+        'compute_backend',
+        current_app.config['DEFAULT_COMPUTE_BACKEND'])
+    if not current_app.config['MULTIPLE_COMPUTE_BACKENDS'] and \
+       current_app.config['DEFAULT_COMPUTE_BACKEND'] != compute_backend:
+        msg = 'Job submission failed. Backend {} is not supported.'.format(
+            compute_backend)
+        logging.error(msg, exc_info=True)
+        update_workflow_logs(job_request['workflow_uuid'], msg)
+        return jsonify({'job': msg}), 500
+    job_obj = current_app.config['COMPUTE_BACKENDS'][compute_backend](
+        docker_img=job_request['docker_img'],
+        cmd=job_request['cmd'],
+        env_vars=job_request['env_vars'],
+        workflow_uuid=job_request['workflow_uuid'],
+        workflow_workspace=str(job_request['workflow_workspace']),
+        cvmfs_mounts=job_request['cvmfs_mounts'],
+        shared_file_system=job_request['shared_file_system'],
+        job_name=job_request.get('job_name', '')
+    )
     backend_jod_id = job_obj.execute()
     if job_obj:
         job = copy.deepcopy(job_request)
@@ -225,8 +223,8 @@ def create_job():  # noqa
         job['obj'] = job_obj
         job['job_id'] = job_obj.job_id
         job['backend_job_id'] = backend_jod_id
+        job['compute_backend'] = compute_backend
         JOB_DB[str(job['job_id'])] = job
-
         return jsonify({'job_id': job['job_id']}), 201
     else:
         return jsonify({'job': 'Could not be allocated'}), 500
@@ -346,11 +344,16 @@ def delete_job(job_id):  # noqa
          description: Required. ID of the job to be deleted.
          required: true
          type: string
+       - name: compute_backend
+         in: query
+         description: Job compute backend.
+         required: false
+         type: string
       responses:
         204:
           description: >-
             Request accepted. A request to delete the job has been sent to the
-              computing backend.
+              compute backend.
         404:
           description: Request failed. The given job ID does not seem to exist.
           examples:
@@ -359,23 +362,26 @@ def delete_job(job_id):  # noqa
                 The job cdcf48b1-c2f3-4693-8230-b066e088444c doesn't exist
         502:
           description: >-
-            Request failed. Something went wrong while calling the computing
+            Request failed. Something went wrong while calling the compute
             backend.
           examples:
             application/json:
               "message": >-
-                Connection to computing backend failed:
+                Connection to compute backend failed:
                 [reason]
     """
     if job_exists(job_id):
         try:
+            compute_backend = request.args.get(
+                'compute_backend',
+                current_app.config['DEFAULT_COMPUTE_BACKEND'])
             backend_job_id = retrieve_backend_job_id(job_id)
-            #KubernetesJobManager.stop(backend_job_id)
-            HTCondorJobManager.stop(backend_job_id)
+            current_app.config['COMPUTE_BACKENDS'][compute_backend].stop(
+                backend_job_id)
             return jsonify(), 204
         except ComputingBackendSubmissionError as e:
             return jsonify(
-                {'message': 'Connection to computing backend failed:\n{}'
+                {'message': 'Connection to compute backend failed:\n{}'
                     .format(e)}), 502
     else:
         return jsonify({'message': 'The job {} doesn\'t exist'

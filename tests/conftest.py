@@ -27,6 +27,23 @@ def mocked_job():
     return job_id
 
 
+@pytest.fixture()
+def job_spec():
+    """Job spec dict."""
+    job_spec = {
+        'experiment': 'experiment',
+        'docker_img': 'image',
+        'cmd': 'cmd',
+        'prettified_cmd': 'prettified_cmd',
+        'env_vars': {},
+        'workflow_workspace': 'workflow_workspace',
+        'job_name': 'job_name',
+        'cvmfs_mounts': 'cvmfs_mounts',
+        'workflow_uuid': 'workflow_uuid',
+    }
+    return job_spec
+
+
 @pytest.fixture(scope="module")
 def base_app(tmp_shared_volume_path):
     """Flask application fixture."""

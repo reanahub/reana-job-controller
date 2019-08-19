@@ -8,10 +8,11 @@
 
 """REST API test for REANA-Job-Controller. """
 
+import json
 import uuid
 
 import pytest
-from flask import url_for
+from flask import current_app, url_for
 from kubernetes.client.rest import ApiException
 from mock import Mock, patch
 
@@ -22,7 +23,11 @@ def test_delete_job(app, mocked_job):
         with patch('reana_job_controller.kubernetes_job_manager.'
                    'current_k8s_batchv1_api_client',
                    Mock()):
-            res = client.delete(url_for('jobs.delete_job', job_id=mocked_job))
+            res = client.delete(
+                url_for('jobs.delete_job', job_id=mocked_job),
+                query_string={
+                    "compute_backend":
+                        current_app.config['DEFAULT_COMPUTE_BACKEND']})
             assert res.status_code == 204
 
 
@@ -33,18 +38,22 @@ def test_delete_unknown_job(app):
         with patch('reana_job_controller.kubernetes_job_manager.'
                    'current_k8s_batchv1_api_client',
                    Mock()):
-            res = client.delete(url_for('jobs.delete_job', job_id=random_job))
+            res = client.delete(
+                url_for('jobs.delete_job', job_id=random_job),
+                query_string={
+                    "compute_backend":
+                        current_app.config['DEFAULT_COMPUTE_BACKEND']})
             assert res.status_code == 404
 
 
 def test_delete_job_failed_backend(app, mocked_job):
-    """Test delete job simulating a computing backend error."""
-    computing_backend_error_msg = 'Something went wrong.'
-    expected_msg = {'message': 'Connection to computing backend failed:\n{}'
-                    .format(computing_backend_error_msg)}
+    """Test delete job simulating a compute backend error."""
+    compute_backend_error_msg = 'Something went wrong.'
+    expected_msg = {'message': 'Connection to compute backend failed:\n{}'
+                    .format(compute_backend_error_msg)}
     mocked_k8s_client = Mock()
     mocked_k8s_client.delete_namespaced_job = \
-        Mock(side_effect=ApiException(reason=computing_backend_error_msg))
+        Mock(side_effect=ApiException(reason=compute_backend_error_msg))
     with app.test_request_context(), app.test_client() as client:
         with patch('reana_job_controller.kubernetes_job_manager'
                    '.current_k8s_batchv1_api_client', mocked_k8s_client):
@@ -52,3 +61,18 @@ def test_delete_job_failed_backend(app, mocked_job):
                                         job_id=mocked_job))
             assert res.json == expected_msg
             assert res.status_code == 502
+
+
+def test_create_job_unsupported_backend(app, job_spec):
+    """Test create job with unsupported backend."""
+    fake_backend = 'htcondorcern'
+    expected_msg =  \
+        'Job submission failed. Backend {} is not supported.'.format(
+            fake_backend)
+    job_spec['compute_backend'] = fake_backend
+    with app.test_client() as client:
+        res = client.post(url_for('jobs.create_job'),
+                          content_type='application/json',
+                          data=json.dumps(job_spec))
+        assert res.json == {'job': expected_msg}
+        assert res.status_code == 500
