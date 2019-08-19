@@ -18,7 +18,8 @@ from flask import current_app
 from kubernetes import client
 from kubernetes.client.models.v1_delete_options import V1DeleteOptions
 from kubernetes.client.rest import ApiException
-from reana_commons.config import (CVMFS_REPOSITORIES, K8S_DEFAULT_NAMESPACE,
+from reana_commons.config import (CVMFS_CMS_SITE, CVMFS_REPOSITORIES,
+                                  K8S_DEFAULT_NAMESPACE,
                                   WORKFLOW_RUNTIME_USER_GID,
                                   WORKFLOW_RUNTIME_USER_UID)
 from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
@@ -134,6 +135,15 @@ class KubernetesJobManager(JobManager):
 
             for repository, mount_path in cvmfs_map.items():
                 volume = get_k8s_cvmfs_volume(repository)
+
+                if mount_path == 'cms.cern.ch':
+                    (self.job['spec']['template']['spec']['containers'][0]
+                        ['volumeMounts'].append(
+                            {'name': volume['name'],
+                             'mountPath': '/cvmfs/cms.cern.ch/SITECONF/{}'
+                                .format(CVMFS_CMS_SITE),
+                             'subPath': 'SITECONF/local'}
+                    ))
 
                 (self.job['spec']['template']['spec']['containers'][0]
                     ['volumeMounts'].append(
