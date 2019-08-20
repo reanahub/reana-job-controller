@@ -13,6 +13,8 @@ import os
 from reana_job_controller.htcondorcern_job_manager import \
     HTCondorJobManagerCERN
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
+from reana_job_controller.htcondorvc3_job_manager import \
+    HTCondorJobManagerVC3
 
 MAX_JOB_RESTARTS = 3
 """Number of retries for a job before considering it as failed."""

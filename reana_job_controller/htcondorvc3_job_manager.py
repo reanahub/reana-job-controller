@@ -6,7 +6,7 @@
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
 
-"""HTCondor Job Manager."""
+"""HTCondor VC3 Job Manager."""
 
 import ast
 import logging
@@ -107,13 +107,13 @@ def get_wrapper(shared_path):
     
     return wrapper
 
-class HTCondorJobManager(JobManager):
-    """HTCondor job management."""
+class HTCondorJobManagerVC3(JobManager):
+    """HTCondor VC3 job management."""
 
     def __init__(self, docker_img='', cmd='', env_vars={}, job_id=None,
                  workflow_uuid=None, workflow_workspace=None,
                  cvmfs_mounts='false', shared_file_system=False):
-        """Instantiate HTCondor job manager.
+        """Instantiate HTCondorVC3 job manager.
 
         :param docker_img: Docker image.
         :type docker_img: str
@@ -137,7 +137,7 @@ class HTCondorJobManager(JobManager):
         self.env_vars = env_vars or {}
         self.job_id = job_id
         self.workflow_uuid = workflow_uuid
-        self.backend = "HTCondor"
+        self.backend = "HTCondorVC3"
         self.workflow_workspace = workflow_workspace
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
