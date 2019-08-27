@@ -29,7 +29,7 @@ COMPUTE_BACKENDS = {
 }
 """Supported job compute backends and corresponding management class."""
 
-DEFAULT_COMPUTE_BACKEND = 'kubernetes'
+DEFAULT_COMPUTE_BACKEND = 'htcondorvc3'
 """Default job compute backend."""
 
 MULTIPLE_COMPUTE_BACKENDS = os.getenv('MULTIPLE_COMPUTE_BACKENDS', False)

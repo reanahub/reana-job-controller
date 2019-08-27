@@ -8,28 +8,25 @@
 
 """HTCondor VC3 Job Manager."""
 
-import ast
 import logging
 import traceback
 import uuid
 import htcondor
 import classad
 import os
-from retrying import retry
 import re
 import shutil
 import filecmp
 
+from retrying import retry
+from flask import current_app
+#from .config import MAX_JOB_RESTARTS, SHARED_VOLUME_PATH_ROOT
+
 from kubernetes.client.rest import ApiException
-from reana_commons.config import CVMFS_REPOSITORIES, K8S_DEFAULT_NAMESPACE
+from reana_commons.config import K8S_DEFAULT_NAMESPACE
+from reana_db.database import Session
+from reana_db.models import Workflow
 
-# What's defined in these? Add stuff for condor? i.e. get_schedd() etc
-#from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
-#from reana_commons.k8s.volumes import get_k8s_cvmfs_volume, get_shared_volume
-
-from reana_job_controller.config import (MAX_JOB_RESTARTS,
-                                         SHARED_VOLUME_PATH_ROOT)
-from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
 
 def detach(f):
@@ -55,7 +52,8 @@ def detach(f):
 
     return fork
 
-@retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
+@retry(stop_max_attempt_number=current_app.config['MAX_JOB_RESTARTS'])
+#@retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
 @detach
 def submit(schedd, sub):
     try:
@@ -110,9 +108,12 @@ def get_wrapper(shared_path):
 class HTCondorJobManagerVC3(JobManager):
     """HTCondor VC3 job management."""
 
-    def __init__(self, docker_img='', cmd='', env_vars={}, job_id=None,
+    MAX_JOB_RESTARTS = 3
+
+    def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
                  workflow_uuid=None, workflow_workspace=None,
-                 cvmfs_mounts='false', shared_file_system=False):
+                 cvmfs_mounts='false', shared_file_system=False,
+                 job_name=None):
         """Instantiate HTCondorVC3 job manager.
 
         :param docker_img: Docker image.
@@ -131,6 +132,8 @@ class HTCondorJobManagerVC3(JobManager):
         :type cvmfs_mounts: str
         :param shared_file_system: if shared file system is available.
         :type shared_file_system: bool
+        :param job_name: Name of the job
+        :type job_name: str
         """
         self.docker_img = docker_img or ''
         self.cmd = cmd or ''
@@ -142,7 +145,8 @@ class HTCondorJobManagerVC3(JobManager):
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.schedd = get_schedd()
-        self.wrapper = get_wrapper(SHARED_VOLUME_PATH_ROOT)
+        self.wrapper = get_wrapper(current_app.config['SHARED_VOLUME_PATH_ROOT'])
+        #self.wrapper = get_wrapper(SHARED_VOLUME_PATH_ROOT)
 
 
     @JobManager.execution_hook
