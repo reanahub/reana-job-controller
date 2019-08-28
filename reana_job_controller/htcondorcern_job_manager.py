@@ -205,10 +205,10 @@ class HTCondorJobManagerCERN(JobManager):
         """Find and return the HTCondor sched."""
         try:
             schedd = htcondor.Schedd()
+            return schedd
         except Exception as e:
             logging.error("Can't locate schedd: {0}".format(e), exc_info=True)
             time.sleep(10)
-        return schedd
 
     def autheticate():
         """Create kerberos ticket from mounted keytab_file."""

@@ -14,7 +14,6 @@ RUN apt-get update && \
 
 ARG COMPUTE_BACKENDS=kubernetes
 #CERN HTCondor part taken from https://gitlab.cern.ch/batch-team/condorsubmit
-#RUN if [[ $COMPUTE_BACKENDS == *"htcondorcern"* ]]; then \
 RUN case $COMPUTE_BACKENDS in \
     *"htcondorcern"*) \
       export DEBIAN_FRONTEND=noninteractive ;\
@@ -28,11 +27,10 @@ RUN case $COMPUTE_BACKENDS in \
       wget -O cernbatchsubmit.rpm http://linuxsoft.cern.ch/internal/repos/batch7-stable/x86_64/os/Packages/cernbatchsubmit-0.1.0-1.el7.x86_64.rpm; \
       yes | alien -i cernbatchsubmit.rpm; \
       yes | alien -i ngbauth-submit.rpm; \
-      wget -qO - http://research.cs.wisc.edu/htcondor/debian/HTCondor-Release.gpg.key | apt-key add - :\
-      echo "deb http://research.cs.wisc.edu/htcondor/debian/8.8/stretch stretch contrib" >> /etc/apt/sources.list; \
-      echo "deb-src http://research.cs.wisc.edu/htcondor/debian/8.8/stretch stretch contrib" >> /etc/apt/sources.list; \
+      wget -qO - http://research.cs.wisc.edu/htcondor/debian/HTCondor-Release.gpg.key | apt-key add -; \
+      echo "deb https://research.cs.wisc.edu/htcondor/debian/8.8/buster buster contrib" >>/etc/apt/sources.list; \
       apt-get update; \
-      apt-get install -y htcondor --no-install-recommends; \
+      apt-get install -y condor --no-install-recommends; \
       apt-get -y remove gnupg2 wget alien; \
       ;; \
     *) \

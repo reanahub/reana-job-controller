@@ -26,24 +26,31 @@ from reana_job_controller.job_db import JOB_DB
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 
 
+def singleton(cls):
+    """Singelton decorator."""
+    instances = {}
+
+    def getinstance():
+        if cls not in instances:
+            instances[cls] = cls()
+        return instances[cls]
+    return getinstance
+
+
+@singleton
 class JobMonitorKubernetes():
     """Kubernetes job monitor."""
-
-    def __new__(cls):
-        """Check if instance already exists."""
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(JobMonitorKubernetes, cls).__new__(cls)
-        return cls.instance
 
     def __init__(self):
         """Initialize Kubernetes job monitor thread."""
         self.job_event_reader_thread = threading.Thread(
-            target=JobMonitorKubernetes.watch_jobs,
+            name='kubernetes_job_monitor',
+            target=self.watch_jobs,
             args=(JOB_DB,))
         self.job_event_reader_thread.daemon = True
         self.job_event_reader_thread.start()
 
-    def watch_jobs(job_db):
+    def watch_jobs(self, job_db):
         """Open stream connection to k8s apiserver to watch all jobs status.
 
         :param job_db: Dictionary which contains all current jobs.
@@ -125,24 +132,20 @@ condorJobStatus = {
 }
 
 
+@singleton
 class JobMonitorHTCondorCERN():
     """HTCondor jobs monitor CERN."""
-
-    def __new__(cls):
-        """Check if instance already exists."""
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(JobMonitorHTCondorCERN, cls).__new__(cls)
-        return cls.instance
 
     def __init__(self):
         """Initialize HTCondor job monitor thread."""
         self.job_event_reader_thread = threading.Thread(
-            target=JobMonitorHTCondorCERN.watch_jobs,
+            name='htcondorcern_job_monitor',
+            target=self.watch_jobs,
             args=(JOB_DB,))
         self.job_event_reader_thread.daemon = True
         self.job_event_reader_thread.start()
 
-    def watch_jobs(job_db):
+    def watch_jobs(self, job_db):
         """Watch currently running HTCondor jobs.
 
         :param job_db: Dictionary which contains all current jobs.
@@ -186,6 +189,7 @@ class JobMonitorHTCondorCERN():
                                 str(condor_job))
                             logging.error(msg)
                             job_db[job_id]['status'] = 'failed'
+                            job_db[job_id]['log'] = msg
                         continue
                     if condor_job['JobStatus'] == condorJobStatus['Completed']:
                         exit_code = condor_job.get(
