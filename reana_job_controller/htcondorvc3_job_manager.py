@@ -43,7 +43,8 @@ def detach(f):
             try:
                 os.close(r)
                 w = os.fdopen(w, 'w')
-                os.setuid(int(os.environ.get('VC3USERID')))
+                #os.setuid(int(os.environ.get('VC3USERID')))
+                os.setuid(int(os.environ.get('WORKFLOW_RUNTIME_USER_UID')))
                 out = f(*args, **kwargs)
                 w.write(str(out))
                 w.close()
@@ -54,7 +55,7 @@ def detach(f):
 
 @retry(stop_max_attempt_number=current_app.config['MAX_JOB_RESTARTS'])
 #@retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
-@detach
+#@detach
 def submit(schedd, sub):
     try:
         with schedd.transaction() as txn:
