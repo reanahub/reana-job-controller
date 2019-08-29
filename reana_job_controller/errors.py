@@ -10,4 +10,4 @@
 
 
 class ComputingBackendSubmissionError(Exception):
-    """Operation to computer backend could not be performed."""
+    """Operation to compute backend could not be performed."""

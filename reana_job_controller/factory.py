@@ -9,14 +9,12 @@
 """REANA-Job-Controller application factory."""
 
 import logging
-import threading
 
 from flask import Flask
 from reana_commons.config import REANA_LOG_FORMAT, REANA_LOG_LEVEL
 
 from reana_job_controller import config
-#from reana_job_controller.k8s import start_watch_jobs_thread
-from reana_job_controller.condor import start_watch_jobs_thread
+from reana_job_controller.job_monitor import start_watch_jobs_thread
 from reana_job_controller.spec import build_openapi_spec
 
 
@@ -28,10 +26,9 @@ def create_app(JOB_DB=None, watch_jobs=True, config_mapping=None):
     )
     app = Flask(__name__)
     app.secret_key = "mega secret key"
+    app.config.from_object(config)
     if config_mapping:
         app.config.from_mapping(config_mapping)
-    else:
-        app.config.from_object(config)
     with app.app_context():
         app.config['OPENAPI_SPEC'] = build_openapi_spec()
 

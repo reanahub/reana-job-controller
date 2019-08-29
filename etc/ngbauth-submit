@@ -1,0 +1,3 @@
+# config for ngauth, submission-side, comes from puppet module 'ngauth'
+principalname=ngauth/ngauth.cern.ch
+pubkey=/etc/ngauth_batch_crypt_pub.pem
