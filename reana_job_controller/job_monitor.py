@@ -23,7 +23,8 @@ from reana_job_controller import config
 from reana_job_controller.htcondorcern_job_manager import \
     HTCondorJobManagerCERN
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
-
+from reana_job_controller.htcondorvc3_job_manager import \
+    HTCondorJobManagerVC3
 
 def watch_jobs_kubernetes(job_db):
     """Open stream connection to k8s apiserver to watch all jobs status.
@@ -182,6 +183,53 @@ def watch_jobs_htcondorcern(job_db):
             logging.error("Unexpected error: {}".format(e), exc_info=True)
             time.sleep(120)
 
+def watch_jobs_htcondorvc3(job_db):
+    """Watch currently running HTCondor jobs.
+    :param job_db: Dictionary which contains all current jobs.
+    """
+    from reana_job_controller.htcondorvc3_job_manager import get_schedd
+
+    condorJobStatus = {
+        'Unexpanded': 0,
+        'Idle': 1,
+        'Running': 2,
+        'Removed': 3,
+        'Completed': 4,
+        'Held': 5,
+        'Submission_Error': 6
+    }
+    schedd = get_schedd()
+    ads = ['ClusterId', 'JobStatus', 'ExitCode']
+    while True:
+        logging.debug('Starting a new stream request to watch Condor Jobs')
+
+        for job_id, job_dict in job_db.items():
+            if job_db[job_id]['deleted']:
+                continue
+            condor_it = schedd.history('ClusterId == {0}'.format(
+                job_dict['backend_job_id']), ads, match=1)
+            try:
+                condor_job = next(condor_it)
+            except:
+                # Did not match to any job in the history queue yet
+                continue
+            if condor_job['JobStatus'] == condorJobStatus['Completed']:
+                if condor_job['ExitCode'] == 0:
+                    job_db[job_id]['status'] = 'succeeded'
+                else:
+                    logging.info(
+                        'Job job_id: {0}, condor_job_id: {1} failed'.format(
+                            job_id, condor_job['ClusterId']))
+                    job_db[job_id]['status'] = 'failed'
+                # @todo: Grab/Save logs when job either succeeds or fails.
+                job_db[job_id]['deleted'] = True
+            elif condor_job['JobStatus'] == condorJobStatus['Held']:
+                logging.info('Job Was held, will delette and set as failed')
+                HTCondorJobManagerVC3.condor_delete_job(condor_job['ClusterId'])
+                job_db[job_id]['deleted'] == True
+             
+        time.sleep(120)
+
 
 def store_logs(logs, job_id):
     """Write logs to DB."""
@@ -208,7 +256,8 @@ def start_watch_jobs_thread(job_db):
     compute_backend = config.DEFAULT_COMPUTE_BACKEND
     watch_jobs = {
         'kubernetes': watch_jobs_kubernetes,
-        'htcondorcern': watch_jobs_htcondorcern
+        'htcondorcern': watch_jobs_htcondorcern,
+        'htcondorvc3' : watch_jobs_htcondorvc3
     }
     if config.MULTIPLE_COMPUTE_BACKENDS:
         job_event_reader_thread = {}

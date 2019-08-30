@@ -17,9 +17,9 @@ import os
 import re
 import shutil
 import filecmp
+import pwd
 
 from retrying import retry
-#from flask import current_app
 from reana_job_controller.variables import (MAX_JOB_RESTARTS, SHARED_VOLUME_PATH_ROOT)
 
 from kubernetes.client.rest import ApiException
@@ -44,7 +44,8 @@ def detach(f):
                 os.close(r)
                 w = os.fdopen(w, 'w')
                 #os.setuid(int(os.environ.get('VC3USERID')))
-                os.setuid(int(os.environ.get('WORKFLOW_RUNTIME_USER_UID')))
+                user_id = pwd.getpwnam(os.getenv('USER')).pw_uid
+                os.setuid(user_id)
                 out = f(*args, **kwargs)
                 w.write(str(out))
                 w.close()
@@ -53,7 +54,6 @@ def detach(f):
 
     return fork
 
-#@retry(stop_max_attempt_number=current_app.config['MAX_JOB_RESTARTS'])
 @retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
 #@detach
 def submit(schedd, sub):
@@ -84,15 +84,15 @@ def get_schedd():
 
     # Getting remote scheduler
     schedd_ad = classad.ClassAd()
-    schedd_ad["MyAddress"] = os.environ.get("HTCONDOR_ADDR", None) 
+    schedd_ad["MyAddress"] = os.environ.get("REANA_JOB_CONTROLLER_VC3_HTCONDOR_ADDR", None) 
     schedd = htcondor.Schedd(schedd_ad)
     return schedd
 
-def get_wrapper(shared_path):
+def get_wrapper(workflow_workspace):
     """Get wrapper for job. Transfer if it does not exist.
     :param shared_path: Shared FS directory, e.g.: /var/reana."""
     
-    wrapper = os.path.join(shared_path, 'wrapper', 'job_wrapper.sh')
+    wrapper = os.path.join(workflow_workspace, 'wrapper', 'job_wrapper.sh')
     local_wrapper = '/code/files/job_wrapper.sh'
     if os.path.exists(wrapper) and filecmp.cmp(local_wrapper, wrapper):
         return wrapper
@@ -102,14 +102,13 @@ def get_wrapper(shared_path):
         shutil.copy('/code/files/job_wrapper.sh', wrapper)
     except Exception as e:
         logging.debug("Error transfering wrapper : {0}.".format(e))
+        logging.debug("user: {0}".format(pwd.getpwuid(os.getuid()).pw_name))
         raise e
     
     return wrapper
 
 class HTCondorJobManagerVC3(JobManager):
     """HTCondor VC3 job management."""
-
-    MAX_JOB_RESTARTS = 3
 
     def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
                  workflow_uuid=None, workflow_workspace=None,
@@ -146,8 +145,7 @@ class HTCondorJobManagerVC3(JobManager):
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.schedd = get_schedd()
-        #self.wrapper = get_wrapper(current_app.config['SHARED_VOLUME_PATH_ROOT'])
-        self.wrapper = get_wrapper(SHARED_VOLUME_PATH_ROOT)
+        self.wrapper = get_wrapper(workflow_workspace)
 
 
     @JobManager.execution_hook
@@ -188,3 +186,14 @@ class HTCondorJobManagerVC3(JobManager):
         """Add shared CephFS volume to a given job.
         """
         pass #Not Implemented yet
+
+
+    def condor_delete_job(job, asynchronous=True):
+        """Delete HTCondor job.
+    
+        :param job: The :string: HTCondor cluster ID of the job to be removed.
+        :param asynchronous: Place holder for comparison to k8s.
+        """
+    
+        self.schedd.act(htcondor.JobAction.Remove, 'ClusterID==%d' % job)
+
