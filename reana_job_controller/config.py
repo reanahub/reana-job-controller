@@ -15,12 +15,8 @@ from reana_job_controller.htcondorcern_job_manager import \
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 from reana_job_controller.htcondorvc3_job_manager import \
     HTCondorJobManagerVC3
-
-MAX_JOB_RESTARTS = 3
-"""Number of retries for a job before considering it as failed."""
-
-SHARED_VOLUME_PATH_ROOT = os.getenv('SHARED_VOLUME_PATH_ROOT', '/var/reana')
-"""Root path of the shared volume ."""
+from reana_job_controller.variables import (MAX_JOB_RESTARTS,
+                                            SHARED_VOLUME_PATH_ROOT)
 
 COMPUTE_BACKENDS = {
     'kubernetes': KubernetesJobManager,

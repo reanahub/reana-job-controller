@@ -19,8 +19,8 @@ import shutil
 import filecmp
 
 from retrying import retry
-from flask import current_app
-#from .config import MAX_JOB_RESTARTS, SHARED_VOLUME_PATH_ROOT
+#from flask import current_app
+from reana_job_controller.variables import (MAX_JOB_RESTARTS, SHARED_VOLUME_PATH_ROOT)
 
 from kubernetes.client.rest import ApiException
 from reana_commons.config import K8S_DEFAULT_NAMESPACE
@@ -53,8 +53,8 @@ def detach(f):
 
     return fork
 
-@retry(stop_max_attempt_number=current_app.config['MAX_JOB_RESTARTS'])
-#@retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
+#@retry(stop_max_attempt_number=current_app.config['MAX_JOB_RESTARTS'])
+@retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
 #@detach
 def submit(schedd, sub):
     try:
@@ -146,8 +146,8 @@ class HTCondorJobManagerVC3(JobManager):
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.schedd = get_schedd()
-        self.wrapper = get_wrapper(current_app.config['SHARED_VOLUME_PATH_ROOT'])
-        #self.wrapper = get_wrapper(SHARED_VOLUME_PATH_ROOT)
+        #self.wrapper = get_wrapper(current_app.config['SHARED_VOLUME_PATH_ROOT'])
+        self.wrapper = get_wrapper(SHARED_VOLUME_PATH_ROOT)
 
 
     @JobManager.execution_hook
@@ -169,6 +169,7 @@ class HTCondorJobManagerVC3(JobManager):
         for key, value in self.env_vars.items():
             job_env += '; {0}={1}'.format(key, value)
         sub['environment'] = job_env
+        sub['on_exit_remove'] = '(ExitBySignal == False) && ((ExitCode == 0) || (ExitCode !=0 && NumJobStarts > {0}))'.format(MAX_JOB_RESTARTS)
         clusterid = submit(self.schedd, sub)
         logging.warning("Submitting job clusterid: {0}".format(clusterid))
         return str(clusterid)
