@@ -47,11 +47,11 @@ install_requires = [
     'apispec>=0.21.0,<0.40',
     'Flask>=0.11',
     'fs>=2.0',
-    'marshmallow>=2.13',
+    'marshmallow>2.13.0,<=2.20.1',
     'reana-commons[kubernetes]>=0.6.0.dev20190812,<0.7.0',
     'reana-db>=0.6.0.dev20190715,<0.7.0',
     'urllib3<1.25,>=1.21.1',
-    'htcondor',
+    'htcondor==8.9.1',
     'retrying>=1.3.3',
 ]
 
