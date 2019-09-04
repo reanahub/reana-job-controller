@@ -140,12 +140,13 @@ class HTCondorJobManagerVC3(JobManager):
         self.env_vars = env_vars or {}
         self.job_id = job_id
         self.workflow_uuid = workflow_uuid
-        self.backend = "HTCondorVC3"
+        self.compute_backend = "HTCondorVC3"
         self.workflow_workspace = workflow_workspace
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.schedd = get_schedd()
         self.wrapper = get_wrapper(workflow_workspace)
+        self.job_name = job_name
 
 
     @JobManager.execution_hook
