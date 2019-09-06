@@ -27,17 +27,19 @@ def test_execute_kubernetes_job(app, session, sample_serial_workflow_in_db,
                                 monkeypatch):
     """Test execution of Kubernetes job."""
     workflow_uuid = sample_serial_workflow_in_db.id_
-    next(sample_workflow_workspace(
+    workflow_workspace = next(sample_workflow_workspace(
         str(workflow_uuid)))
-    expected_env_var_name = "env_var"
-    expected_env_var_value = "value"
+    env_var_key = 'key'
+    env_var_value = 'value'
+    expected_env_var = {env_var_key: env_var_value}
     expected_image = "busybox"
     expected_command = ["ls"]
     monkeypatch.setenv('REANA_USER_ID', str(default_user.id_))
     job_manager = KubernetesJobManager(
         docker_img=expected_image, cmd=expected_command,
-        env_vars={expected_env_var_name: expected_env_var_value},
-        workflow_uuid=workflow_uuid)
+        env_vars=expected_env_var,
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace)
     with mock.patch("reana_job_controller.kubernetes_job_manager."
                     "current_k8s_batchv1_api_client") as kubernetes_client:
         with mock.patch("reana_commons.k8s.secrets."
@@ -50,8 +52,7 @@ def test_execute_kubernetes_job(app, session, sample_serial_workflow_in_db,
             assert created_job
             assert created_job.docker_img == expected_image
             assert created_job.cmd == json.dumps(expected_command)
-            assert created_job.env_vars == json.dumps(
-                {expected_env_var_name: expected_env_var_value})
+            assert json.dumps(expected_env_var) in created_job.env_vars
             assert created_job.status == JobStatus.created
             kubernetes_client.create_namespaced_job.assert_called_once()
             body = kubernetes_client.create_namespaced_job.call_args[1]['body']
@@ -59,9 +60,8 @@ def test_execute_kubernetes_job(app, session, sample_serial_workflow_in_db,
             image = body['spec']['template']['spec']['containers'][0]['image']
             command = \
                 body['spec']['template']['spec']['containers'][0]['command']
-            assert len(env_vars) == 1
-            assert env_vars[0]['name'] == expected_env_var_name
-            assert env_vars[0]['value'] == expected_env_var_value
+            assert len(env_vars) == 3
+            assert {'name': env_var_key, 'value': env_var_value} in env_vars
             assert image == expected_image
             assert command == expected_command
 
@@ -74,7 +74,7 @@ def test_stop_kubernetes_job(app, session, sample_serial_workflow_in_db,
                              ):
     """Test stop of Kubernetes job."""
     workflow_uuid = sample_serial_workflow_in_db.id_
-    next(sample_workflow_workspace(
+    workflow_workspace = next(sample_workflow_workspace(
         str(workflow_uuid)))
     expected_env_var_name = "env_var"
     expected_env_var_value = "value"
@@ -84,7 +84,8 @@ def test_stop_kubernetes_job(app, session, sample_serial_workflow_in_db,
     job_manager = KubernetesJobManager(
         docker_img=expected_image, cmd=expected_command,
         env_vars={expected_env_var_name: expected_env_var_value},
-        workflow_uuid=workflow_uuid)
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace)
     with mock.patch("reana_job_controller.kubernetes_job_manager."
                     "current_k8s_batchv1_api_client") as kubernetes_client:
         with mock.patch("reana_commons.k8s.secrets."

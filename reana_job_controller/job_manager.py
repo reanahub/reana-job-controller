@@ -22,7 +22,7 @@ class JobManager():
     """Job management interface."""
 
     def __init__(self, docker_img='', cmd=[], env_vars={}, job_id=None,
-                 workflow_uuid=None, job_name=None):
+                 workflow_uuid=None, workflow_workspace=None, job_name=None):
         """Instanciates basic job.
 
         :param docker_img: Docker image.
@@ -35,6 +35,8 @@ class JobManager():
         :type job_id: str
         :param workflow_uuid: Unique workflow id.
         :type workflow_uuid: str
+        :param workflow_workspace: Absolute path to workspace
+        :type workflow_workspace: str
         :param job_name: Name of the job.
         :type job_name: str
         """
@@ -43,10 +45,11 @@ class JobManager():
             self.cmd = shlex.split(cmd)
         else:
             self.cmd = cmd or []
-        self.env_vars = env_vars or {}
         self.job_id = job_id
         self.workflow_uuid = workflow_uuid
+        self.workflow_workspace = workflow_workspace
         self.job_name = job_name
+        self.env_vars = self._extend_env_vars(env_vars)
 
     def execution_hook(fn):
         """Add before execution hooks and DB operations."""
@@ -107,8 +110,6 @@ class JobManager():
             docker_img=self.docker_img,
             cmd=json.dumps(self.cmd),
             env_vars=json.dumps(self.env_vars),
-            restart_count=0,
-            max_restart_count=current_app.config['MAX_JOB_RESTARTS'],
             deleted=False,
             job_name=self.job_id,
             prettified_cmd=json.dumps(self.cmd))
@@ -130,3 +131,10 @@ class JobManager():
     def update_job_status(self):
         """Update job status in DB."""
         pass
+
+    def _extend_env_vars(self, env_vars):
+        """Extend environment variables with REANA specific ones."""
+        prefix = 'REANA'
+        env_vars[prefix + '_WORKSPACE'] = self.workflow_workspace
+        env_vars[prefix + '_WORKFLOW_UUID'] = str(self.workflow_uuid)
+        return env_vars

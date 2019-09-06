@@ -196,8 +196,7 @@ def create_job():  # noqa
     compute_backend = job_request.get(
         'compute_backend',
         current_app.config['DEFAULT_COMPUTE_BACKEND'])
-    if not current_app.config['MULTIPLE_COMPUTE_BACKENDS'] and \
-       current_app.config['DEFAULT_COMPUTE_BACKEND'] != compute_backend:
+    if compute_backend not in current_app.config['SUPPORTED_COMPUTE_BACKENDS']:
         msg = 'Job submission failed. Backend {} is not supported.'.format(
             compute_backend)
         logging.error(msg, exc_info=True)
@@ -211,7 +210,8 @@ def create_job():  # noqa
         workflow_workspace=str(job_request['workflow_workspace']),
         cvmfs_mounts=job_request['cvmfs_mounts'],
         shared_file_system=job_request['shared_file_system'],
-        job_name=job_request.get('job_name', '')
+        job_name=job_request.get('job_name', ''),
+        kerberos=job_request.get('kerberos', ''),
     )
     backend_jod_id = job_obj.execute()
     if job_obj:
@@ -225,6 +225,7 @@ def create_job():  # noqa
         job['backend_job_id'] = backend_jod_id
         job['compute_backend'] = compute_backend
         JOB_DB[str(job['job_id'])] = job
+        current_app.config['JOB_MONITORS'][compute_backend]()
         return jsonify({'job_id': job['job_id']}), 201
     else:
         return jsonify({'job': 'Could not be allocated'}), 500

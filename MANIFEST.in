@@ -27,3 +27,4 @@ recursive-include etc *.pem
 recursive-include etc *.yaml
 recursive-include etc *.sh
 include etc/ngbauth-submit
+include krb5/Dockerfile

@@ -42,6 +42,7 @@ class JobRequest(Schema):
     env_vars = fields.Dict(missing={})
     shared_file_system = fields.Bool(missing=True)
     compute_backend = fields.Str(required=False)
+    kerberos = fields.Bool(required=False)
 
     @pre_load
     def make_id(self, data):
