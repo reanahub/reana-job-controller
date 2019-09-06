@@ -27,6 +27,7 @@ from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 from reana_job_controller.htcondorvc3_job_manager import \
     HTCondorJobManagerVC3
 
+
 def singleton(cls):
     """Singelton decorator."""
     instances = {}
@@ -227,7 +228,8 @@ class JobMonitorHTCondorCERN():
                 logging.error("Unexpected error: {}".format(e), exc_info=True)
                 time.sleep(120)
 
-def JobMonitorHTCondorVC3():
+@singleton
+class JobMonitorHTCondorVC3():
     """HTCondor jobs monitor VC3."""
 
     def __init__(self):

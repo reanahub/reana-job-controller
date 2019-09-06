@@ -62,8 +62,13 @@ This way all jobs will have ``/mydata`` mounted with the content of
 ``/usr/local/share/mydata`` in the host machine.
 """
 
-SUPPORTED_COMPUTE_BACKENDS = os.getenv('COMPUTE_BACKENDS',
-                                       DEFAULT_COMPUTE_BACKEND).split(",")
+# How is this set in the environment?
+# It is hardcoded in Dockerfile and there is no code
+# in workflow-controller to override that for the job-controller.
+#SUPPORTED_COMPUTE_BACKENDS = os.getenv('COMPUTE_BACKENDS',
+#                                       DEFAULT_COMPUTE_BACKEND).split(",")
+SUPPORTED_COMPUTE_BACKENDS = DEFAULT_COMPUTE_BACKEND.split(",")
+
 """List of supported compute backends provided as docker build arg."""
 
 KRB5_CONTAINER_IMAGE = os.getenv('KRB5_CONTAINER_IMAGE',

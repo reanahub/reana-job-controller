@@ -113,7 +113,7 @@ class HTCondorJobManagerVC3(JobManager):
     def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
                  workflow_uuid=None, workflow_workspace=None,
                  cvmfs_mounts='false', shared_file_system=False,
-                 job_name=None):
+                 job_name=None, kerberos=False):
         """Instantiate HTCondorVC3 job manager.
 
         :param docker_img: Docker image.
@@ -147,6 +147,7 @@ class HTCondorJobManagerVC3(JobManager):
         self.schedd = get_schedd()
         self.wrapper = get_wrapper(workflow_workspace)
         self.job_name = job_name
+        self.kerberos = kerberos
 
 
     @JobManager.execution_hook
