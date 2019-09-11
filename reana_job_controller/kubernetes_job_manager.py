@@ -80,6 +80,7 @@ class KubernetesJobManager(JobManager):
     def execute(self):
         """Execute a job in Kubernetes."""
         backend_job_id = str(uuid.uuid4())
+
         self.job = {
             'kind': 'Job',
             'apiVersion': 'batch/v1',
@@ -102,6 +103,9 @@ class KubernetesJobManager(JobManager):
                                 'name': backend_job_id,
                                 'env': [],
                                 'volumeMounts': [],
+                                'resources': {
+                                    "limits": {"memory": "2Gi"}
+                                }
                             }
                         ],
                         'volumes': [],
