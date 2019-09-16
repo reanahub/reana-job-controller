@@ -102,8 +102,8 @@ class HTCondorJobManagerCERN(JobManager):
         logging.warning("Submitting job clusterid: {0}".format(clusterid))
         return clusterid
 
-    def _replace_absolut_paths_with_relative(self, base_64_enconded_cmd):
-        """."""
+    def _replace_absolute_paths_with_relative(self, base_64_enconded_cmd):
+        """Replace absolute with relative path."""
         relative_paths_command = None
         decoded_cmd = \
             base64.b64decode(base_64_enconded_cmd).decode('utf-8')
@@ -135,7 +135,7 @@ class HTCondorJobManagerCERN(JobManager):
             if 'base64' in ' '.join(self.cmd):
                 base_64_encoded_cmd = self.cmd[2].split('|')[0].split()[1]
                 base_64_encoded_cmd = \
-                    self._replace_absolut_paths_with_relative(
+                    self._replace_absolute_paths_with_relative(
                         base_64_encoded_cmd) or base_64_encoded_cmd
                 arguments = \
                     'echo {}|base64 -d|bash'.format(base_64_encoded_cmd)

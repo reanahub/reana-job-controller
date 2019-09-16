@@ -164,9 +164,11 @@ class JobMonitorHTCondorCERN():
                     [job_dict['backend_job_id'] for id, job_dict in
                      job_db.items()
                      if not job_db[id]['deleted'] and
-                     job_db[id]['compute_backend'] != 'htcondorcern']
+                     job_db[id]['compute_backend'] == 'htcondorcern']
                 query = format_condor_job_que_query(backend_job_ids)
-                condor_jobs = schedd.query(query, attr_list=ads)
+                condor_jobs = schedd.xquery(
+                    requirements=query,
+                    projection=ads)
                 for job_id, job_dict in job_db.items():
                     if job_db[job_id]['deleted'] or \
                        job_db[job_id]['compute_backend'] != 'htcondorcern' or \

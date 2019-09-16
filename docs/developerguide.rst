@@ -36,11 +36,11 @@ HTCondor
 ~~~~~~~~
 
 To build REANA-Job-Controller Docker image with HTCondor dependencies use build
-argument ``HTCONDORCERN=1``.
+argument ``COMPUTE_BACKENDS=kubernetes,htcondorcern``.
 
 .. code-block:: console
 
-    $ reana-dev docker-build -c reana-job-controller -b HTCONDORCERN=1
+    $ reana-dev docker-build -c reana-job-controller -b COMPUTE_BACKENDS=kubernetes,htcondorcern
 
 The users should then upload their HTCondor username and keytab secrets using:
 
