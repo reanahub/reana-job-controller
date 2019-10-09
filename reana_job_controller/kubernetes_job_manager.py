@@ -99,7 +99,7 @@ class KubernetesJobManager(JobManager):
                             {
                                 'image': self.docker_img,
                                 'command': self.cmd,
-                                'name': backend_job_id,
+                                'name': 'job',
                                 'env': [],
                                 'volumeMounts': [],
                             }
