@@ -227,7 +227,7 @@ def create_job():  # noqa
         job['compute_backend'] = compute_backend
         JOB_DB[str(job['job_id'])] = job
         current_app.config['JOB_MONITORS'][compute_backend](
-            current_app._get_current_object())
+            app=current_app._get_current_object())
         return jsonify({'job_id': job['job_id']}), 201
     else:
         return jsonify({'job': 'Could not be allocated'}), 500

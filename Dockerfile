@@ -11,17 +11,20 @@ RUN apt-get update && \
     apt-get install -y vim-tiny && \
     pip install --upgrade pip
 
+RUN export DEBIAN_FRONTEND=noninteractive ;\
+    apt-get -yq install krb5-user \
+                        krb5-config \
+                        libkrb5-dev \
+                        libauthen-krb5-perl \
+                        gcc;
+ADD etc/krb5.conf /etc/krb5.conf
+
 
 ARG COMPUTE_BACKENDS=kubernetes
 # CERN HTCondor part taken from https://gitlab.cern.ch/batch-team/condorsubmit
 RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       export DEBIAN_FRONTEND=noninteractive ;\
-      apt-get -yq install wget alien gnupg2 \
-                                     krb5-user \
-                                     krb5-config \
-                                     libkrb5-dev \
-                                     libauthen-krb5-perl \
-                                     --no-install-recommends; \
+      apt-get -yq install wget alien gnupg2 ;\
       wget -O ngbauth-submit.rpm http://linuxsoft.cern.ch/internal/repos/batch7-stable/x86_64/os/Packages/ngbauth-submit-0.23-1.el7.noarch.rpm; \
       wget -O cernbatchsubmit.rpm http://linuxsoft.cern.ch/internal/repos/batch7-stable/x86_64/os/Packages/cernbatchsubmit-0.1.0-1.el7.x86_64.rpm; \
       yes | alien -i cernbatchsubmit.rpm; \
@@ -34,13 +37,14 @@ RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
     fi
 
 RUN if echo "$COMPUTE_BACKENDS" | grep -q "slurmcern"; then \
-      apt-get install -y openssh-client; \
+      export DEBIAN_FRONTEND=noninteractive ;\
+      apt-get -yq install openssh-client \
+                          --no-install-recommends; \
     fi
 
 ADD etc/cernsubmit.yaml /etc/condor/
 ADD etc/10_cernsubmit.config /etc/condor/config.d/
 
-ADD etc/krb5.conf /etc/krb5.conf
 ADD etc/ngbauth-submit /etc/sysconfig/
 ADD etc/ngauth_batch_crypt_pub.pem /etc/
 ADD etc/cerngridca.crt /usr/local/share/ca-certificates/cerngridca.crt

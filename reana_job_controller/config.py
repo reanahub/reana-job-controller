@@ -13,21 +13,25 @@ import os
 from reana_job_controller.htcondorcern_job_manager import \
     HTCondorJobManagerCERN
 from reana_job_controller.job_monitor import (JobMonitorHTCondorCERN,
-                                              JobMonitorKubernetes)
+                                              JobMonitorKubernetes,
+                                              JobMonitorSlurmCERN)
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
+from reana_job_controller.slurmcern_job_manager import SlurmJobManagerCERN
 
 SHARED_VOLUME_PATH_ROOT = os.getenv('SHARED_VOLUME_PATH_ROOT', '/var/reana')
 """Root path of the shared volume ."""
 
 COMPUTE_BACKENDS = {
     'kubernetes': KubernetesJobManager,
-    'htcondorcern': HTCondorJobManagerCERN
+    'htcondorcern': HTCondorJobManagerCERN,
+    'slurmcern': SlurmJobManagerCERN
 }
 """Supported job compute backends and corresponding management class."""
 
 JOB_MONITORS = {
     'kubernetes': JobMonitorKubernetes,
-    'htcondorcern': JobMonitorHTCondorCERN
+    'htcondorcern': JobMonitorHTCondorCERN,
+    'slurmcern': JobMonitorSlurmCERN,
 }
 """Classes responsible for monitoring specific backend jobs"""
 

@@ -254,7 +254,7 @@ class KubernetesJobManager(JobManager):
                 'subPath': 'krb5.conf'
             }
         ]
-        keytab_file = os.environ.get('HTCONDORCERN_KEYTAB')
+        keytab_file = os.environ.get('CERN_KEYTAB')
         cern_user = os.environ.get('CERN_USER')
         krb5_container = {
             'image': current_app.config['KRB5_CONTAINER_IMAGE'],

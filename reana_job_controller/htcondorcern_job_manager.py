@@ -12,8 +12,6 @@ import base64
 import logging
 import os
 import re
-import subprocess
-import sys
 import threading
 import time
 from shutil import copyfile
@@ -26,6 +24,7 @@ from reana_db.models import Workflow
 from retrying import retry
 
 from reana_job_controller.job_manager import JobManager
+from reana_job_controller.utils import initialize_krb5_token
 
 thread_local = threading.local()
 
@@ -73,13 +72,12 @@ class HTCondorJobManagerCERN(JobManager):
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.workflow = self._get_workflow()
-        self.cern_user = os.environ.get('CERN_USER')
 
     @JobManager.execution_hook
     def execute(self):
         """Execute / submit a job with HTCondor."""
         os.chdir(self.workflow_workspace)
-        self.autheticate()
+        initialize_krb5_token(workflow_uuid=self.workflow_uuid)
         job_ad = classad.ClassAd()
         job_ad['JobDescription'] = \
             self.workflow.get_full_workflow_name() + '_' + self.job_name
@@ -202,10 +200,10 @@ class HTCondorJobManagerCERN(JobManager):
             logging.info('Submiting job - {}'.format(job_ad))
             clusterid = schedd.submit(job_ad, 1, True, ads)
             HTCondorJobManagerCERN._spool_input(ads)
+            return clusterid
         except Exception as e:
             logging.error("Submission failed: {0}".format(e), exc_info=True)
             time.sleep(10)
-        return clusterid
 
     @retry(stop_max_attempt_number=MAX_NUM_RETRIES)
     def _spool_input(ads):
@@ -232,30 +230,6 @@ class HTCondorJobManagerCERN(JobManager):
         except Exception as e:
             logging.error("Can't locate schedd: {0}".format(e), exc_info=True)
             time.sleep(10)
-
-    def autheticate(self):
-        """Create kerberos ticket from mounted keytab_file."""
-        cern_user = os.environ.get('CERN_USER')
-        keytab_file = os.environ.get('HTCONDORCERN_KEYTAB')
-        cmd = \
-            'kinit -kt /etc/reana/secrets/{} {}@CERN.CH'.format(keytab_file,
-                                                                cern_user)
-        if cern_user:
-            try:
-                subprocess.check_output(cmd, shell=True)
-            except subprocess.CalledProcessError as err:
-                msg = 'Executing: {} \n Authentication failed: {}'.format(
-                    cmd, err)
-                Workflow.update_workflow_status(
-                    db_session=Session,
-                    workflow_uuid=self.workflow_uuid,
-                    status=None,
-                    new_logs=msg)
-                logging.error(msg, exc_info=True)
-                sys.exit(1)
-        else:
-            msg = 'CERN_USER is not set.'
-            logging.error(msg, exc_info=True)
 
     def stop(backend_job_id):
         """Stop HTCondor job execution."""
