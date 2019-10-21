@@ -27,7 +27,7 @@ RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       yes | alien -i cernbatchsubmit.rpm; \
       yes | alien -i ngbauth-submit.rpm; \
       wget -qO - http://research.cs.wisc.edu/htcondor/debian/HTCondor-Release.gpg.key | apt-key add -; \
-      echo "deb https://research.cs.wisc.edu/htcondor/debian/8.8/buster buster contrib" >>/etc/apt/sources.list; \
+      echo "deb https://research.cs.wisc.edu/htcondor/debian/8.9/buster buster contrib" >>/etc/apt/sources.list; \
       apt-get update; \
       apt-get install -y condor --no-install-recommends; \
       apt-get -y remove gnupg2 wget alien; \

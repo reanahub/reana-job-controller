@@ -32,6 +32,8 @@ class HTCondorJobManagerCERN(JobManager):
     """Maximum number of tries used for getting schedd, job submission and
     spooling output.
     """
+    SCHEDD = None
+    """HTCondor sheduler object."""
 
     def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
                  workflow_uuid=None, workflow_workspace=None,
@@ -204,8 +206,9 @@ class HTCondorJobManagerCERN(JobManager):
     def _get_schedd():
         """Find and return the HTCondor sched."""
         try:
-            schedd = htcondor.Schedd()
-            return schedd
+            if not HTCondorJobManagerCERN.SCHEDD:
+                HTCondorJobManagerCERN.SCHEDD = htcondor.Schedd()
+            return HTCondorJobManagerCERN.SCHEDD
         except Exception as e:
             logging.error("Can't locate schedd: {0}".format(e), exc_info=True)
             time.sleep(10)
