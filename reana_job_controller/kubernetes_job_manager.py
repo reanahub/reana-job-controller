@@ -18,7 +18,9 @@ from flask import current_app
 from kubernetes import client
 from kubernetes.client.models.v1_delete_options import V1DeleteOptions
 from kubernetes.client.rest import ApiException
-from reana_commons.config import (CVMFS_REPOSITORIES, K8S_DEFAULT_NAMESPACE,
+from reana_commons.config import (CVMFS_REPOSITORIES, K8S_CERN_EOS_AVAILABLE,
+                                  K8S_CERN_EOS_MOUNT_CONFIGURATION,
+                                  K8S_DEFAULT_NAMESPACE,
                                   WORKFLOW_RUNTIME_USER_GID,
                                   WORKFLOW_RUNTIME_USER_UID)
 from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
@@ -135,6 +137,7 @@ class KubernetesJobManager(JobManager):
 
         self.add_hostpath_volumes()
         self.add_shared_volume()
+        self.add_eos_volume()
 
         if self.cvmfs_mounts != 'false':
             cvmfs_map = {}
@@ -207,6 +210,13 @@ class KubernetesJobManager(JobManager):
             volume_mount, volume = get_shared_volume(
                 self.workflow_workspace)
             self.add_volumes([(volume_mount, volume)])
+
+    def add_eos_volume(self):
+        """Add EOS volume to a given job spec."""
+        if K8S_CERN_EOS_AVAILABLE:
+            self.add_volumes([(
+                K8S_CERN_EOS_MOUNT_CONFIGURATION['volumeMounts'],
+                K8S_CERN_EOS_MOUNT_CONFIGURATION['volume'])])
 
     def add_hostpath_volumes(self):
         """Add hostPath mounts from configuration to job."""
