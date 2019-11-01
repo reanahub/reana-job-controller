@@ -202,17 +202,18 @@ def create_job():  # noqa
         logging.error(msg, exc_info=True)
         update_workflow_logs(job_request['workflow_uuid'], msg)
         return jsonify({'job': msg}), 500
-    job_obj = current_app.config['COMPUTE_BACKENDS'][compute_backend](
-        docker_img=job_request['docker_img'],
-        cmd=job_request['cmd'],
-        env_vars=job_request['env_vars'],
-        workflow_uuid=job_request['workflow_uuid'],
-        workflow_workspace=str(job_request['workflow_workspace']),
-        cvmfs_mounts=job_request['cvmfs_mounts'],
-        shared_file_system=job_request['shared_file_system'],
-        job_name=job_request.get('job_name', ''),
-        kerberos=job_request.get('kerberos', ''),
-    )
+    with current_app.app_context():
+        job_obj = current_app.config['COMPUTE_BACKENDS'][compute_backend](
+            docker_img=job_request['docker_img'],
+            cmd=job_request['cmd'],
+            env_vars=job_request['env_vars'],
+            workflow_uuid=job_request['workflow_uuid'],
+            workflow_workspace=str(job_request['workflow_workspace']),
+            cvmfs_mounts=job_request['cvmfs_mounts'],
+            shared_file_system=job_request['shared_file_system'],
+            job_name=job_request.get('job_name', ''),
+            kerberos=job_request.get('kerberos', ''),
+        )
     backend_jod_id = job_obj.execute()
     if job_obj:
         job = copy.deepcopy(job_request)
@@ -225,7 +226,8 @@ def create_job():  # noqa
         job['backend_job_id'] = backend_jod_id
         job['compute_backend'] = compute_backend
         JOB_DB[str(job['job_id'])] = job
-        current_app.config['JOB_MONITORS'][compute_backend]()
+        current_app.config['JOB_MONITORS'][compute_backend](
+            current_app._get_current_object())
         return jsonify({'job_id': job['job_id']}), 201
     else:
         return jsonify({'job': 'Could not be allocated'}), 500

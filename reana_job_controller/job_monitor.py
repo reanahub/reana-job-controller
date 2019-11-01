@@ -19,7 +19,6 @@ from reana_commons.k8s.api_client import (current_k8s_batchv1_api_client,
 from reana_db.database import Session
 from reana_db.models import Job
 
-from reana_job_controller import config
 from reana_job_controller.htcondorcern_job_manager import \
     HTCondorJobManagerCERN
 from reana_job_controller.job_db import JOB_DB
@@ -31,7 +30,7 @@ from reana_job_controller.utils import singleton
 class JobMonitorKubernetes():
     """Kubernetes job monitor."""
 
-    def __init__(self):
+    def __init__(self, app=None):
         """Initialize Kubernetes job monitor thread."""
         self.job_event_reader_thread = threading.Thread(
             name='kubernetes_job_monitor',
@@ -126,21 +125,20 @@ condorJobStatus = {
 class JobMonitorHTCondorCERN():
     """HTCondor jobs monitor CERN."""
 
-    def __init__(self):
+    def __init__(self, app):
         """Initialize HTCondor job monitor thread."""
         self.job_event_reader_thread = threading.Thread(
             name='htcondorcern_job_monitor',
             target=self.watch_jobs,
-            args=(JOB_DB,))
+            args=(JOB_DB, app))
         self.job_event_reader_thread.daemon = True
         self.job_event_reader_thread.start()
 
-    def watch_jobs(self, job_db):
+    def watch_jobs(self, job_db, app):
         """Watch currently running HTCondor jobs.
 
         :param job_db: Dictionary which contains all current jobs.
         """
-        schedd = HTCondorJobManagerCERN._get_schedd()
         ads = \
             ['ClusterId', 'JobStatus', 'ExitCode', 'ExitStatus',
              'HoldReasonCode']
@@ -155,10 +153,11 @@ class JobMonitorHTCondorCERN():
                      job_db.items()
                      if not job_db[id]['deleted'] and
                      job_db[id]['compute_backend'] == 'htcondorcern']
-                query = format_condor_job_que_query(backend_job_ids)
-                condor_jobs = schedd.xquery(
-                    requirements=query,
-                    projection=ads)
+                future_condor_jobs = app.htcondor_executor.submit(
+                    query_condor_jobs,
+                    app,
+                    backend_job_ids)
+                condor_jobs = future_condor_jobs.result()
                 for job_id, job_dict in job_db.items():
                     if job_db[job_id]['deleted'] or \
                        job_db[job_id]['compute_backend'] != 'htcondorcern' or \
@@ -173,9 +172,10 @@ class JobMonitorHTCondorCERN():
                         msg = 'Job with id {} was not found in schedd.'\
                             .format(job_dict['backend_job_id'])
                         logging.error(msg)
-                        condor_job = \
-                            HTCondorJobManagerCERN.find_job_in_history(
-                                job_dict['backend_job_id'])
+                        future_job_history = app.htcondor_executor.submit(
+                            HTCondorJobManagerCERN.find_job_in_history,
+                            job_dict['backend_job_id'])
+                        condor_job = future_job_history.result()
                         if condor_job:
                             msg = 'Job was found in history. {}'.format(
                                 str(condor_job))
@@ -188,7 +188,8 @@ class JobMonitorHTCondorCERN():
                             'ExitCode',
                             condor_job.get('ExitStatus'))
                         if exit_code == 0:
-                            HTCondorJobManagerCERN.spool_output(
+                            app.htcondor_executor.submit(
+                                HTCondorJobManagerCERN.spool_output,
                                 job_dict['backend_job_id'])
                             job_db[job_id]['status'] = 'succeeded'
                         else:
@@ -237,3 +238,14 @@ def format_condor_job_que_query(backend_job_ids):
     for job_id in backend_job_ids:
         query += base_query.format(job_id)
     return query[:-2]
+
+
+def query_condor_jobs(app, backend_job_ids):
+    """Query condor jobs."""
+    ads = ['ClusterId', 'JobStatus', 'ExitCode', 'ExitStatus',
+           'HoldReasonCode']
+    query = format_condor_job_que_query(backend_job_ids)
+    schedd = HTCondorJobManagerCERN._get_schedd()
+    logging.info('Querying jobs {}'.format(backend_job_ids))
+    condor_jobs = schedd.xquery(requirements=query, projection=ads)
+    return condor_jobs
