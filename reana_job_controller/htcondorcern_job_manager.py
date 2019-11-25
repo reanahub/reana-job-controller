@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import threading
 import time
 from shutil import copyfile
@@ -78,7 +79,7 @@ class HTCondorJobManagerCERN(JobManager):
     def execute(self):
         """Execute / submit a job with HTCondor."""
         os.chdir(self.workflow_workspace)
-        HTCondorJobManagerCERN.autheticate()
+        self.autheticate()
         job_ad = classad.ClassAd()
         job_ad['JobDescription'] = \
             self.workflow.get_full_workflow_name() + '_' + self.job_name
@@ -232,7 +233,7 @@ class HTCondorJobManagerCERN(JobManager):
             logging.error("Can't locate schedd: {0}".format(e), exc_info=True)
             time.sleep(10)
 
-    def autheticate():
+    def autheticate(self):
         """Create kerberos ticket from mounted keytab_file."""
         cern_user = os.environ.get('CERN_USER')
         keytab_file = os.environ.get('HTCONDORCERN_KEYTAB')
@@ -243,8 +244,15 @@ class HTCondorJobManagerCERN(JobManager):
             try:
                 subprocess.check_output(cmd, shell=True)
             except subprocess.CalledProcessError as err:
-                logging.error("Authentication failed: {}".format(err),
-                              exc_info=True)
+                msg = 'Executing: {} \n Authentication failed: {}'.format(
+                    cmd, err)
+                Workflow.update_workflow_status(
+                    db_session=Session,
+                    workflow_uuid=self.workflow_uuid,
+                    status=None,
+                    new_logs=msg)
+                logging.error(msg, exc_info=True)
+                sys.exit(1)
         else:
             msg = 'CERN_USER is not set.'
             logging.error(msg, exc_info=True)
