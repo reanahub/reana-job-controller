@@ -39,6 +39,29 @@ class JobMonitorKubernetes():
         self.job_event_reader_thread.daemon = True
         self.job_event_reader_thread.start()
 
+    def get_container_logs(self, last_spawned_pod):
+        """Get job pod's containers' logs."""
+        try:
+            pod_logs = ''
+            pod = current_k8s_corev1_api_client.read_namespaced_pod(
+                namespace=last_spawned_pod.metadata.namespace,
+                name=last_spawned_pod.metadata.name)
+            for container in pod.spec.containers:
+                container_log = \
+                    current_k8s_corev1_api_client.read_namespaced_pod_log(
+                        namespace=last_spawned_pod.metadata.namespace,
+                        name=last_spawned_pod.metadata.name,
+                        container=container.name)
+                pod_logs += '{}: \n {} \n'.format(
+                    container.name, container_log)
+            return pod_logs
+        except client.rest.ApiException as e:
+                logging.error(
+                    "Error while connecting to Kubernetes API: {}".format(e))
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            logging.error("Unexpected error: {}".format(e))
+
     def watch_jobs(self, job_db):
         """Open stream connection to k8s apiserver to watch all jobs status.
 
@@ -93,9 +116,7 @@ class JobMonitorKubernetes():
                     logging.info('Grabbing pod {} logs...'.format(
                         last_spawned_pod.metadata.name))
                     job_db[job_id]['log'] = \
-                        current_k8s_corev1_api_client.read_namespaced_pod_log(
-                            namespace=last_spawned_pod.metadata.namespace,
-                            name=last_spawned_pod.metadata.name)
+                        self.get_container_logs(last_spawned_pod)
                     store_logs(job_id=job_id, logs=job_db[job_id]['log'])
 
                     logging.info('Cleaning Kubernetes job {} ...'.format(
@@ -103,11 +124,11 @@ class JobMonitorKubernetes():
                     KubernetesJobManager.stop(kubernetes_job_id)
                     job_db[job_id]['deleted'] = True
             except client.rest.ApiException as e:
-                logging.debug(
+                logging.error(
                     "Error while connecting to Kubernetes API: {}".format(e))
             except Exception as e:
                 logging.error(traceback.format_exc())
-                logging.debug("Unexpected error: {}".format(e))
+                logging.error("Unexpected error: {}".format(e))
 
 
 condorJobStatus = {
