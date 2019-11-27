@@ -205,8 +205,7 @@ class KubernetesJobManager(JobManager):
         """Add shared CephFS volume to a given job spec."""
         if self.shared_file_system:
             volume_mount, volume = get_shared_volume(
-                self.workflow_workspace,
-                current_app.config['SHARED_VOLUME_PATH_ROOT'])
+                self.workflow_workspace)
             self.add_volumes([(volume_mount, volume)])
 
     def add_hostpath_volumes(self):
