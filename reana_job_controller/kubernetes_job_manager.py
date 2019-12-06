@@ -106,6 +106,7 @@ class KubernetesJobManager(JobManager):
                                 'volumeMounts': [],
                             }
                         ],
+                        'initContainers': [],
                         'volumes': [],
                         'restartPolicy': 'Never'
                     }
@@ -163,7 +164,7 @@ class KubernetesJobManager(JobManager):
                 run_as_user=WORKFLOW_RUNTIME_USER_UID)
 
         if self.kerberos:
-            self._add_krb5_sidecar_container(secrets_volume_mount)
+            self._add_krb5_init_container(secrets_volume_mount)
 
         backend_job_id = self._submit()
         return backend_job_id
@@ -242,7 +243,7 @@ class KubernetesJobManager(JobManager):
                 'volumeMounts'].append(volume_mount)
             self.job['spec']['template']['spec']['volumes'].append(volume)
 
-    def _add_krb5_sidecar_container(self, secrets_volume_mount):
+    def _add_krb5_init_container(self, secrets_volume_mount):
         """Add  sidecar container for a job."""
         krb5_config_map_name = current_app.config['KRB5_CONFIGMAP_NAME']
         ticket_cache_volume = {
@@ -279,5 +280,14 @@ class KubernetesJobManager(JobManager):
             [ticket_cache_volume, krb5_config_volume])
         self.job['spec']['template']['spec']['containers'][0][
             'volumeMounts'].extend(volume_mounts)
-        self.job['spec']['template']['spec']['containers'].append(
+        # Add the Kerberos token cache file location to the job container
+        # so every instance of Kerberos picks it up even if it doesn't read
+        # the configuration file.
+        self.job['spec']['template']['spec']['containers'][0][
+            'env'].append({'name': 'KRB5CCNAME',
+                           'value': os.path.join(
+                               current_app.config['KRB5_TOKEN_CACHE_LOCATION'],
+                               current_app.config['KRB5_TOKEN_CACHE_FILENAME']
+                           )})
+        self.job['spec']['template']['spec']['initContainers'].append(
             krb5_container)

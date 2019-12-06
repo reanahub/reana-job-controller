@@ -63,7 +63,7 @@ class JobMonitorKubernetes(JobMonitor):
             pod = current_k8s_corev1_api_client.read_namespaced_pod(
                 namespace=last_spawned_pod.metadata.namespace,
                 name=last_spawned_pod.metadata.name)
-            for container in pod.spec.containers:
+            for container in pod.spec.init_containers + pod.spec.containers:
                 container_log = \
                     current_k8s_corev1_api_client.read_namespaced_pod_log(
                         namespace=last_spawned_pod.metadata.namespace,
@@ -73,8 +73,8 @@ class JobMonitorKubernetes(JobMonitor):
                     container.name, container_log)
             return pod_logs
         except client.rest.ApiException as e:
-                logging.error(
-                    "Error while connecting to Kubernetes API: {}".format(e))
+            logging.error(
+                "Error while connecting to Kubernetes API: {}".format(e))
         except Exception as e:
             logging.error(traceback.format_exc())
             logging.error("Unexpected error: {}".format(e))
