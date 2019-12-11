@@ -37,8 +37,8 @@ class HTCondorJobManagerCERN(JobManager):
     spooling output.
     """
 
-    def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
-                 workflow_uuid=None, workflow_workspace=None,
+    def __init__(self, docker_img=None, cmd=None, prettified_cmd=None,
+                 env_vars=None, workflow_uuid=None, workflow_workspace=None,
                  cvmfs_mounts='false', shared_file_system=False,
                  job_name=None, kerberos=False):
         """Instanciate HTCondor job manager.
@@ -47,10 +47,10 @@ class HTCondorJobManagerCERN(JobManager):
         :type docker_img: str
         :param cmd: Command to execute.
         :type cmd: list
+        :param prettified_cmd: pretified version of command to execute.
+        :type prettified_cmd: str
         :param env_vars: Environment variables.
         :type env_vars: dict
-        :param job_id: Unique job id.
-        :type job_id: str
         :param workflow_uuid: Unique workflow id.
         :type workflow_uuid: str
         :param workflow_workspace: Workflow workspace path.
@@ -63,8 +63,10 @@ class HTCondorJobManagerCERN(JobManager):
         :type job_name: str
         """
         super(HTCondorJobManagerCERN, self).__init__(
-            docker_img=docker_img, cmd=cmd,
-            env_vars=env_vars, job_id=job_id,
+            docker_img=docker_img,
+            cmd=cmd,
+            prettified_cmd=prettified_cmd,
+            env_vars=env_vars,
             workflow_uuid=workflow_uuid,
             workflow_workspace=workflow_workspace,
             job_name=job_name)

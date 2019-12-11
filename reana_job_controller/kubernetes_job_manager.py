@@ -40,20 +40,20 @@ class KubernetesJobManager(JobManager):
     MAX_NUM_JOB_RESTARTS = 0
     """Maximum number of job restarts in case of internal failures."""
 
-    def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
-                 workflow_uuid=None, workflow_workspace=None,
-                 cvmfs_mounts='false', shared_file_system=False,
-                 job_name=None, kerberos=False):
+    def __init__(self, docker_img=None, cmd=None, prettified_cmd=None,
+                 env_vars=None, workflow_uuid=None, workflow_workspace=None,
+                 cvmfs_mounts='false', shared_file_system=False, job_name=None,
+                 kerberos=False, kubernetes_uid=None):
         """Instanciate kubernetes job manager.
 
         :param docker_img: Docker image.
         :type docker_img: str
         :param cmd: Command to execute.
         :type cmd: list
+        :param prettified_cmd: pretified version of command to execute.
+        :type prettified_cmd: str
         :param env_vars: Environment variables.
         :type env_vars: dict
-        :param job_id: Unique job id.
-        :type job_id: str
         :param workflow_uuid: Unique workflow id.
         :type workflow_uuid: str
         :param workflow_workspace: Workflow workspace path.
@@ -66,17 +66,22 @@ class KubernetesJobManager(JobManager):
         :type job_name: str
         :param kerberos: Decides if kerberos should be provided for job.
         :type kerberos: bool
+        :param kubernetes_uid: User ID for job container.
+        :type kubernetes_uid: int
         """
         super(KubernetesJobManager, self).__init__(
-                         docker_img=docker_img, cmd=cmd,
-                         env_vars=env_vars, job_id=job_id,
-                         workflow_uuid=workflow_uuid,
-                         workflow_workspace=workflow_workspace,
-                         job_name=job_name)
+            docker_img=docker_img,
+            cmd=cmd,
+            prettified_cmd=prettified_cmd,
+            env_vars=env_vars,
+            workflow_uuid=workflow_uuid,
+            workflow_workspace=workflow_workspace,
+            job_name=job_name)
         self.compute_backend = "Kubernetes"
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.kerberos = kerberos
+        self.set_user_id(kubernetes_uid)
 
     @JobManager.execution_hook
     def execute(self):
@@ -161,7 +166,7 @@ class KubernetesJobManager(JobManager):
         self.job['spec']['template']['spec']['securityContext'] = \
             client.V1PodSecurityContext(
                 run_as_group=WORKFLOW_RUNTIME_USER_GID,
-                run_as_user=WORKFLOW_RUNTIME_USER_UID)
+                run_as_user=self.kubernetes_uid)
 
         if self.kerberos:
             self._add_krb5_init_container(secrets_volume_mount)
@@ -291,3 +296,10 @@ class KubernetesJobManager(JobManager):
                            )})
         self.job['spec']['template']['spec']['initContainers'].append(
             krb5_container)
+
+    def set_user_id(self, kubernetes_uid):
+        """Set user id for job pods. UIDs < 100 are refused for security."""
+        if kubernetes_uid and kubernetes_uid >= 100:
+            self.kubernetes_uid = kubernetes_uid
+        else:
+            self.kubernetes_uid = WORKFLOW_RUNTIME_USER_UID

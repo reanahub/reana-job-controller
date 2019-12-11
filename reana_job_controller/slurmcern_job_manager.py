@@ -35,20 +35,20 @@ class SlurmJobManagerCERN(JobManager):
     SLURM_HOME_PATH = os.getenv('SLURM_HOME_PATH', '')
     """Default SLURM home path."""
 
-    def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
-                 workflow_uuid=None, workflow_workspace=None,
-                 cvmfs_mounts='false', shared_file_system=False,
-                 job_name=None, kerberos=False):
+    def __init__(self, docker_img=None, cmd=None, prettified_cmd=None,
+                 env_vars=None, workflow_uuid=None, workflow_workspace=None,
+                 cvmfs_mounts='false', shared_file_system=False, job_name=None,
+                 kerberos=False):
         """Instanciate Slurm job manager.
 
         :param docker_img: Docker image.
         :type docker_img: str
         :param cmd: Command to execute.
         :type cmd: list
+        :param prettified_cmd: pretified version of command to execute.
+        :type prettified_cmd: str
         :param env_vars: Environment variables.
         :type env_vars: dict
-        :param job_id: Unique job id.
-        :type job_id: str
         :param workflow_id: Unique workflow id.
         :type workflow_id: str
         :param workflow_workspace: Workflow workspace path.
@@ -61,8 +61,10 @@ class SlurmJobManagerCERN(JobManager):
         :type job_name: str
         """
         super(SlurmJobManagerCERN, self).__init__(
-            docker_img=docker_img, cmd=cmd,
-            env_vars=env_vars, job_id=job_id,
+            docker_img=docker_img,
+            cmd=cmd,
+            prettified_cmd=prettified_cmd,
+            env_vars=env_vars,
             workflow_uuid=workflow_uuid,
             job_name=job_name)
         self.compute_backend = "Slurm"

@@ -9,7 +9,6 @@
 """Job monitoring wrapper."""
 
 import logging
-import os
 import threading
 import time
 import traceback
@@ -20,7 +19,6 @@ from reana_commons.k8s.api_client import (current_k8s_batchv1_api_client,
 from reana_db.database import Session
 from reana_db.models import Job
 
-from reana_job_controller import config
 from reana_job_controller.htcondorcern_job_manager import \
     HTCondorJobManagerCERN
 from reana_job_controller.job_db import JOB_DB
@@ -63,7 +61,9 @@ class JobMonitorKubernetes(JobMonitor):
             pod = current_k8s_corev1_api_client.read_namespaced_pod(
                 namespace=last_spawned_pod.metadata.namespace,
                 name=last_spawned_pod.metadata.name)
-            for container in pod.spec.init_containers + pod.spec.containers:
+            containers = pod.spec.init_containers + pod.spec.containers \
+                if pod.spec.init_containers else pod.spec.containers
+            for container in containers:
                 container_log = \
                     current_k8s_corev1_api_client.read_namespaced_pod_log(
                         namespace=last_spawned_pod.metadata.namespace,

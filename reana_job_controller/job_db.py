@@ -28,7 +28,6 @@ def retrieve_job(job_id):
         "cvmfs_mounts": job['cvmfs_mounts']
         if job.get('cvmfs_mounts') else '',
         "docker_img": job['docker_img'],
-        "experiment": job['experiment'],
         "job_id": job['job_id'],
         "max_restart_count": job['max_restart_count'],
         "restart_count": job['restart_count'],
@@ -69,7 +68,6 @@ def retrieve_all_jobs():
                 "cvmfs_mounts": job['cvmfs_mounts']
                 if job.get('cvmfs_mounts') else [],
                 "docker_img": job['docker_img'],
-                "experiment": job['experiment'],
                 "job_id": job['job_id'],
                 "max_restart_count": job['max_restart_count'],
                 "restart_count": job['restart_count'],

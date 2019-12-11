@@ -120,7 +120,6 @@ def get_jobs():  # noqa
                     "cmd": "date",
                     "cvmfs_mounts": ['atlas.cern.ch', 'atlas-condb.cern.ch'],
                     "docker_img": "busybox",
-                    "experiment": "atlas",
                     "job_id": "1612a779-f3fa-4344-8819-3d12fa9b9d90",
                     "max_restart_count": 3,
                     "restart_count": 0,
@@ -130,7 +129,6 @@ def get_jobs():  # noqa
                     "cmd": "date",
                     "cvmfs_mounts": ['atlas.cern.ch', 'atlas-condb.cern.ch'],
                     "docker_img": "busybox",
-                    "experiment": "atlas",
                     "job_id": "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20",
                     "max_restart_count": 3,
                     "restart_count": 0,
@@ -196,6 +194,7 @@ def create_job():  # noqa
     compute_backend = job_request.get(
         'compute_backend',
         current_app.config['DEFAULT_COMPUTE_BACKEND'])
+    job_request.pop('compute_backend', None)
     if compute_backend not in current_app.config['SUPPORTED_COMPUTE_BACKENDS']:
         msg = 'Job submission failed. Backend {} is not supported.'.format(
             compute_backend)
@@ -204,16 +203,7 @@ def create_job():  # noqa
         return jsonify({'job': msg}), 500
     with current_app.app_context():
         job_obj = current_app.config['COMPUTE_BACKENDS'][compute_backend](
-            docker_img=job_request['docker_img'],
-            cmd=job_request['cmd'],
-            env_vars=job_request['env_vars'],
-            workflow_uuid=job_request['workflow_uuid'],
-            workflow_workspace=str(job_request['workflow_workspace']),
-            cvmfs_mounts=job_request['cvmfs_mounts'],
-            shared_file_system=job_request['shared_file_system'],
-            job_name=job_request.get('job_name', ''),
-            kerberos=job_request.get('kerberos', ''),
-        )
+            **job_request)
     backend_jod_id = job_obj.execute()
     if job_obj:
         job = copy.deepcopy(job_request)
@@ -265,7 +255,6 @@ def get_job(job_id):  # noqa
                 "cmd": "date",
                 "cvmfs_mounts": ['atlas.cern.ch', 'atlas-condb.cern.ch'],
                 "docker_img": "busybox",
-                "experiment": "atlas",
                 "job_id": "cdcf48b1-c2f3-4693-8230-b066e088c6ac",
                 "max_restart_count": 3,
                 "restart_count": 0,
