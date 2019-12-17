@@ -73,16 +73,24 @@ class SSHClient():
 
     def __init__(self, hostname=None, port=None):
         """Initialize ssh client."""
+        self.hostname = hostname
+        self.port = port
+        self.establish_connection()
+
+    def establish_connection(self):
+        """Establish the connection."""
         self.ssh_client = paramiko.SSHClient()
         self.ssh_client.set_missing_host_key_policy(
             paramiko.AutoAddPolicy())
         self.ssh_client.connect(
-            hostname=hostname,
-            port=port,
+            hostname=self.hostname,
+            port=self.port,
             gss_auth=True)
 
     def exec_command(self, command):
         """Execute command and return exit code."""
+        if not self.ssh_client.get_transport().active:
+            self.establish_connection()
         try:
             stdin, stdout, stderr = \
                 self.ssh_client.exec_command(command)

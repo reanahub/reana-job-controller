@@ -13,8 +13,6 @@ import logging
 import os
 from stat import S_ISDIR
 
-from flask import current_app
-
 from reana_job_controller.job_manager import JobManager
 from reana_job_controller.utils import SSHClient, initialize_krb5_token
 
@@ -132,7 +130,7 @@ class SlurmJobManagerCERN(JobManager):
                         "#SBATCH --output=reana_job.%j.out \n"
                         "#SBATCH --error=reana_job.%j.err \n"
                         "#SBATCH --partition {partition} \n"
-                        "#SBATCH --time 5 \n"
+                        "#SBATCH --time 60 \n"
                         "srun {command}").format(
                             partition=SlurmJobManagerCERN.SLURM_PARTITION,
                             job_name=self.job_name,
