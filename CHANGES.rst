@@ -1,6 +1,18 @@
 Changes
 =======
 
+Version 0.6.0 (2019-12-20)
+--------------------------
+
+- Adds generic job manager class and provides example classes for CERN HTCondor
+  and CERN Slurm clusters.
+- Moves job controller to the same Kubernetes pod with the
+  REANA-Workflow-Engine-* (sidecar pattern).
+- Adds sidecar container to the Kubernetes job pod if Kerberos authentication
+  is required.
+- Provides user secrets to the job container runtime tasks.
+- Refactors job monitoring using singleton pattern.
+
 Version 0.5.1 (2019-04-23)
 --------------------------
 

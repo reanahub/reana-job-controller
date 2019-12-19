@@ -94,7 +94,7 @@
   "info": {
     "description": "REANA Job Controller API",
     "title": "reana-job-controller",
-    "version": "0.5.1"
+    "version": "0.6.0"
   },
   "parameters": {},
   "paths": {
