@@ -108,17 +108,12 @@ class HTCondorJobManagerCERN(JobManager):
         clusterid = future.result()
         return clusterid
 
-    def _replace_absolute_paths_with_relative(self, base_64_enconded_cmd):
+    def _replace_absolute_paths_with_relative(self, cmd):
         """Replace absolute with relative path."""
         relative_paths_command = None
-        decoded_cmd = \
-            base64.b64decode(base_64_enconded_cmd).decode('utf-8')
-        if self.workflow_workspace in decoded_cmd:
-            decoded_cmd = \
-                decoded_cmd.replace(self.workflow_workspace + '/', '')
+        if self.workflow_workspace in cmd:
             relative_paths_command = \
-                base64.b64encode(
-                    decoded_cmd.encode('utf-8')).decode('utf-8')
+                cmd.replace(self.workflow_workspace + '/', '')
         return relative_paths_command
 
     def _format_arguments(self):
@@ -133,24 +128,24 @@ class HTCondorJobManagerCERN(JobManager):
                  --outputfile \"results/greetings.txt\" --sleeptime 0
         """
         if self.workflow.type_ == 'serial':
-            arguments = re.sub(r'"', '\\"', " ".join(self.cmd[2].split()[3:]))
+            base_cmd = " ".join(self.cmd[2].split()[3:])
         elif self.workflow.type_ == 'cwl':
-            arguments = self.cmd[2].replace(self.workflow_workspace,
-                                            '$_CONDOR_JOB_IWD')
+            base_cmd = self.cmd[2].replace(self.workflow_workspace,
+                                           '$_CONDOR_JOB_IWD')
         elif self.workflow.type_ == 'yadage':
             if 'base64' in ' '.join(self.cmd):
                 base_64_encoded_cmd = self.cmd[2].split('|')[0].split()[1]
-                base_64_encoded_cmd = \
+                decoded_cmd = \
+                    base64.b64decode(base_64_encoded_cmd).decode('utf-8')
+                base_cmd = \
                     self._replace_absolute_paths_with_relative(
-                        base_64_encoded_cmd) or base_64_encoded_cmd
-                arguments = \
-                    'echo {}|base64 -d|bash'.format(base_64_encoded_cmd)
+                        decoded_cmd) or decoded_cmd
             else:
                 if self.workflow_workspace in self.cmd[2]:
-                    arguments = \
-                        self.cmd[2].replace(self.workflow_workspace + '/', '')
-                    arguments = re.sub(r'"', '\"', arguments)
-        return "{}".format(arguments)
+                    base_cmd = self._replace_absolute_paths_with_relative(
+                        self.cmd[2]) or self.cmd[2]
+        return 'echo {}|base64 -d'.format(
+            base64.b64encode(base_cmd.encode('utf-8')).decode('utf-8'))
 
     def _format_env_vars(self):
         """Return job env vars in job description format."""

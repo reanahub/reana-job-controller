@@ -8,8 +8,11 @@
 # temporary wrapper file.
 tmpjob=$(mktemp -p .)
 chmod +x $tmpjob
-echo "command to execute:" $@
-echo  "$@" > $tmpjob
+echo "command to execute:"
+# $@ input is base64 encoded string of command to execute
+eval $@
+
+echo "$@" "|bash" > $tmpjob
 bash $tmpjob
 res=$?
 rm $tmpjob

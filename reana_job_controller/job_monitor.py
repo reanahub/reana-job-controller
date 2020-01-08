@@ -239,12 +239,13 @@ class JobMonitorHTCondorCERN(JobMonitor):
                                 'failed'.format(job_id,
                                                 condor_job['ClusterId']))
                             job_db[job_id]['status'] = 'failed'
-                        job_db[job_id]['log'] = \
-                            HTCondorJobManagerCERN.get_logs(
-                                backend_job_id=job_dict['backend_job_id'],
-                                workspace=job_db[
-                                    job_id]['obj'].workflow_workspace)
+                        job_logs = app.htcondor_executor.submit(
+                            HTCondorJobManagerCERN.get_logs,
+                            job_dict['backend_job_id'],
+                            job_db[job_id]['obj'].workflow_workspace)
+                        job_db[job_id]['log'] = job_logs.result()
                         store_logs(logs=job_db[job_id]['log'], job_id=job_id)
+
                         job_db[job_id]['deleted'] = True
                     elif (condor_job['JobStatus'] ==
                           condorJobStatus['Held'] and
@@ -324,11 +325,16 @@ class JobMonitorSlurmCERN(JobMonitor):
                         SlurmJobManagerCERN.get_outputs()
                         job_db[job_id]['status'] = 'succeeded'
                         job_db[job_id]['deleted'] = True
+                        job_db[job_id]['log'] = \
+                            SlurmJobManagerCERN.get_logs(
+                                backend_job_id=job_dict['backend_job_id'],
+                                workspace=job_db[
+                                    job_id]['obj'].workflow_workspace)
+                        store_logs(logs=job_db[job_id]['log'], job_id=job_id)
                     if slurm_job_status in slurmJobStatus['failed']:
+                        SlurmJobManagerCERN.get_outputs()
                         job_db[job_id]['status'] = 'failed'
                         job_db[job_id]['deleted'] = True
-                    if slurm_job_status in slurmJobStatus['failed'] or \
-                       slurm_job_status in slurmJobStatus['succeeded']:
                         job_db[job_id]['log'] = \
                             SlurmJobManagerCERN.get_logs(
                                 backend_job_id=job_dict['backend_job_id'],
