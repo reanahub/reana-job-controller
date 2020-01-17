@@ -82,10 +82,10 @@ KRB5_TOKEN_CACHE_LOCATION = '/krb5_cache/'
 should match `default_ccache_name` in krb5.conf.
 """
 
-KRB5_TOKEN_CACHE_FILENAME = 'krb5_{}'.format(WORKFLOW_RUNTIME_USER_UID)
+KRB5_TOKEN_CACHE_FILENAME = 'krb5_{}'
 """Name of the Kerberos token cache file."""
 
-KRB5_CONFIGMAP_NAME = 'krb5-conf'
+KRB5_CONFIGMAP_NAME = 'reana-krb5-conf'
 """Kerberos configMap name. Must be the same as in
 reana_cluster/backends/kubernetes/templates/configmaps/kerberos.yaml.
 """

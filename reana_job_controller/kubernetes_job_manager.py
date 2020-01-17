@@ -280,7 +280,11 @@ class KubernetesJobManager(JobManager):
             'name': current_app.config['KRB5_CONTAINER_NAME'],
             'imagePullPolicy': 'IfNotPresent',
             'volumeMounts': [secrets_volume_mount] + volume_mounts,
+            'security_context': client.V1PodSecurityContext(
+                run_as_group=WORKFLOW_RUNTIME_USER_GID,
+                run_as_user=self.kubernetes_uid)
         }
+
         self.job['spec']['template']['spec']['volumes'].extend(
             [ticket_cache_volume, krb5_config_volume])
         self.job['spec']['template']['spec']['containers'][0][
@@ -293,6 +297,7 @@ class KubernetesJobManager(JobManager):
                            'value': os.path.join(
                                current_app.config['KRB5_TOKEN_CACHE_LOCATION'],
                                current_app.config['KRB5_TOKEN_CACHE_FILENAME']
+                               .format(self.kubernetes_uid)
                            )})
         self.job['spec']['template']['spec']['initContainers'].append(
             krb5_container)
