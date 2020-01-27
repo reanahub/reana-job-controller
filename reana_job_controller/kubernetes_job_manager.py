@@ -159,7 +159,8 @@ class KubernetesJobManager(JobManager):
                 (self.job['spec']['template']['spec']['containers'][0]
                     ['volumeMounts'].append(
                         {'name': volume['name'],
-                         'mountPath': '/cvmfs/{}'.format(mount_path)}
+                         'mountPath': '/cvmfs/{}'.format(mount_path),
+                         'readOnly': volume['readOnly']}
                 ))
                 self.job['spec']['template']['spec']['volumes'].append(volume)
 
