@@ -122,7 +122,7 @@ class JobManager():
         """Cache a job."""
         workflow = Session.query(Workflow).filter_by(
             id_=self.workflow_uuid).one_or_none()
-        access_times = calculate_file_access_time(workflow.get_workspace())
+        access_times = calculate_file_access_time(workflow.workspace_path)
         prepared_job_cache = JobCache()
         prepared_job_cache.job_id = self.job_id
         prepared_job_cache.access_times = access_times
