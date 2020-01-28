@@ -18,35 +18,40 @@ RUN apt-get update && \
     pip install --upgrade pip && \
     pip install htcondor==8.9.1 retrying
 
+RUN export DEBIAN_FRONTEND=noninteractive ;\
+    apt-get -yq install krb5-user \
+                        krb5-config \
+                        libkrb5-dev \
+                        libauthen-krb5-perl \
+                        gcc;
+ADD etc/krb5.conf /etc/krb5.conf
+
 
 ARG COMPUTE_BACKENDS=kubernetes
-#CERN HTCondor part taken from https://gitlab.cern.ch/batch-team/condorsubmit
-RUN case $COMPUTE_BACKENDS in \
-    *"htcondorcern"*) \
+# CERN HTCondor part taken from https://gitlab.cern.ch/batch-team/condorsubmit
+RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       export DEBIAN_FRONTEND=noninteractive ;\
-      apt-get -yq install wget alien gnupg2 \
-                                     krb5-user \
-                                     krb5-config \
-                                     libkrb5-dev \
-                                     libauthen-krb5-perl \
-                                     --no-install-recommends; \
+      apt-get -yq install wget alien gnupg2 ;\
       wget -O ngbauth-submit.rpm http://linuxsoft.cern.ch/internal/repos/batch7-stable/x86_64/os/Packages/ngbauth-submit-0.23-1.el7.noarch.rpm; \
       wget -O cernbatchsubmit.rpm http://linuxsoft.cern.ch/internal/repos/batch7-stable/x86_64/os/Packages/cernbatchsubmit-0.1.0-1.el7.x86_64.rpm; \
       yes | alien -i cernbatchsubmit.rpm; \
       yes | alien -i ngbauth-submit.rpm; \
       wget -qO - http://research.cs.wisc.edu/htcondor/debian/HTCondor-Release.gpg.key | apt-key add -; \
-      echo "deb https://research.cs.wisc.edu/htcondor/debian/8.8/buster buster contrib" >>/etc/apt/sources.list; \
+      echo "deb https://research.cs.wisc.edu/htcondor/debian/8.9/buster buster contrib" >>/etc/apt/sources.list; \
       apt-get update; \
       apt-get install -y condor --no-install-recommends; \
       apt-get -y remove gnupg2 wget alien; \
-      ;; \
-    *) \
-esac
+    fi
+
+RUN if echo "$COMPUTE_BACKENDS" | grep -q "slurmcern"; then \
+      export DEBIAN_FRONTEND=noninteractive ;\
+      apt-get -yq install openssh-client \
+                          --no-install-recommends; \
+    fi
 
 ADD etc/cernsubmit.yaml /etc/condor/
 ADD etc/10_cernsubmit.config /etc/condor/config.d/
 
-ADD etc/krb5.conf /etc/krb5.conf
 ADD etc/ngbauth-submit /etc/sysconfig/
 ADD etc/ngauth_batch_crypt_pub.pem /etc/
 ADD etc/cerngridca.crt /usr/local/share/ca-certificates/cerngridca.crt
@@ -70,7 +75,7 @@ ARG DEBUG=0
 RUN if [ "${DEBUG}" -gt 0 ]; then pip install -r requirements-dev.txt; pip install -e .; else pip install .; fi;
 
 # Building with locally-checked-out shared modules?
-RUN if test -e modules/reana-commons; then pip install modules/reana-commons --upgrade; fi
+RUN if test -e modules/reana-commons; then pip install modules/reana-commons[kubernetes] --upgrade; fi
 RUN if test -e modules/reana-db; then pip install modules/reana-db --upgrade; fi
 
 # Check if there are broken requirements

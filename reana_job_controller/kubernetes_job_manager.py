@@ -18,7 +18,9 @@ from flask import current_app
 from kubernetes import client
 from kubernetes.client.models.v1_delete_options import V1DeleteOptions
 from kubernetes.client.rest import ApiException
-from reana_commons.config import (CVMFS_REPOSITORIES, K8S_DEFAULT_NAMESPACE,
+from reana_commons.config import (CVMFS_REPOSITORIES, K8S_CERN_EOS_AVAILABLE,
+                                  K8S_CERN_EOS_MOUNT_CONFIGURATION,
+                                  K8S_DEFAULT_NAMESPACE,
                                   WORKFLOW_RUNTIME_USER_GID,
                                   WORKFLOW_RUNTIME_USER_UID)
 from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
@@ -38,20 +40,20 @@ class KubernetesJobManager(JobManager):
     MAX_NUM_JOB_RESTARTS = 0
     """Maximum number of job restarts in case of internal failures."""
 
-    def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
-                 workflow_uuid=None, workflow_workspace=None,
-                 cvmfs_mounts='false', shared_file_system=False,
-                 job_name=None, kerberos=False):
+    def __init__(self, docker_img=None, cmd=None, prettified_cmd=None,
+                 env_vars=None, workflow_uuid=None, workflow_workspace=None,
+                 cvmfs_mounts='false', shared_file_system=False, job_name=None,
+                 kerberos=False, kubernetes_uid=None):
         """Instanciate kubernetes job manager.
 
         :param docker_img: Docker image.
         :type docker_img: str
         :param cmd: Command to execute.
         :type cmd: list
+        :param prettified_cmd: pretified version of command to execute.
+        :type prettified_cmd: str
         :param env_vars: Environment variables.
         :type env_vars: dict
-        :param job_id: Unique job id.
-        :type job_id: str
         :param workflow_uuid: Unique workflow id.
         :type workflow_uuid: str
         :param workflow_workspace: Workflow workspace path.
@@ -64,17 +66,22 @@ class KubernetesJobManager(JobManager):
         :type job_name: str
         :param kerberos: Decides if kerberos should be provided for job.
         :type kerberos: bool
+        :param kubernetes_uid: User ID for job container.
+        :type kubernetes_uid: int
         """
         super(KubernetesJobManager, self).__init__(
-                         docker_img=docker_img, cmd=cmd,
-                         env_vars=env_vars, job_id=job_id,
-                         workflow_uuid=workflow_uuid,
-                         workflow_workspace=workflow_workspace,
-                         job_name=job_name)
+            docker_img=docker_img,
+            cmd=cmd,
+            prettified_cmd=prettified_cmd,
+            env_vars=env_vars,
+            workflow_uuid=workflow_uuid,
+            workflow_workspace=workflow_workspace,
+            job_name=job_name)
         self.compute_backend = "Kubernetes"
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.kerberos = kerberos
+        self.set_user_id(kubernetes_uid)
 
     @JobManager.execution_hook
     def execute(self):
@@ -99,11 +106,12 @@ class KubernetesJobManager(JobManager):
                             {
                                 'image': self.docker_img,
                                 'command': self.cmd,
-                                'name': backend_job_id,
+                                'name': 'job',
                                 'env': [],
                                 'volumeMounts': [],
                             }
                         ],
+                        'initContainers': [],
                         'volumes': [],
                         'restartPolicy': 'Never'
                     }
@@ -135,6 +143,7 @@ class KubernetesJobManager(JobManager):
 
         self.add_hostpath_volumes()
         self.add_shared_volume()
+        self.add_eos_volume()
 
         if self.cvmfs_mounts != 'false':
             cvmfs_map = {}
@@ -157,10 +166,10 @@ class KubernetesJobManager(JobManager):
         self.job['spec']['template']['spec']['securityContext'] = \
             client.V1PodSecurityContext(
                 run_as_group=WORKFLOW_RUNTIME_USER_GID,
-                run_as_user=WORKFLOW_RUNTIME_USER_UID)
+                run_as_user=self.kubernetes_uid)
 
         if self.kerberos:
-            self._add_krb5_sidecar_container(secrets_volume_mount)
+            self._add_krb5_init_container(secrets_volume_mount)
 
         backend_job_id = self._submit()
         return backend_job_id
@@ -205,9 +214,15 @@ class KubernetesJobManager(JobManager):
         """Add shared CephFS volume to a given job spec."""
         if self.shared_file_system:
             volume_mount, volume = get_shared_volume(
-                self.workflow_workspace,
-                current_app.config['SHARED_VOLUME_PATH_ROOT'])
+                self.workflow_workspace)
             self.add_volumes([(volume_mount, volume)])
+
+    def add_eos_volume(self):
+        """Add EOS volume to a given job spec."""
+        if K8S_CERN_EOS_AVAILABLE:
+            self.add_volumes([(
+                K8S_CERN_EOS_MOUNT_CONFIGURATION['volumeMounts'],
+                K8S_CERN_EOS_MOUNT_CONFIGURATION['volume'])])
 
     def add_hostpath_volumes(self):
         """Add hostPath mounts from configuration to job."""
@@ -233,7 +248,7 @@ class KubernetesJobManager(JobManager):
                 'volumeMounts'].append(volume_mount)
             self.job['spec']['template']['spec']['volumes'].append(volume)
 
-    def _add_krb5_sidecar_container(self, secrets_volume_mount):
+    def _add_krb5_init_container(self, secrets_volume_mount):
         """Add  sidecar container for a job."""
         krb5_config_map_name = current_app.config['KRB5_CONFIGMAP_NAME']
         ticket_cache_volume = {
@@ -255,7 +270,7 @@ class KubernetesJobManager(JobManager):
                 'subPath': 'krb5.conf'
             }
         ]
-        keytab_file = os.environ.get('HTCONDORCERN_KEYTAB')
+        keytab_file = os.environ.get('CERN_KEYTAB')
         cern_user = os.environ.get('CERN_USER')
         krb5_container = {
             'image': current_app.config['KRB5_CONTAINER_IMAGE'],
@@ -270,5 +285,21 @@ class KubernetesJobManager(JobManager):
             [ticket_cache_volume, krb5_config_volume])
         self.job['spec']['template']['spec']['containers'][0][
             'volumeMounts'].extend(volume_mounts)
-        self.job['spec']['template']['spec']['containers'].append(
+        # Add the Kerberos token cache file location to the job container
+        # so every instance of Kerberos picks it up even if it doesn't read
+        # the configuration file.
+        self.job['spec']['template']['spec']['containers'][0][
+            'env'].append({'name': 'KRB5CCNAME',
+                           'value': os.path.join(
+                               current_app.config['KRB5_TOKEN_CACHE_LOCATION'],
+                               current_app.config['KRB5_TOKEN_CACHE_FILENAME']
+                           )})
+        self.job['spec']['template']['spec']['initContainers'].append(
             krb5_container)
+
+    def set_user_id(self, kubernetes_uid):
+        """Set user id for job pods. UIDs < 100 are refused for security."""
+        if kubernetes_uid and kubernetes_uid >= 100:
+            self.kubernetes_uid = kubernetes_uid
+        else:
+            self.kubernetes_uid = WORKFLOW_RUNTIME_USER_UID

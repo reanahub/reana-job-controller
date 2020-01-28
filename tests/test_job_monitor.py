@@ -15,13 +15,13 @@ from reana_job_controller.job_monitor import (JobMonitorHTCondorCERN,
                                               JobMonitorKubernetes)
 
 
-def test_if_singelton():
+def test_if_singelton(app):
     """Test if job monitor classes are singelton."""
     with mock.patch("reana_job_controller.job_monitor."
                     "threading") as threading:
-        first_k8s_instance = JobMonitorKubernetes()
-        second_k8s_instance = JobMonitorKubernetes()
+        first_k8s_instance = JobMonitorKubernetes(app=app)
+        second_k8s_instance = JobMonitorKubernetes(app=app)
         assert first_k8s_instance is second_k8s_instance
-        first_htc_instance = JobMonitorHTCondorCERN()
-        second_htc_instance = JobMonitorHTCondorCERN()
+        first_htc_instance = JobMonitorHTCondorCERN(app=app)
+        second_htc_instance = JobMonitorHTCondorCERN(app=app)
         assert first_htc_instance is second_htc_instance

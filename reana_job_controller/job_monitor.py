@@ -19,40 +19,69 @@ from reana_commons.k8s.api_client import (current_k8s_batchv1_api_client,
 from reana_db.database import Session
 from reana_db.models import Job
 
-from reana_job_controller import config
 from reana_job_controller.htcondorcern_job_manager import \
     HTCondorJobManagerCERN
 from reana_job_controller.job_db import JOB_DB
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 from reana_job_controller.htcondorvc3_job_manager import \
     HTCondorJobManagerVC3
+from reana_job_controller.slurmcern_job_manager import SlurmJobManagerCERN
+from reana_job_controller.utils import SSHClient, singleton
 
 
-def singleton(cls):
-    """Singelton decorator."""
-    instances = {}
+class JobMonitor():
+    """Job monitor interface."""
 
-    def getinstance():
-        if cls not in instances:
-            instances[cls] = cls()
-        return instances[cls]
-    return getinstance
-
-
-@singleton
-class JobMonitorKubernetes():
-    """Kubernetes job monitor."""
-
-    def __init__(self):
-        """Initialize Kubernetes job monitor thread."""
+    def __init__(self, thread_name, app=None):
+        """Initialize REANA job monitors."""
         self.job_event_reader_thread = threading.Thread(
-            name='kubernetes_job_monitor',
+            name=thread_name,
             target=self.watch_jobs,
-            args=(JOB_DB,))
+            args=(JOB_DB, app))
         self.job_event_reader_thread.daemon = True
         self.job_event_reader_thread.start()
 
-    def watch_jobs(self, job_db):
+    def watch_jobs(self, job_db, app):
+        """Monitor running jobs."""
+        raise NotImplementedError
+
+
+@singleton
+class JobMonitorKubernetes(JobMonitor):
+    """Kubernetes job monitor."""
+
+    def __init__(self, app=None):
+        """Initialize Kubernetes job monitor thread."""
+        super(__class__, self).__init__(
+            thread_name='kubernetes_job_monitor'
+        )
+
+    def get_container_logs(self, last_spawned_pod):
+        """Get job pod's containers' logs."""
+        try:
+            pod_logs = ''
+            pod = current_k8s_corev1_api_client.read_namespaced_pod(
+                namespace=last_spawned_pod.metadata.namespace,
+                name=last_spawned_pod.metadata.name)
+            containers = pod.spec.init_containers + pod.spec.containers \
+                if pod.spec.init_containers else pod.spec.containers
+            for container in containers:
+                container_log = \
+                    current_k8s_corev1_api_client.read_namespaced_pod_log(
+                        namespace=last_spawned_pod.metadata.namespace,
+                        name=last_spawned_pod.metadata.name,
+                        container=container.name)
+                pod_logs += '{}: \n {} \n'.format(
+                    container.name, container_log)
+            return pod_logs
+        except client.rest.ApiException as e:
+            logging.error(
+                "Error while connecting to Kubernetes API: {}".format(e))
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            logging.error("Unexpected error: {}".format(e))
+
+    def watch_jobs(self, job_db, app=None):
         """Open stream connection to k8s apiserver to watch all jobs status.
 
         :param job_db: Dictionary which contains all current jobs.
@@ -106,9 +135,7 @@ class JobMonitorKubernetes():
                     logging.info('Grabbing pod {} logs...'.format(
                         last_spawned_pod.metadata.name))
                     job_db[job_id]['log'] = \
-                        current_k8s_corev1_api_client.read_namespaced_pod_log(
-                            namespace=last_spawned_pod.metadata.namespace,
-                            name=last_spawned_pod.metadata.name)
+                        self.get_container_logs(last_spawned_pod)
                     store_logs(job_id=job_id, logs=job_db[job_id]['log'])
 
                     logging.info('Cleaning Kubernetes job {} ...'.format(
@@ -116,11 +143,11 @@ class JobMonitorKubernetes():
                     KubernetesJobManager.stop(kubernetes_job_id)
                     job_db[job_id]['deleted'] = True
             except client.rest.ApiException as e:
-                logging.debug(
+                logging.error(
                     "Error while connecting to Kubernetes API: {}".format(e))
             except Exception as e:
                 logging.error(traceback.format_exc())
-                logging.debug("Unexpected error: {}".format(e))
+                logging.error("Unexpected error: {}".format(e))
 
 
 condorJobStatus = {
@@ -135,27 +162,29 @@ condorJobStatus = {
 
 
 @singleton
-class JobMonitorHTCondorCERN():
+class JobMonitorHTCondorCERN(JobMonitor):
     """HTCondor jobs monitor CERN."""
 
-    def __init__(self):
+    def __init__(self, app):
         """Initialize HTCondor job monitor thread."""
-        self.job_event_reader_thread = threading.Thread(
-            name='htcondorcern_job_monitor',
-            target=self.watch_jobs,
-            args=(JOB_DB,))
-        self.job_event_reader_thread.daemon = True
-        self.job_event_reader_thread.start()
+        super(__class__, self).__init__(
+            thread_name='htcondor_job_monitor',
+            app=app
+        )
 
-    def watch_jobs(self, job_db):
+    def format_condor_job_que_query(self, backend_job_ids):
+        """Format HTCondor job que query."""
+        base_query = 'ClusterId == {} ||'
+        query = ''
+        for job_id in backend_job_ids:
+            query += base_query.format(job_id)
+        return query[:-2]
+
+    def watch_jobs(self, job_db, app):
         """Watch currently running HTCondor jobs.
 
         :param job_db: Dictionary which contains all current jobs.
         """
-        schedd = HTCondorJobManagerCERN._get_schedd()
-        ads = \
-            ['ClusterId', 'JobStatus', 'ExitCode', 'ExitStatus',
-             'HoldReasonCode']
         ignore_hold_codes = [35, 16]
         statuses_to_skip = ['succeeded', 'failed']
         while True:
@@ -166,9 +195,12 @@ class JobMonitorHTCondorCERN():
                     [job_dict['backend_job_id'] for id, job_dict in
                      job_db.items()
                      if not job_db[id]['deleted'] and
-                     job_db[id]['compute_backend'] != 'htcondorcern']
-                query = format_condor_job_que_query(backend_job_ids)
-                condor_jobs = schedd.query(query, attr_list=ads)
+                     job_db[id]['compute_backend'] == 'htcondorcern']
+                future_condor_jobs = app.htcondor_executor.submit(
+                    query_condor_jobs,
+                    app,
+                    backend_job_ids)
+                condor_jobs = future_condor_jobs.result()
                 for job_id, job_dict in job_db.items():
                     if job_db[job_id]['deleted'] or \
                        job_db[job_id]['compute_backend'] != 'htcondorcern' or \
@@ -183,9 +215,10 @@ class JobMonitorHTCondorCERN():
                         msg = 'Job with id {} was not found in schedd.'\
                             .format(job_dict['backend_job_id'])
                         logging.error(msg)
-                        condor_job = \
-                            HTCondorJobManagerCERN.find_job_in_history(
-                                job_dict['backend_job_id'])
+                        future_job_history = app.htcondor_executor.submit(
+                            HTCondorJobManagerCERN.find_job_in_history,
+                            job_dict['backend_job_id'])
+                        condor_job = future_job_history.result()
                         if condor_job:
                             msg = 'Job was found in history. {}'.format(
                                 str(condor_job))
@@ -198,7 +231,8 @@ class JobMonitorHTCondorCERN():
                             'ExitCode',
                             condor_job.get('ExitStatus'))
                         if exit_code == 0:
-                            HTCondorJobManagerCERN.spool_output(
+                            app.htcondor_executor.submit(
+                                HTCondorJobManagerCERN.spool_output,
                                 job_dict['backend_job_id'])
                             job_db[job_id]['status'] = 'succeeded'
                         else:
@@ -282,6 +316,85 @@ class JobMonitorHTCondorVC3():
             time.sleep(120)
 
 
+slurmJobStatus = {
+    'failed': ['BOOT_FAIL', 'CANCELLED', 'DEADLINE', 'FAILED', 'NODE_FAIL',
+               'OUT_OF_MEMORY', 'PREEMPTED', 'TIMEOUT', 'SUSPENDED',
+               'STOPPED'],
+    'succeeded': ['COMPLETED'],
+    'running': ['CONFIGURING', 'COMPLETING', 'RUNNING', 'STAGE_OUT'],
+    'idle': ['PENDING', 'REQUEUE_FED', 'REQUEUE_HOLD', 'RESV_DEL_HOLD',
+             'REQUEUED', 'RESIZING']
+    # 'REVOKED',
+    # 'SIGNALING',
+    # 'SPECIAL_EXIT',
+}
+
+
+@singleton
+class JobMonitorSlurmCERN(JobMonitor):
+    """Slurm jobs monitor CERN."""
+
+    def __init__(self, app=None):
+        """Initialize Slurm job monitor thread."""
+        super(__class__, self).__init__(
+            thread_name='slurm_job_monitor'
+        )
+
+    def format_slurm_job_query(self, backend_job_ids):
+        """Format Slurm job query."""
+        cmd = 'sacct --jobs {} --noheader --allocations --parsable ' \
+              '--format State,JobID'.format(','.join(backend_job_ids))
+        return cmd
+
+    def watch_jobs(self, job_db, app=None):
+        """Use SSH connection to slurm submitnode to monitor jobs.
+
+        :param job_db: Dictionary which contains all running jobs.
+        """
+        slurm_connection = SSHClient(
+            hostname=SlurmJobManagerCERN.SLURM_HEADNODE_HOSTNAME,
+            port=SlurmJobManagerCERN.SLURM_HEADNODE_PORT,
+        )
+        statuses_to_skip = ['succeeded', 'failed']
+        while True:
+            logging.debug('Starting a new stream request to watch Jobs')
+            try:
+                slurm_jobs = {}
+                for id, job_dict in job_db.items():
+                    if (not job_db[id]['deleted'] and
+                       job_db[id]['compute_backend'] == 'slurmcern' and
+                       not job_db[id]['status'] in statuses_to_skip):
+                        slurm_jobs[job_dict['backend_job_id']] = id
+                if not slurm_jobs.keys():
+                    logging.error('No slurm jobs')
+                    continue
+                slurm_query_cmd = self.format_slurm_job_query(
+                    slurm_jobs.keys())
+                stdout = slurm_connection.exec_command(slurm_query_cmd)
+                for item in stdout.rstrip().split('\n'):
+                    slurm_job_status = item.split('|')[0]
+                    slurm_job_id = item.split('|')[1]
+                    job_id = slurm_jobs[slurm_job_id]
+                    if slurm_job_status in slurmJobStatus['succeeded']:
+                        SlurmJobManagerCERN.get_outputs()
+                        job_db[job_id]['status'] = 'succeeded'
+                        job_db[job_id]['deleted'] = True
+                    if slurm_job_status in slurmJobStatus['failed']:
+                        job_db[job_id]['status'] = 'failed'
+                        job_db[job_id]['deleted'] = True
+                    if slurm_job_status in slurmJobStatus['failed'] or \
+                       slurm_job_status in slurmJobStatus['succeeded']:
+                        job_db[job_id]['log'] = \
+                            SlurmJobManagerCERN.get_logs(
+                                backend_job_id=job_dict['backend_job_id'],
+                                workspace=job_db[
+                                    job_id]['obj'].workflow_workspace)
+                        store_logs(logs=job_db[job_id]['log'], job_id=job_id)
+            except Exception as e:
+                logging.error("Unexpected error: {}".format(e), exc_info=True)
+                time.sleep(120)
+
+
 def store_logs(logs, job_id):
     """Write logs to DB."""
     try:
@@ -300,3 +413,14 @@ def format_condor_job_que_query(backend_job_ids):
     for job_id in backend_job_ids:
         query += base_query.format(job_id)
     return query[:-2]
+
+
+def query_condor_jobs(app, backend_job_ids):
+    """Query condor jobs."""
+    ads = ['ClusterId', 'JobStatus', 'ExitCode', 'ExitStatus',
+           'HoldReasonCode']
+    query = format_condor_job_que_query(backend_job_ids)
+    schedd = HTCondorJobManagerCERN._get_schedd()
+    logging.info('Querying jobs {}'.format(backend_job_ids))
+    condor_jobs = schedd.xquery(requirements=query, projection=ads)
+    return condor_jobs

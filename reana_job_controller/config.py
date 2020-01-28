@@ -10,19 +10,24 @@
 
 import os
 
+from reana_commons.config import WORKFLOW_RUNTIME_USER_UID
+
 from reana_job_controller.htcondorcern_job_manager import \
     HTCondorJobManagerCERN
 from reana_job_controller.job_monitor import (JobMonitorHTCondorCERN,
                                               JobMonitorKubernetes,
+                                              JobMonitorSlurmCERN,
                                               JobMonitorHTCondorVC3)
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
+from reana_job_controller.slurmcern_job_manager import SlurmJobManagerCERN
 from reana_job_controller.htcondorvc3_job_manager import \
     HTCondorJobManagerVC3
 from reana_job_controller.variables import (MAX_JOB_RESTARTS,
-                                            SHARED_VOLUME_PATH_ROOT)
+
 COMPUTE_BACKENDS = {
     'kubernetes': KubernetesJobManager,
     'htcondorcern': HTCondorJobManagerCERN,
+    'slurmcern': SlurmJobManagerCERN,
     'htcondorvc3' : HTCondorJobManagerVC3
 }
 """Supported job compute backends and corresponding management class."""
@@ -30,6 +35,7 @@ COMPUTE_BACKENDS = {
 JOB_MONITORS = {
     'kubernetes': JobMonitorKubernetes,
     'htcondorcern': JobMonitorHTCondorCERN,
+    'slurmcern': JobMonitorSlurmCERN,
     'htcondorvc3': JobMonitorHTCondorVC3
 }
 """Classes responsible for monitoring specific backend jobs"""
@@ -82,6 +88,9 @@ KRB5_TOKEN_CACHE_LOCATION = '/krb5_cache/'
 """Directory of Kerberos tokens cache, shared between job & KRB5 container. It
 should match `default_ccache_name` in krb5.conf.
 """
+
+KRB5_TOKEN_CACHE_FILENAME = 'krb5_{}'.format(WORKFLOW_RUNTIME_USER_UID)
+"""Name of the Kerberos token cache file."""
 
 KRB5_CONFIGMAP_NAME = 'krb5-conf'
 """Kerberos configMap name. Must be the same as in

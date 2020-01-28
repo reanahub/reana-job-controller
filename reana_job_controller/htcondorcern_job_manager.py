@@ -12,17 +12,21 @@ import base64
 import logging
 import os
 import re
-import subprocess
+import threading
 import time
 from shutil import copyfile
 
 import classad
 import htcondor
+from flask import current_app
 from reana_db.database import Session
 from reana_db.models import Workflow
 from retrying import retry
 
 from reana_job_controller.job_manager import JobManager
+from reana_job_controller.utils import initialize_krb5_token
+
+thread_local = threading.local()
 
 
 class HTCondorJobManagerCERN(JobManager):
@@ -33,20 +37,20 @@ class HTCondorJobManagerCERN(JobManager):
     spooling output.
     """
 
-    def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
-                 workflow_uuid=None, workflow_workspace=None,
+    def __init__(self, docker_img=None, cmd=None, prettified_cmd=None,
+                 env_vars=None, workflow_uuid=None, workflow_workspace=None,
                  cvmfs_mounts='false', shared_file_system=False,
-                 job_name=None, kerberos=False):
+                 job_name=None, kerberos=False, kubernetes_uid=None):
         """Instanciate HTCondor job manager.
 
         :param docker_img: Docker image.
         :type docker_img: str
         :param cmd: Command to execute.
         :type cmd: list
+        :param prettified_cmd: pretified version of command to execute.
+        :type prettified_cmd: str
         :param env_vars: Environment variables.
         :type env_vars: dict
-        :param job_id: Unique job id.
-        :type job_id: str
         :param workflow_uuid: Unique workflow id.
         :type workflow_uuid: str
         :param workflow_workspace: Workflow workspace path.
@@ -59,8 +63,10 @@ class HTCondorJobManagerCERN(JobManager):
         :type job_name: str
         """
         super(HTCondorJobManagerCERN, self).__init__(
-            docker_img=docker_img, cmd=cmd,
-            env_vars=env_vars, job_id=job_id,
+            docker_img=docker_img,
+            cmd=cmd,
+            prettified_cmd=prettified_cmd,
+            env_vars=env_vars,
             workflow_uuid=workflow_uuid,
             workflow_workspace=workflow_workspace,
             job_name=job_name)
@@ -68,19 +74,19 @@ class HTCondorJobManagerCERN(JobManager):
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.workflow = self._get_workflow()
-        self.cern_user = os.environ.get('CERN_USER')
 
     @JobManager.execution_hook
     def execute(self):
         """Execute / submit a job with HTCondor."""
         os.chdir(self.workflow_workspace)
-        HTCondorJobManagerCERN.autheticate()
+        initialize_krb5_token(workflow_uuid=self.workflow_uuid)
         job_ad = classad.ClassAd()
         job_ad['JobDescription'] = \
             self.workflow.get_full_workflow_name() + '_' + self.job_name
         job_ad['JobMaxRetries'] = 3
-        job_ad['OnExitRemove'] = classad.ExprTree(
-            'NumJobCompletions > JobMaxRetries || ExitCode == 0')
+        job_ad['LeaveJobInQueue'] = classad.ExprTree(
+            '(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || '
+            '(StageOutFinish == 0))')
         job_ad['DockerImage'] = self.docker_img
         job_ad['WantDocker'] = True
         job_ad['Cmd'] = './job_wrapper.sh'
@@ -98,12 +104,12 @@ class HTCondorJobManagerCERN(JobManager):
         job_ad['TransferOutput'] = '.'
         job_ad['PeriodicRelease'] = classad.ExprTree('(HoldReasonCode == 35)')
         job_ad['MaxRunTime'] = 3600
-        clusterid = self._submit(job_ad)
-        logging.warning("Submitting job clusterid: {0}".format(clusterid))
+        future = current_app.htcondor_executor.submit(self._submit, job_ad)
+        clusterid = future.result()
         return clusterid
 
-    def _replace_absolut_paths_with_relative(self, base_64_enconded_cmd):
-        """."""
+    def _replace_absolute_paths_with_relative(self, base_64_enconded_cmd):
+        """Replace absolute with relative path."""
         relative_paths_command = None
         decoded_cmd = \
             base64.b64decode(base_64_enconded_cmd).decode('utf-8')
@@ -127,7 +133,7 @@ class HTCondorJobManagerCERN(JobManager):
                  --outputfile \"results/greetings.txt\" --sleeptime 0
         """
         if self.workflow.type_ == 'serial':
-            arguments = re.sub(r'"', '\"', " ".join(self.cmd[2].split()[3:]))
+            arguments = re.sub(r'"', '\\"', " ".join(self.cmd[2].split()[3:]))
         elif self.workflow.type_ == 'cwl':
             arguments = self.cmd[2].replace(self.workflow_workspace,
                                             '$_CONDOR_JOB_IWD')
@@ -135,7 +141,7 @@ class HTCondorJobManagerCERN(JobManager):
             if 'base64' in ' '.join(self.cmd):
                 base_64_encoded_cmd = self.cmd[2].split('|')[0].split()[1]
                 base_64_encoded_cmd = \
-                    self._replace_absolut_paths_with_relative(
+                    self._replace_absolute_paths_with_relative(
                         base_64_encoded_cmd) or base_64_encoded_cmd
                 arguments = \
                     'echo {}|base64 -d|bash'.format(base_64_encoded_cmd)
@@ -193,39 +199,39 @@ class HTCondorJobManagerCERN(JobManager):
         try:
             ads = []
             schedd = HTCondorJobManagerCERN._get_schedd()
+            logging.info('Submiting job - {}'.format(job_ad))
             clusterid = schedd.submit(job_ad, 1, True, ads)
-            schedd.spool(ads)
+            HTCondorJobManagerCERN._spool_input(ads)
+            return clusterid
         except Exception as e:
             logging.error("Submission failed: {0}".format(e), exc_info=True)
-            raise e
-        return clusterid
+            time.sleep(10)
+
+    @retry(stop_max_attempt_number=MAX_NUM_RETRIES)
+    def _spool_input(ads):
+        try:
+            schedd = HTCondorJobManagerCERN._get_schedd()
+            logging.info('Spooling job inputs - {}'.format(ads))
+            schedd.spool(ads)
+        except Exception as e:
+            logging.error("Spooling failed: {0}".format(e), exc_info=True)
+            time.sleep(10)
 
     @retry(stop_max_attempt_number=MAX_NUM_RETRIES)
     def _get_schedd():
-        """Find and return the HTCondor sched."""
+        """Find and return the HTCondor schedd."""
         try:
-            schedd = htcondor.Schedd()
-            return schedd
+            schedd = getattr(thread_local, 'MONITOR_THREAD_SCHEDD', None)
+            if schedd is None:
+                setattr(thread_local,
+                        'MONITOR_THREAD_SCHEDD',
+                        htcondor.Schedd())
+            logging.info("Getting schedd: {}".format(
+                thread_local.MONITOR_THREAD_SCHEDD))
+            return thread_local.MONITOR_THREAD_SCHEDD
         except Exception as e:
             logging.error("Can't locate schedd: {0}".format(e), exc_info=True)
             time.sleep(10)
-
-    def autheticate():
-        """Create kerberos ticket from mounted keytab_file."""
-        cern_user = os.environ.get('CERN_USER')
-        keytab_file = os.environ.get('HTCONDORCERN_KEYTAB')
-        cmd = \
-            'kinit -kt /etc/reana/secrets/{} {}@CERN.CH'.format(keytab_file,
-                                                                cern_user)
-        if cern_user:
-            try:
-                subprocess.check_output(cmd, shell=True)
-            except subprocess.CalledProcessError as err:
-                logging.error("Authentication failed: {}".format(err),
-                              exc_info=True)
-        else:
-            msg = 'CERN_USER is not set.'
-            logging.error(msg, exc_info=True)
 
     def stop(backend_job_id):
         """Stop HTCondor job execution."""
@@ -240,8 +246,13 @@ class HTCondorJobManagerCERN(JobManager):
     @retry(stop_max_attempt_number=MAX_NUM_RETRIES)
     def spool_output(backend_job_id):
         """Transfer job output."""
-        schedd = HTCondorJobManagerCERN._get_schedd()
-        schedd.retrieve("ClusterId == {}".format(backend_job_id))
+        try:
+            schedd = HTCondorJobManagerCERN._get_schedd()
+            logging.info("Spooling jobs {} output.".format(backend_job_id))
+            schedd.retrieve("ClusterId == {}".format(backend_job_id))
+        except Exception as e:
+            logging.error(e, exc_info=True)
+            time.sleep(10)
 
     def get_logs(backend_job_id, workspace):
         """Return job logs if log files are present."""

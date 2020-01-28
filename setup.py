@@ -19,7 +19,7 @@ readme = open('README.rst').read()
 history = open('CHANGES.rst').read()
 
 tests_require = [
-    'pytest-reana>=0.6.0.dev20190705,<0.7.0',
+    'pytest-reana>=0.6.0,<0.7.0',
 ]
 
 extras_require = {
@@ -48,11 +48,11 @@ install_requires = [
     'Flask>=0.11',
     'fs>=2.0',
     'marshmallow>2.13.0,<=2.20.1',
-    'reana-commons[kubernetes]>=0.6.0.dev20190823,<0.7.0',
-    'reana-db>=0.6.0.dev20190828,<0.7.0',
-    'urllib3<1.25,>=1.21.1',
-    'htcondor==8.9.1',
+    'reana-commons[kubernetes]>=0.6.0,<0.7.0',
+    'reana-db>=0.6.0,<0.7.0',
+    'htcondor==8.9.2',
     'retrying>=1.3.3',
+    'paramiko[gssapi]>=2.6.0',
 ]
 
 packages = find_packages()

@@ -21,18 +21,19 @@ from reana_db.models import JobCache, JobStatus, Workflow
 class JobManager():
     """Job management interface."""
 
-    def __init__(self, docker_img='', cmd=[], env_vars={}, job_id=None,
-                 workflow_uuid=None, workflow_workspace=None, job_name=None):
+    def __init__(self, docker_img='', cmd=[], prettified_cmd='', env_vars={},
+                 workflow_uuid=None, workflow_workspace=None,
+                 job_name=None):
         """Instanciates basic job.
 
         :param docker_img: Docker image.
         :type docker_img: str
         :param cmd: Command to execute.
         :type cmd: list
+        :param prettified_cmd: pretified version of command to execute.
+        :type prettified_cmd: str
         :param env_vars: Environment variables.
         :type env_vars: dict
-        :param job_id: Unique job id.
-        :type job_id: str
         :param workflow_uuid: Unique workflow id.
         :type workflow_uuid: str
         :param workflow_workspace: Absolute path to workspace
@@ -45,7 +46,7 @@ class JobManager():
             self.cmd = shlex.split(cmd)
         else:
             self.cmd = cmd or []
-        self.job_id = job_id
+        self.prettified_cmd = prettified_cmd
         self.workflow_uuid = workflow_uuid
         self.workflow_workspace = workflow_workspace
         self.job_name = job_name
@@ -111,8 +112,8 @@ class JobManager():
             cmd=json.dumps(self.cmd),
             env_vars=json.dumps(self.env_vars),
             deleted=False,
-            job_name=self.job_id,
-            prettified_cmd=json.dumps(self.cmd))
+            job_name=self.job_name,
+            prettified_cmd=self.prettified_cmd)
         Session.add(job_db_entry)
         Session.commit()
         self.job_id = str(job_db_entry.id_)
