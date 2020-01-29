@@ -110,20 +110,20 @@ def get_wrapper(workflow_workspace):
 class HTCondorJobManagerVC3(JobManager):
     """HTCondor VC3 job management."""
 
-    def __init__(self, docker_img=None, cmd=None, env_vars=None, job_id=None,
-                 workflow_uuid=None, workflow_workspace=None,
+    def __init__(self, docker_img=None, cmd=None, prettified_cmd=None,
+                 env_vars=None, workflow_uuid=None, workflow_workspace=None,
                  cvmfs_mounts='false', shared_file_system=False,
-                 job_name=None, kerberos=False):
+                 job_name=None, kerberos=False, kubernetes_uid=None):
         """Instantiate HTCondorVC3 job manager.
 
         :param docker_img: Docker image.
         :type docker_img: str
         :param cmd: Command to execute.
         :type cmd: list
+        :param prettified_cmd: pretified version of command to execute.
+        :type prettified_cmd: str
         :param env_vars: Environment variables.
         :type env_vars: dict
-        :param job_id: Unique job id.
-        :type job_id: str
         :param workflow_id: Unique workflow id.
         :type workflow_id: str
         :param workflow_workspace: Workflow workspace path.
@@ -138,7 +138,6 @@ class HTCondorJobManagerVC3(JobManager):
         self.docker_img = docker_img or ''
         self.cmd = cmd or ''
         self.env_vars = env_vars or {}
-        self.job_id = job_id
         self.workflow_uuid = workflow_uuid
         self.compute_backend = "HTCondorVC3"
         self.workflow_workspace = workflow_workspace
@@ -148,6 +147,7 @@ class HTCondorJobManagerVC3(JobManager):
         self.wrapper = get_wrapper(workflow_workspace)
         self.job_name = job_name
         self.kerberos = kerberos
+        self.prettified_cmd = prettified_cmd
 
 
     @JobManager.execution_hook
