@@ -85,5 +85,6 @@ EXPOSE 5000
 
 ENV COMPUTE_BACKENDS $COMPUTE_BACKENDS
 ENV FLASK_APP reana_job_controller/app.py
+ENV REANA_LOG_LEVEL DEBUG
 
 CMD ["flask", "run", "-h", "0.0.0.0"]
