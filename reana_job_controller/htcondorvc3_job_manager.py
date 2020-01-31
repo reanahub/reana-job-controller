@@ -175,27 +175,20 @@ class HTCondorJobManagerVC3(JobManager):
         return str(clusterid)
 
 
-    def stop(self, backend_job_id, asynchronous=True):
-        """Stop HTCondor job execution.
-
-        :param backend_job_id: HTCondor job id.
-        :param asynchronous: Ignored.
-        """
-        self.schedd.act(htcondor.JobAction.Remove, 'ClusterId==%d' % backend_job_id)
-
-
     def add_shared_volume(self, job):
         """Add shared CephFS volume to a given job.
         """
         pass #Not Implemented yet
 
 
-    def condor_delete_job(job, asynchronous=True):
-        """Delete HTCondor job.
+    def stop(backend_job_id):
+        """Stop HTCondor job execution.
     
-        :param job: The :string: HTCondor cluster ID of the job to be removed.
-        :param asynchronous: Place holder for comparison to k8s.
+        :param backend_job_id: HTCondor cluster ID of the job to be removed.
         """
-    
-        self.schedd.act(htcondor.JobAction.Remove, 'ClusterID==%d' % job)
-
+        try:
+            schedd.act(
+                htcondor.JobAction.Remove,
+                'ClusterId=={}'.format(backend_job_id))
+        except Exception as e:
+            logging.error(e, exc_info=True)
