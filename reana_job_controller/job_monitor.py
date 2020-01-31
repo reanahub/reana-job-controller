@@ -277,6 +277,7 @@ class JobMonitorHTCondorVC3(JobMonitor):
 
     def query_condor_jobs(self, backend_job_ids):
         """Query condor jobs. Return iterable"""
+        logging.debug("Will query jobs: {0}".format(backend_job_ids))
         schedd = self.schedd
         ads = ['ClusterId', 'JobStatus', 'ExitCode']
         base_query = 'ClusterId == {} ||'
@@ -284,8 +285,12 @@ class JobMonitorHTCondorVC3(JobMonitor):
         for job_id in backend_job_ids:
             query += base_query.format(job_id)
         query = query[:-2]
-        condor_jobs = schedd.history(query, ads)
-        return condor_jobs
+        try:
+            condor_jobs = schedd.history(query, ads)
+            return condor_jobs
+        except Exception as e:
+            logging.debug(e)
+            return
 
     def watch_jobs(self, job_db, app):
         """Watch currently running HTCondor jobs.
@@ -312,15 +317,18 @@ class JobMonitorHTCondorVC3(JobMonitor):
                        job_db[job_id]['status'] in statuses_to_skip:
                         continue
                     try:
+                        logging.debug('Looking for job {} in schedd history'\
+                            .format(job_dict['backend_job_id']))
                         condor_job = \
                             next(job for job in condor_jobs
-                                 if job['ClusterId'] == job_dict
-                                 ['backend_job_id'])
-                    except:
+                                 if str(job['ClusterId']) == str(job_dict
+                                 ['backend_job_id']))
+                    except Exception as e:
                         # Did not match to any job in the history queue yet
                         msg = 'Job with id {} was not found in schedd history yet.'\
                             .format(job_dict['backend_job_id'])
                         logging.debug(msg)
+                        logging.debug(e)
                         continue
                     if condor_job['JobStatus'] == condorJobStatus['Completed']:
                         if condor_job['ExitCode'] == 0:
