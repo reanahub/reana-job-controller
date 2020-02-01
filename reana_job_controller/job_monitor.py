@@ -287,6 +287,10 @@ class JobMonitorHTCondorVC3(JobMonitor):
         query = query[:-2]
         try:
             condor_jobs = schedd.history(query, ads)
+            # schedd history is not sorted by ClusterId
+            # as opposed to xquery, so we need to work that around
+            # though we lose the iterator feature and get a list
+            condor_jobs = sorted(condor_jobs, key=lambda x: x['ClusterId'])
             return condor_jobs
         except Exception as e:
             logging.debug(e)
