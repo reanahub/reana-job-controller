@@ -89,12 +89,13 @@ class JobMonitorKubernetes(JobMonitor):
             try:
                 w = watch.Watch()
                 for event in w.stream(
-                    current_k8s_batchv1_api_client.list_job_for_all_namespaces
+                    current_k8s_corev1_api_client.list_namespaced_pod,
+                    namespace='default',
+                    label_selector='job-name'
                 ):
                     logging.info(
                         'New Job event received: {0}'.format(event['type']))
                     job = event['object']
-
                     # Taking note of the remaining jobs since deletion might
                     # not happen straight away.
                     remaining_jobs = dict()
@@ -102,24 +103,40 @@ class JobMonitorKubernetes(JobMonitor):
                         if not job_db[job_id]['deleted']:
                             remaining_jobs[job_dict['backend_job_id']] = job_id
                     if (not job_db.get(remaining_jobs.get(
-                            job.metadata.name)) or
-                            job.metadata.name not in remaining_jobs):
+                            job.metadata.labels['job-name'])) or
+                            job.metadata.labels['job-name'] not in
+                            remaining_jobs):
                         # Ignore jobs not created by this specific instance
                         # or already deleted jobs.
                         continue
-                    job_id = remaining_jobs[job.metadata.name]
-                    kubernetes_job_id = job.metadata.name
-                    if job.status.succeeded:
+                    job_id = remaining_jobs[job.metadata.labels['job-name']]
+                    kubernetes_job_id = job.metadata.labels['job-name']
+                    if job.status.phase == 'Succeeded':
                         logging.info(
                             'Job job_id: {}, kubernetes_job_id: {}'
                             ' succeeded.'.format(job_id, kubernetes_job_id)
                         )
                         job_db[job_id]['status'] = 'succeeded'
-                    elif job.status.failed:
+                    elif job.status.phase == 'Failed':
                         logging.info(
                             'Job job_id: {}, kubernetes_job_id: {} failed.'
                             .format(job_id, kubernetes_job_id))
                         job_db[job_id]['status'] = 'failed'
+                    elif job.status.phase == 'Pending':
+                        try:
+                            reason = \
+                                job.status.container_statuses[0].state \
+                                .waiting.reason
+                            if 'ErrImagePull' in reason:
+                                logging.info(
+                                    'Job job_id: {}, kubernetes_job_id: {} '
+                                    'failed to fetch image.'
+                                    .format(job_id, kubernetes_job_id))
+                                job_db[job_id]['status'] = 'failed'
+                            else:
+                                continue
+                        except (AttributeError, TypeError) as e:
+                            continue
                     else:
                         continue
                     # Grab logs when job either succeeds or fails.
@@ -133,7 +150,9 @@ class JobMonitorKubernetes(JobMonitor):
                     logging.info('Grabbing pod {} logs...'.format(
                         last_spawned_pod.metadata.name))
                     job_db[job_id]['log'] = \
-                        self.get_container_logs(last_spawned_pod)
+                        self.get_container_logs(last_spawned_pod) or \
+                        job.status.container_statuses[0].state \
+                        .waiting.message
                     store_logs(job_id=job_id, logs=job_db[job_id]['log'])
 
                     logging.info('Cleaning Kubernetes job {} ...'.format(
