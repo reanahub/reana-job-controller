@@ -11,9 +11,7 @@
 import base64
 import logging
 import os
-import re
 import threading
-import time
 from shutil import copyfile
 
 import classad
@@ -36,6 +34,8 @@ class HTCondorJobManagerCERN(JobManager):
     """Maximum number of tries used for getting schedd, job submission and
     spooling output.
     """
+    RETRY_WAIT_TIME = 10000
+    """Wait time between retries in miliseconds."""
 
     def __init__(self, docker_img=None, cmd=None, prettified_cmd=None,
                  env_vars=None, workflow_uuid=None, workflow_workspace=None,
@@ -188,45 +188,33 @@ class HTCondorJobManagerCERN(JobManager):
                           exc_info=True)
             raise e
 
-    @retry(stop_max_attempt_number=MAX_NUM_RETRIES)
+    @retry(stop_max_attempt_number=MAX_NUM_RETRIES, wait_fixed=RETRY_WAIT_TIME)
     def _submit(self, job_ad):
         """Execute submission transaction."""
-        try:
-            ads = []
-            schedd = HTCondorJobManagerCERN._get_schedd()
-            logging.info('Submiting job - {}'.format(job_ad))
-            clusterid = schedd.submit(job_ad, 1, True, ads)
-            HTCondorJobManagerCERN._spool_input(ads)
-            return clusterid
-        except Exception as e:
-            logging.error("Submission failed: {0}".format(e), exc_info=True)
-            time.sleep(10)
+        ads = []
+        schedd = HTCondorJobManagerCERN._get_schedd()
+        logging.info('Submiting job - {}'.format(job_ad))
+        clusterid = schedd.submit(job_ad, 1, True, ads)
+        HTCondorJobManagerCERN._spool_input(ads)
+        return clusterid
 
-    @retry(stop_max_attempt_number=MAX_NUM_RETRIES)
+    @retry(stop_max_attempt_number=MAX_NUM_RETRIES, wait_fixed=RETRY_WAIT_TIME)
     def _spool_input(ads):
-        try:
-            schedd = HTCondorJobManagerCERN._get_schedd()
-            logging.info('Spooling job inputs - {}'.format(ads))
-            schedd.spool(ads)
-        except Exception as e:
-            logging.error("Spooling failed: {0}".format(e), exc_info=True)
-            time.sleep(10)
+        schedd = HTCondorJobManagerCERN._get_schedd()
+        logging.info('Spooling job inputs - {}'.format(ads))
+        schedd.spool(ads)
 
-    @retry(stop_max_attempt_number=MAX_NUM_RETRIES)
+    @retry(stop_max_attempt_number=MAX_NUM_RETRIES, wait_fixed=RETRY_WAIT_TIME)
     def _get_schedd():
         """Find and return the HTCondor schedd."""
-        try:
-            schedd = getattr(thread_local, 'MONITOR_THREAD_SCHEDD', None)
-            if schedd is None:
-                setattr(thread_local,
-                        'MONITOR_THREAD_SCHEDD',
-                        htcondor.Schedd())
-            logging.info("Getting schedd: {}".format(
-                thread_local.MONITOR_THREAD_SCHEDD))
-            return thread_local.MONITOR_THREAD_SCHEDD
-        except Exception as e:
-            logging.error("Can't locate schedd: {0}".format(e), exc_info=True)
-            time.sleep(10)
+        schedd = getattr(thread_local, 'MONITOR_THREAD_SCHEDD', None)
+        if schedd is None:
+            setattr(thread_local,
+                    'MONITOR_THREAD_SCHEDD',
+                    htcondor.Schedd())
+        logging.info("Getting schedd: {}".format(
+            thread_local.MONITOR_THREAD_SCHEDD))
+        return thread_local.MONITOR_THREAD_SCHEDD
 
     def stop(backend_job_id):
         """Stop HTCondor job execution."""
@@ -238,16 +226,12 @@ class HTCondorJobManagerCERN(JobManager):
         except Exception as e:
             logging.error(e, exc_info=True)
 
-    @retry(stop_max_attempt_number=MAX_NUM_RETRIES)
+    @retry(stop_max_attempt_number=MAX_NUM_RETRIES, wait_fixed=RETRY_WAIT_TIME)
     def spool_output(backend_job_id):
         """Transfer job output."""
-        try:
-            schedd = HTCondorJobManagerCERN._get_schedd()
-            logging.info("Spooling jobs {} output.".format(backend_job_id))
-            schedd.retrieve("ClusterId == {}".format(backend_job_id))
-        except Exception as e:
-            logging.error(e, exc_info=True)
-            time.sleep(10)
+        schedd = HTCondorJobManagerCERN._get_schedd()
+        logging.info("Spooling jobs {} output.".format(backend_job_id))
+        schedd.retrieve("ClusterId == {}".format(backend_job_id))
 
     def get_logs(backend_job_id, workspace):
         """Return job logs if log files are present."""
