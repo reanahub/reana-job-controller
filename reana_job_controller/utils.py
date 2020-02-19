@@ -65,6 +65,12 @@ def initialize_krb5_token(workflow_uuid):
     else:
         msg = 'CERN_USER is not set.'
         logging.error(msg, exc_info=True)
+        Workflow.update_workflow_status(
+            db_session=Session,
+            workflow_uuid=workflow_uuid,
+            status=None,
+            new_logs=msg)
+        logging.error(msg, exc_info=True)
 
 
 @singleton
