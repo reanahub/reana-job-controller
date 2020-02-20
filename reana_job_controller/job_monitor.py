@@ -142,15 +142,10 @@ class JobMonitorKubernetes(JobMonitor):
                     # Grab logs when job either succeeds or fails.
                     logging.info('Getting last spawned pod for kubernetes'
                                  ' job {}'.format(kubernetes_job_id))
-                    last_spawned_pod = \
-                        current_k8s_corev1_api_client.list_namespaced_pod(
-                            namespace=job.metadata.namespace,
-                            label_selector='job-name={job_name}'.format(
-                                job_name=kubernetes_job_id)).items[-1]
                     logging.info('Grabbing pod {} logs...'.format(
-                        last_spawned_pod.metadata.name))
+                        job_id))
                     job_db[job_id]['log'] = \
-                        self.get_container_logs(last_spawned_pod) or \
+                        self.get_container_logs(job_id) or \
                         job.status.container_statuses[0].state \
                         .waiting.message
                     store_logs(job_id=job_id, logs=job_db[job_id]['log'])
