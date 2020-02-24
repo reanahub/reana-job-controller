@@ -133,6 +133,12 @@ class JobMonitorKubernetes(JobMonitor):
                                     'failed to fetch image.'
                                     .format(job_id, kubernetes_job_id))
                                 job_db[job_id]['status'] = 'failed'
+                            elif 'InvalidImageName' in reason:
+                                logging.info(
+                                    'Job job_id: {}, kubernetes_job_id: {} '
+                                    'invalid image name.'
+                                    .format(job_id, kubernetes_job_id))
+                                job_db[job_id]['status'] = 'failed'
                             else:
                                 continue
                         except (AttributeError, TypeError) as e:
