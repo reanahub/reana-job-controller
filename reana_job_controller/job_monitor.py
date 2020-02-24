@@ -54,20 +54,20 @@ class JobMonitorKubernetes(JobMonitor):
             thread_name='kubernetes_job_monitor'
         )
 
-    def get_container_logs(self, last_spawned_pod):
+    def get_container_logs(self, job_id):
         """Get job pod's containers' logs."""
         try:
             pod_logs = ''
             pod = current_k8s_corev1_api_client.read_namespaced_pod(
-                namespace=last_spawned_pod.metadata.namespace,
-                name=last_spawned_pod.metadata.name)
+                namespace='default',
+                name=job_id)
             containers = pod.spec.init_containers + pod.spec.containers \
                 if pod.spec.init_containers else pod.spec.containers
             for container in containers:
                 container_log = \
                     current_k8s_corev1_api_client.read_namespaced_pod_log(
-                        namespace=last_spawned_pod.metadata.namespace,
-                        name=last_spawned_pod.metadata.name,
+                        namespace='default',
+                        name=job_id,
                         container=container.name)
                 pod_logs += '{}: \n {} \n'.format(
                     container.name, container_log)
@@ -75,9 +75,11 @@ class JobMonitorKubernetes(JobMonitor):
         except client.rest.ApiException as e:
             logging.error(
                 "Error while connecting to Kubernetes API: {}".format(e))
+            return None
         except Exception as e:
             logging.error(traceback.format_exc())
             logging.error("Unexpected error: {}".format(e))
+            return None
 
     def watch_jobs(self, job_db, app=None):
         """Open stream connection to k8s apiserver to watch all jobs status.
@@ -111,6 +113,7 @@ class JobMonitorKubernetes(JobMonitor):
                         continue
                     job_id = remaining_jobs[job.metadata.labels['job-name']]
                     kubernetes_job_id = job.metadata.labels['job-name']
+                    kubernetes_pod_job_id = job.metadata.name
                     if job.status.phase == 'Succeeded':
                         logging.info(
                             'Job job_id: {}, kubernetes_job_id: {}'
@@ -151,7 +154,7 @@ class JobMonitorKubernetes(JobMonitor):
                     logging.info('Grabbing pod {} logs...'.format(
                         job_id))
                     job_db[job_id]['log'] = \
-                        self.get_container_logs(job_id) or \
+                        self.get_container_logs(kubernetes_pod_job_id) or \
                         job.status.container_statuses[0].state \
                         .waiting.message
                     store_logs(job_id=job_id, logs=job_db[job_id]['log'])
