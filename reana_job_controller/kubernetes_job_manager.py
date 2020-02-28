@@ -144,6 +144,7 @@ class KubernetesJobManager(JobManager):
         self.add_hostpath_volumes()
         self.add_shared_volume()
         self.add_eos_volume()
+        self.add_image_pull_secrets()
 
         if self.cvmfs_mounts != 'false':
             cvmfs_map = {}
@@ -224,6 +225,16 @@ class KubernetesJobManager(JobManager):
             self.add_volumes([(
                 K8S_CERN_EOS_MOUNT_CONFIGURATION['volumeMounts'],
                 K8S_CERN_EOS_MOUNT_CONFIGURATION['volume'])])
+
+    def add_image_pull_secrets(self):
+        """Attach to the container the configured image pull secrets."""
+        image_pull_secrets = []
+        for secret_name in current_app.config['IMAGE_PULL_SECRETS']:
+            if secret_name:
+                image_pull_secrets.append({'name': secret_name})
+
+        self.job['spec']['template']['spec']['imagePullSecrets'] = \
+            image_pull_secrets
 
     def add_hostpath_volumes(self):
         """Add hostPath mounts from configuration to job."""

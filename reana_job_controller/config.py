@@ -89,3 +89,6 @@ KRB5_CONFIGMAP_NAME = 'reana-krb5-conf'
 """Kerberos configMap name. Must be the same as in
 reana_cluster/backends/kubernetes/templates/configmaps/kerberos.yaml.
 """
+
+IMAGE_PULL_SECRETS = os.getenv('IMAGE_PULL_SECRETS', '').split(',')
+"""Docker image pull secrets which allow the usage of private images."""
