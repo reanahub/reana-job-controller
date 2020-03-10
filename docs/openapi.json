@@ -75,6 +75,9 @@
           "default": true,
           "type": "boolean"
         },
+        "unpacked_img": {
+          "type": "boolean"
+        },
         "workflow_uuid": {
           "type": "string"
         },

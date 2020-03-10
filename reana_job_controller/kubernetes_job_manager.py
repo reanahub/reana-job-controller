@@ -43,7 +43,7 @@ class KubernetesJobManager(JobManager):
     def __init__(self, docker_img=None, cmd=None, prettified_cmd=None,
                  env_vars=None, workflow_uuid=None, workflow_workspace=None,
                  cvmfs_mounts='false', shared_file_system=False, job_name=None,
-                 kerberos=False, kubernetes_uid=None):
+                 kerberos=False, kubernetes_uid=None, unpacked_img=False):
         """Instanciate kubernetes job manager.
 
         :param docker_img: Docker image.

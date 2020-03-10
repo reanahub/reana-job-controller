@@ -40,7 +40,8 @@ class HTCondorJobManagerCERN(JobManager):
     def __init__(self, docker_img=None, cmd=None, prettified_cmd=None,
                  env_vars=None, workflow_uuid=None, workflow_workspace=None,
                  cvmfs_mounts='false', shared_file_system=False,
-                 job_name=None, kerberos=False, kubernetes_uid=None):
+                 job_name=None, kerberos=False, kubernetes_uid=None,
+                 unpacked_img=False):
         """Instanciate HTCondor job manager.
 
         :param docker_img: Docker image.
@@ -61,6 +62,8 @@ class HTCondorJobManagerCERN(JobManager):
         :type shared_file_system: bool
         :param job_name: Name of the job
         :type job_name: str
+        :unpacked_img: if unpacked_img should be used
+        :type unpacked_img: bool
         """
         super(HTCondorJobManagerCERN, self).__init__(
             docker_img=docker_img,
@@ -74,6 +77,7 @@ class HTCondorJobManagerCERN(JobManager):
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.workflow = self._get_workflow()
+        self.unpacked_img = unpacked_img
 
     @JobManager.execution_hook
     def execute(self):
@@ -87,10 +91,13 @@ class HTCondorJobManagerCERN(JobManager):
         job_ad['LeaveJobInQueue'] = classad.ExprTree(
             '(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || '
             '(StageOutFinish == 0))')
-        job_ad['DockerImage'] = self.docker_img
-        job_ad['WantDocker'] = True
-        job_ad['Cmd'] = './job_wrapper.sh'
-        job_ad['Arguments'] = self._format_arguments()
+        job_ad['Cmd'] = \
+            './job_wrapper.sh' if not self.unpacked_img \
+            else './job_singularity_wrapper.sh'
+        if not self.unpacked_img:
+            job_ad['Arguments'] = self._format_arguments()
+            job_ad['DockerImage'] = self.docker_img
+            job_ad['WantDocker'] = True
         job_ad['Environment'] = self._format_env_vars()
         job_ad['Out'] = classad.ExprTree(
             'strcat("reana_job.", ClusterId, ".", ProcId, ".out")')
@@ -180,9 +187,24 @@ class HTCondorJobManagerCERN(JobManager):
     def _copy_wrapper_file(self):
         """Copy job wrapper file to workspace."""
         try:
-            copyfile('/etc/job_wrapper.sh',
-                     os.path.join(self.workflow_workspace + '/' +
-                                  'job_wrapper.sh'))
+            if not self.unpacked_img:
+                copyfile('/etc/job_wrapper.sh',
+                         os.path.join(self.workflow_workspace + '/' +
+                                      'job_wrapper.sh'))
+            else:
+                template = '#!/bin/bash \n' \
+                           'singularity exec ' \
+                           '--home $PWD:/srv ' \
+                           '--bind $PWD:/srv ' \
+                           '--bind /cvmfs ' \
+                           '--bind /eos ' \
+                           '{DOCKER_IMG} {CMD}'.format(
+                               DOCKER_IMG=self.docker_img,
+                               CMD=self._format_arguments() + ' | bash'
+                           )
+                f = open('job_singularity_wrapper.sh', 'w')
+                f.write(template)
+                f.close()
         except Exception as e:
             logging.error("Failed to copy job wrapper file: {0}".format(e),
                           exc_info=True)

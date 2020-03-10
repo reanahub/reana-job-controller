@@ -39,3 +39,4 @@ class JobRequest(Schema):
     compute_backend = fields.Str(required=False)
     kerberos = fields.Bool(required=False)
     kubernetes_uid = fields.Int(required=False)
+    unpacked_img = fields.Bool(required=False)
