@@ -38,5 +38,6 @@ class JobRequest(Schema):
     shared_file_system = fields.Bool(missing=True)
     compute_backend = fields.Str(required=False)
     kerberos = fields.Bool(required=False)
+    voms_proxy = fields.Bool(required=False)
     kubernetes_uid = fields.Int(required=False)
     unpacked_img = fields.Bool(required=False)

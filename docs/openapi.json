@@ -78,6 +78,9 @@
         "unpacked_img": {
           "type": "boolean"
         },
+        "voms_proxy": {
+          "type": "boolean"
+        },
         "workflow_uuid": {
           "type": "string"
         },
