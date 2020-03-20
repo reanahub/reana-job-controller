@@ -10,7 +10,8 @@
 
 import os
 
-from reana_commons.config import WORKFLOW_RUNTIME_USER_UID
+from reana_commons.config import (REANA_COMPONENT_PREFIX,
+                                  WORKFLOW_RUNTIME_USER_UID)
 
 from reana_job_controller.htcondorcern_job_manager import \
     HTCondorJobManagerCERN
@@ -85,10 +86,9 @@ should match `default_ccache_name` in krb5.conf.
 KRB5_TOKEN_CACHE_FILENAME = 'krb5_{}'
 """Name of the Kerberos token cache file."""
 
-KRB5_CONFIGMAP_NAME = 'reana-krb5-conf'
-"""Kerberos configMap name. Must be the same as in
-reana_cluster/backends/kubernetes/templates/configmaps/kerberos.yaml.
-"""
+KRB5_CONFIGMAP_NAME = os.getenv('REANA_KRB5_CONFIGMAP_NAME',
+                                f'{REANA_COMPONENT_PREFIX}-krb5-conf')
+"""Kerberos configMap name."""
 
 IMAGE_PULL_SECRETS = os.getenv('IMAGE_PULL_SECRETS', '').split(',')
 """Docker image pull secrets which allow the usage of private images."""
