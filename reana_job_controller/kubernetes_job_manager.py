@@ -179,7 +179,8 @@ class KubernetesJobManager(JobManager):
             self._add_krb5_init_container(secrets_volume_mount)
 
         if self.voms_proxy:
-            self._add_voms_proxy_init_container(secrets_volume_mount)
+            self._add_voms_proxy_init_container(secrets_volume_mount,
+                                                secret_env_vars)
 
         backend_job_id = self._submit()
         return backend_job_id
@@ -322,7 +323,8 @@ class KubernetesJobManager(JobManager):
         self.job['spec']['template']['spec']['initContainers'].append(
             krb5_container)
 
-    def _add_voms_proxy_init_container(self, secrets_volume_mount):
+    def _add_voms_proxy_init_container(self, secrets_volume_mount,
+                                       secret_env_vars):
         """Add  sidecar container for a job."""
         ticket_cache_volume = {
             'name': 'voms-proxy-cache',
@@ -346,14 +348,16 @@ class KubernetesJobManager(JobManager):
             'args': ['-c', 'cp /etc/reana/secrets/userkey.pem /tmp/userkey.pem; \
                      chmod 400 /tmp/userkey.pem; \
                      echo $VOMSPROXY_PASS | base64 -d | voms-proxy-init \
-                     --voms $VO --key /tmp/userkey.pem \
+                     --voms $VOMSPROXY_VO --key /tmp/userkey.pem \
                      --cert $(readlink -f /etc/reana/secrets/usercert.pem) \
                      --pwstdin --out {voms_proxy_file_path}; \
-                     chown {kubernetes_uid} {voms_proxy_file_path}'.format(voms_proxy_file_path=voms_proxy_file_path, \
+                     chown {kubernetes_uid} {voms_proxy_file_path}'.format(
+                         voms_proxy_file_path=voms_proxy_file_path, \
                      kubernetes_uid=self.kubernetes_uid)],
             'name': current_app.config['VOMSPROXY_CONTAINER_NAME'],
             'imagePullPolicy': 'IfNotPresent',
             'volumeMounts': [secrets_volume_mount] + volume_mounts,
+            'env': secret_env_vars,
         }
 
         self.job['spec']['template']['spec']['volumes'].extend(
