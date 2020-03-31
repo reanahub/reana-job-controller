@@ -346,7 +346,7 @@ class KubernetesJobManager(JobManager):
             'args': ['-c', 'cp /etc/reana/secrets/userkey.pem /tmp/userkey.pem; \
                      chmod 400 /tmp/userkey.pem; \
                      echo $VOMSPROXY_PASS | base64 -d | voms-proxy-init \
-                     --voms cms --key /tmp/userkey.pem \
+                     --voms $VO --key /tmp/userkey.pem \
                      --cert $(readlink -f /etc/reana/secrets/usercert.pem) \
                      --pwstdin --out {voms_proxy_file_path}; \
                      chown {kubernetes_uid} {voms_proxy_file_path}'.format(voms_proxy_file_path=voms_proxy_file_path, \
