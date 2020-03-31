@@ -45,7 +45,8 @@ class KubernetesJobManager(JobManager):
     def __init__(self, docker_img=None, cmd=None, prettified_cmd=None,
                  env_vars=None, workflow_uuid=None, workflow_workspace=None,
                  cvmfs_mounts='false', shared_file_system=False, job_name=None,
-                 kerberos=False, kubernetes_uid=None, unpacked_img=False, voms_proxy=False):
+                 kerberos=False, kubernetes_uid=None, unpacked_img=False,
+                 voms_proxy=False):
         """Instanciate kubernetes job manager.
 
         :param docker_img: Docker image.
@@ -70,7 +71,8 @@ class KubernetesJobManager(JobManager):
         :type kerberos: bool
         :param kubernetes_uid: User ID for job container.
         :type kubernetes_uid: int
-        :param voms_proxy: Decides if a voms-proxy certificate should be provided for job.
+        :param voms_proxy: Decides if a voms-proxy certificate should be
+            provided for job.
         :type voms_proxy: bool
         """
         super(KubernetesJobManager, self).__init__(
@@ -127,27 +129,28 @@ class KubernetesJobManager(JobManager):
         secrets_store = REANAUserSecretsStore(user_id)
 
         secret_env_vars = secrets_store.get_env_secrets_as_k8s_spec()
-        self.job['spec']['template']['spec']['containers'][0]['env'].extend(
+        job_spec = self.job['spec']['template']['spec']
+        job_spec['containers'][0]['env'].extend(
             secret_env_vars
         )
 
-        self.job['spec']['template']['spec']['volumes'].append(
+        job_spec['volumes'].append(
             secrets_store.get_file_secrets_volume_as_k8s_specs()
         )
 
         secrets_volume_mount = \
             secrets_store.get_secrets_volume_mount_as_k8s_spec()
-        self.job['spec']['template']['spec']['containers'][0]['volumeMounts'] \
+        job_spec['containers'][0]['volumeMounts'] \
             .append(secrets_volume_mount)
 
-        self.job['spec']['template']['spec']['containers'][0]['securityContext'] = \
+        job_spec['containers'][0]['securityContext'] = \
             client.V1PodSecurityContext(
                 run_as_group=WORKFLOW_RUNTIME_USER_GID,
                 run_as_user=self.kubernetes_uid)
 
         if self.env_vars:
             for var, value in self.env_vars.items():
-                self.job['spec']['template']['spec'][
+                job_spec[
                     'containers'][0]['env'].append({'name': var,
                                                     'value': value})
 
@@ -167,13 +170,13 @@ class KubernetesJobManager(JobManager):
             for repository, mount_path in cvmfs_map.items():
                 volume = get_k8s_cvmfs_volume(repository)
 
-                (self.job['spec']['template']['spec']['containers'][0]
+                (job_spec['containers'][0]
                     ['volumeMounts'].append(
                         {'name': volume['name'],
                          'mountPath': '/cvmfs/{}'.format(mount_path),
                          'readOnly': volume['readOnly']}
                 ))
-                self.job['spec']['template']['spec']['volumes'].append(volume)
+                job_spec['volumes'].append(volume)
 
         if self.kerberos:
             self._add_krb5_init_container(secrets_volume_mount)
@@ -333,14 +336,15 @@ class KubernetesJobManager(JobManager):
         volume_mounts = [
             {
                 'name': ticket_cache_volume['name'],
-                'mountPath': current_app.config['VOMSPROXY_CERT_CACHE_LOCATION']
+                'mountPath':
+                current_app.config['VOMSPROXY_CERT_CACHE_LOCATION']
             }
         ]
 
         voms_proxy_file_path = os.path.join(
-                               current_app.config['VOMSPROXY_CERT_CACHE_LOCATION'],
-                               current_app.config['VOMSPROXY_CERT_CACHE_FILENAME']
-                           )
+            current_app.config['VOMSPROXY_CERT_CACHE_LOCATION'],
+            current_app.config['VOMSPROXY_CERT_CACHE_FILENAME']
+        )
 
         voms_proxy_container = {
             'image': current_app.config['VOMSPROXY_CONTAINER_IMAGE'],
@@ -352,8 +356,8 @@ class KubernetesJobManager(JobManager):
                      --cert $(readlink -f /etc/reana/secrets/usercert.pem) \
                      --pwstdin --out {voms_proxy_file_path}; \
                      chown {kubernetes_uid} {voms_proxy_file_path}'.format(
-                         voms_proxy_file_path=voms_proxy_file_path, \
-                     kubernetes_uid=self.kubernetes_uid)],
+                         voms_proxy_file_path=voms_proxy_file_path,
+                         kubernetes_uid=self.kubernetes_uid)],
             'name': current_app.config['VOMSPROXY_CONTAINER_NAME'],
             'imagePullPolicy': 'IfNotPresent',
             'volumeMounts': [secrets_volume_mount] + volume_mounts,
@@ -365,7 +369,8 @@ class KubernetesJobManager(JobManager):
         self.job['spec']['template']['spec']['containers'][0][
             'volumeMounts'].extend(volume_mounts)
 
-        # XrootD will look for a valid grid proxy in the location pointed to by the environment variable $X509_USER_PROXY
+        # XrootD will look for a valid grid proxy in the location pointed to
+        # by the environment variable $X509_USER_PROXY
         self.job['spec']['template']['spec']['containers'][0][
             'env'].append({'name': 'X509_USER_PROXY',
                            'value': voms_proxy_file_path})

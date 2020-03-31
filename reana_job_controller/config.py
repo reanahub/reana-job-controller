@@ -91,15 +91,16 @@ KRB5_CONFIGMAP_NAME = os.getenv('REANA_KRB5_CONFIGMAP_NAME',
 """Kerberos configMap name."""
 
 VOMSPROXY_CONTAINER_IMAGE = os.getenv('VOMSPROXY_CONTAINER_IMAGE',
-                                 'reanahub/reana-auth-vomsproxy')
+                                      'reanahub/reana-auth-vomsproxy')
 """Default docker image of VOMSPROXY sidecar container."""
 
 VOMSPROXY_CONTAINER_NAME = 'voms-proxy'
 """Name of VOMSPROXY sidecar container."""
 
 VOMSPROXY_CERT_CACHE_LOCATION = '/vomsproxy_cache/'
-"""Directory of voms-proxy certificate cache, shared between job & VOMSPROXY container.
-"""
+"""Directory of voms-proxy certificate cache.
+
+This directory is shared between job & VOMSPROXY container."""
 
 VOMSPROXY_CERT_CACHE_FILENAME = 'x509up_proxy'
 """Name of the voms-proxy certificate cache file."""
