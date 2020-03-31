@@ -61,16 +61,19 @@ class JobMonitorKubernetes(JobMonitor):
             pod = current_k8s_corev1_api_client.read_namespaced_pod(
                 namespace='default',
                 name=job_id)
-            containers = pod.spec.init_containers + pod.spec.containers \
-                if pod.spec.init_containers else pod.spec.containers
-            for container in containers:
-                container_log = \
-                    current_k8s_corev1_api_client.read_namespaced_pod_log(
-                        namespace='default',
-                        name=job_id,
-                        container=container.name)
-                pod_logs += '{}: \n {} \n'.format(
-                    container.name, container_log)
+            container_statuses = (pod.status.container_statuses +
+                                  pod.status.init_container_statuses)
+            for container in container_statuses:
+                if container.state.terminated:
+                    container_log = \
+                        current_k8s_corev1_api_client.read_namespaced_pod_log(
+                            namespace='default',
+                            name=job_id,
+                            container=container.name)
+                    pod_logs += '{}:\nMessage: {}\nReason: {}\nLogs:\n {}\n'.format(
+                        container.state.terminated.message,
+                        container.state.terminated.reason,
+                        container.name, container_log)
             return pod_logs
         except client.rest.ApiException as e:
             logging.error(
