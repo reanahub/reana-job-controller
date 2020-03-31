@@ -335,7 +335,6 @@ class KubernetesJobManager(JobManager):
             }
         ]
 
-        voms_proxy_pass = os.environ.get('VOMSPROXY_PASS')
         voms_proxy_file_path = os.path.join(
                                current_app.config['VOMSPROXY_CERT_CACHE_LOCATION'],
                                current_app.config['VOMSPROXY_CERT_CACHE_FILENAME']
@@ -346,12 +345,12 @@ class KubernetesJobManager(JobManager):
             'command': ['/bin/bash'],
             'args': ['-c', 'cp /etc/reana/secrets/userkey.pem /tmp/userkey.pem; \
                      chmod 400 /tmp/userkey.pem; \
-                     echo {voms_proxy_pass} | base64 -d | voms-proxy-init \
+                     echo $VOMSPROXY_PASS | base64 -d | voms-proxy-init \
                      --voms cms --key /tmp/userkey.pem \
                      --cert $(readlink -f /etc/reana/secrets/usercert.pem) \
                      --pwstdin --out {voms_proxy_file_path}; \
-                     chown {kubernetes_uid} {voms_proxy_file_path}'.format(voms_proxy_pass=voms_proxy_pass, \
-                     voms_proxy_file_path=voms_proxy_file_path, kubernetes_uid=self.kubernetes_uid)],
+                     chown {kubernetes_uid} {voms_proxy_file_path}'.format(voms_proxy_file_path=voms_proxy_file_path, \
+                     kubernetes_uid=self.kubernetes_uid)],
             'name': current_app.config['VOMSPROXY_CONTAINER_NAME'],
             'imagePullPolicy': 'IfNotPresent',
             'volumeMounts': [secrets_volume_mount] + volume_mounts,
