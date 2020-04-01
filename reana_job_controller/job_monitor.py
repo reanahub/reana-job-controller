@@ -38,6 +38,7 @@ class JobMonitor():
             args=(JOB_DB, app))
         self.job_event_reader_thread.daemon = True
         self.job_event_reader_thread.start()
+        self.job_db = JOB_DB
 
     def watch_jobs(self, job_db, app):
         """Monitor running jobs."""
@@ -54,26 +55,182 @@ class JobMonitorKubernetes(JobMonitor):
             thread_name='kubernetes_job_monitor'
         )
 
-    def get_container_logs(self, job_id):
+    def _get_remaining_jobs(self, compute_backend='kubernetes',
+                            statuses_to_skip=None):
+        """Get remaining jobs according to a set of conditions.
+
+        :param compute_backend: For which compute backend to search remaining
+            jobs.
+        :param statuses_to_skip: List of statuses to skip when searching for
+            remaining jobs.
+        :type compute_backend: str
+        :type statuses_to_skip: list
+
+        :return: Dictionary composed of backend IDs as keys and REANA job IDs
+            as value.
+        :rtype: dict
+        """
+        remaining_jobs = dict()
+        statuses_to_skip = statuses_to_skip or []
+        for job_id, job_dict in self.job_db.items():
+            is_remaining = (
+                not self.job_db[job_id]['deleted'] and
+                self.job_db[job_id]['compute_backend'] == compute_backend and
+                not self.job_db[job_id]['status'] in statuses_to_skip)
+            if is_remaining:
+                remaining_jobs[job_dict['backend_job_id']] = job_id
+        return remaining_jobs
+
+    def get_reana_job_id(self, backend_job_id):
+        """Get REANA job ID.
+
+        :param job_pod: Compute backend job id.
+        :type job_pod: str
+
+        :return: REANA job ID.
+        :rtype: str
+        """
+        remaining_jobs = self._get_remaining_jobs()
+        return remaining_jobs[backend_job_id]
+
+    def get_backend_job_id(self, job_pod):
+        """Get the backend job id for the backend object.
+
+        :param job_pod: Compute backend job object (Kubernetes V1Pod
+            https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1Pod.md)
+
+        :return: Backend job ID.
+        :rtype: str
+        """
+        return job_pod.metadata.labels['job-name']
+
+    def store_job_logs(self, reana_job_id, logs):
+        """Store logs and update job status.
+
+        :param reana_job_id: Internal REANA job ID.
+        :param logs: Job logs.
+        :type reana_job_id: str
+        :type logs: str
+        """
+        self.job_db[reana_job_id]['log'] = logs
+        store_logs(job_id=reana_job_id, logs=logs)
+
+    def update_job_status(self, reana_job_id, status):
+        """Update job status inside RJC.
+
+        :param reana_job_id: Internal REANA job ID.
+        :param status: One of the possible status for jobs in REANA
+        :type reana_job_id: str
+        :type status: str
+        """
+        self.job_db[reana_job_id]['status'] = status
+
+    def should_process_job(self, job_pod):
+        """Decide whether the job should be processed or not.
+
+        For a job to be processed it has to:
+        - Be a job created by this instance, that's why we check the in
+          memory DB.
+        - It has to be an active job, not having been deleted already.
+        - It has to be terminated, otherwise no status or logs can be
+          retrieved.
+
+        :param job_pod: Compute backend job object (Kubernetes V1Pod
+            https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1Pod.md)
+
+        :return: Boolean representing whether the job should be processed or
+            not.
+        :rtype: bool
+        """
+        remaining_jobs = self._get_remaining_jobs()
+        backend_job_id = self.get_backend_job_id(job_pod)
+        is_job_in_memory_db = self.job_db.get(
+            remaining_jobs.get(backend_job_id))
+        is_job_in_remaining_jobs = backend_job_id in remaining_jobs
+        return is_job_in_memory_db or is_job_in_remaining_jobs
+
+    def clean_job(self, job_id):
+        """Clean up the created Kubernetes Job.
+
+        :param job_id: Kubernetes job ID.
+        """
+        try:
+            logging.info('Cleaning Kubernetes job {} ...'.format(job_id))
+            KubernetesJobManager.stop(job_id)
+            self.job_db[self.get_reana_job_id(job_id)]['deleted'] = True
+        except client.rest.ApiException as e:
+            logging.error(
+                "Error while connecting to Kubernetes API: {}".format(e))
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            logging.error("Unexpected error: {}".format(e))
+
+    def get_job_status(self, job_pod):
+        """Get Kubernetes based REANA job status."""
+        status = None
+        backend_job_id = self.get_backend_job_id(job_pod)
+        if job_pod.status.phase == 'Succeeded':
+            logging.info('Kubernetes_job_id: {} succeeded.'.format(
+                         backend_job_id))
+            status = 'succeeded'
+        elif job_pod.status.phase == 'Failed':
+            logging.info('Kubernetes job id: {} failed.'.format(
+                backend_job_id))
+            status = 'failed'
+        elif job_pod.status.phase == 'Pending':
+            container_statuses = (
+                job_pod.status.container_statuses +
+                (job_pod.status.init_container_statuses or [])
+            )
+            try:
+                for container in container_statuses:
+                    reason = container.state.waiting.reason
+                    if 'ErrImagePull' in reason:
+                        logging.info(
+                            'Container {} in Kubernetes job {} '
+                            'failed to fetch image.'.format(container.name,
+                                                            backend_job_id))
+                        status = 'failed'
+                    elif 'InvalidImageName' in reason:
+                        logging.info(
+                            'Container {} in Kubernetes job {} '
+                            'failed due to invalid image name.'.format(
+                                container.name,
+                                backend_job_id))
+                        status = 'failed'
+            except (AttributeError, TypeError):
+                pass
+
+        return status
+
+    def get_job_logs(self, job_pod):
         """Get job pod's containers' logs."""
         try:
             pod_logs = ''
-            pod = current_k8s_corev1_api_client.read_namespaced_pod(
-                namespace='default',
-                name=job_id)
-            container_statuses = (pod.status.container_statuses +
-                                  pod.status.init_container_statuses)
+            # job_pod = current_k8s_corev1_api_client.read_namespaced_pod(
+            #     namespace='default',
+            #     name=job_pod.metadata.name)
+            # we probably don't need this call again... FIXME
+            container_statuses = (
+                job_pod.status.container_statuses +
+                (job_pod.status.init_container_statuses or [])
+            )
+
+            logging.info('Grabbing pod {} logs ...'.format(
+                job_pod.metadata.name))
             for container in container_statuses:
                 if container.state.terminated:
                     container_log = \
                         current_k8s_corev1_api_client.read_namespaced_pod_log(
                             namespace='default',
-                            name=job_id,
+                            name=job_pod.metadata.name,
                             container=container.name)
-                    pod_logs += '{}:\nMessage: {}\nReason: {}\nLogs:\n {}\n'.format(
-                        container.state.terminated.message,
-                        container.state.terminated.reason,
-                        container.name, container_log)
+                    pod_logs += ('{}: :\n {}\n'.format(
+                        container.name, container_log))
+                elif container.state.waiting:
+                    pod_logs += 'Container {} failed, error: {}'.format(
+                        container.name, container.state.waiting.message)
+
             return pod_logs
         except client.rest.ApiException as e:
             logging.error(
@@ -98,74 +255,21 @@ class JobMonitorKubernetes(JobMonitor):
                     namespace='default',
                     label_selector='job-name'
                 ):
-                    logging.info(
-                        'New Job event received: {0}'.format(event['type']))
-                    job = event['object']
-                    # Taking note of the remaining jobs since deletion might
-                    # not happen straight away.
-                    remaining_jobs = dict()
-                    for job_id, job_dict in job_db.items():
-                        if not job_db[job_id]['deleted']:
-                            remaining_jobs[job_dict['backend_job_id']] = job_id
-                    if (not job_db.get(remaining_jobs.get(
-                            job.metadata.labels['job-name'])) or
-                            job.metadata.labels['job-name'] not in
-                            remaining_jobs):
-                        # Ignore jobs not created by this specific instance
-                        # or already deleted jobs.
-                        continue
-                    job_id = remaining_jobs[job.metadata.labels['job-name']]
-                    kubernetes_job_id = job.metadata.labels['job-name']
-                    kubernetes_pod_job_id = job.metadata.name
-                    if job.status.phase == 'Succeeded':
-                        logging.info(
-                            'Job job_id: {}, kubernetes_job_id: {}'
-                            ' succeeded.'.format(job_id, kubernetes_job_id)
-                        )
-                        job_db[job_id]['status'] = 'succeeded'
-                    elif job.status.phase == 'Failed':
-                        logging.info(
-                            'Job job_id: {}, kubernetes_job_id: {} failed.'
-                            .format(job_id, kubernetes_job_id))
-                        job_db[job_id]['status'] = 'failed'
-                    elif job.status.phase == 'Pending':
-                        try:
-                            reason = \
-                                job.status.container_statuses[0].state \
-                                .waiting.reason
-                            if 'ErrImagePull' in reason:
-                                logging.info(
-                                    'Job job_id: {}, kubernetes_job_id: {} '
-                                    'failed to fetch image.'
-                                    .format(job_id, kubernetes_job_id))
-                                job_db[job_id]['status'] = 'failed'
-                            elif 'InvalidImageName' in reason:
-                                logging.info(
-                                    'Job job_id: {}, kubernetes_job_id: {} '
-                                    'invalid image name.'
-                                    .format(job_id, kubernetes_job_id))
-                                job_db[job_id]['status'] = 'failed'
-                            else:
-                                continue
-                        except (AttributeError, TypeError) as e:
-                            continue
-                    else:
-                        continue
-                    # Grab logs when job either succeeds or fails.
-                    logging.info('Getting last spawned pod for kubernetes'
-                                 ' job {}'.format(kubernetes_job_id))
-                    logging.info('Grabbing pod {} logs...'.format(
-                        job_id))
-                    job_db[job_id]['log'] = \
-                        self.get_container_logs(kubernetes_pod_job_id) or \
-                        job.status.container_statuses[0].state \
-                        .waiting.message
-                    store_logs(job_id=job_id, logs=job_db[job_id]['log'])
+                    logging.info('New Pod event received: {0}'.format(
+                        event['type']))
+                    job_pod = event['object']
 
-                    logging.info('Cleaning Kubernetes job {} ...'.format(
-                        kubernetes_job_id))
-                    KubernetesJobManager.stop(kubernetes_job_id)
-                    job_db[job_id]['deleted'] = True
+                    if not self.should_process_job(job_pod):
+                        continue
+
+                    job_status = self.get_job_status(job_pod)
+                    if job_status in ['failed', 'succeeded']:
+                        backend_job_id = self.get_backend_job_id(job_pod)
+                        reana_job_id = self.get_reana_job_id(backend_job_id)
+                        logs = self.get_job_logs(job_pod)
+                        self.store_job_logs(reana_job_id, logs)
+                        self.update_job_status(reana_job_id, job_status)
+                        self.clean_job(backend_job_id)
             except client.rest.ApiException as e:
                 logging.error(
                     "Error while connecting to Kubernetes API: {}".format(e))
@@ -334,8 +438,8 @@ class JobMonitorSlurmCERN(JobMonitor):
                 slurm_jobs = {}
                 for id, job_dict in job_db.items():
                     if (not job_db[id]['deleted'] and
-                       job_db[id]['compute_backend'] == 'slurmcern' and
-                       not job_db[id]['status'] in statuses_to_skip):
+                        job_db[id]['compute_backend'] == 'slurmcern' and
+                            not job_db[id]['status'] in statuses_to_skip):
                         slurm_jobs[job_dict['backend_job_id']] = id
                 if not slurm_jobs.keys():
                     logging.error('No slurm jobs')
