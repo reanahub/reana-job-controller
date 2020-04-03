@@ -33,7 +33,7 @@ install:
   - travis_retry pip install -e .[all]
 
 script:
-  - ./run-tests.sh
+  - ./run-tests.sh --include-docker-tests
 
 after_success:
   - coveralls
