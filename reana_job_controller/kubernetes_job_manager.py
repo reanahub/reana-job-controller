@@ -346,7 +346,7 @@ class KubernetesJobManager(JobManager):
             current_app.config['VOMSPROXY_CERT_CACHE_FILENAME']
         )
 
-        voms_proxy_vo = os.environ.get('VOMSPROXY_VO')
+        voms_proxy_vo = os.environ.get('VONAME')
 
         voms_proxy_container = {
             'image': current_app.config['VOMSPROXY_CONTAINER_IMAGE'],
