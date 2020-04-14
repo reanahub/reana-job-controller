@@ -51,7 +51,7 @@ install_requires = [
     'kubernetes==10.0.1',
     'reana-commons[kubernetes]>=0.6.0,<0.7.0',
     'reana-db>=0.6.0,<0.7.0',
-    'htcondor==8.9.1',
+    'htcondor==8.9.6',
     'retrying>=1.3.3',
     'paramiko[gssapi]>=2.6.0',
 ]
