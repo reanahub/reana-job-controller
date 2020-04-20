@@ -202,8 +202,9 @@ def create_job():  # noqa
         update_workflow_logs(job_request['workflow_uuid'], msg)
         return jsonify({'job': msg}), 500
     with current_app.app_context():
-        job_obj = current_app.config['COMPUTE_BACKENDS'][compute_backend](
-            **job_request)
+        job_manager_cls = \
+          current_app.config['COMPUTE_BACKENDS'][compute_backend]()
+        job_obj = job_manager_cls(**job_request)
     backend_jod_id = job_obj.execute()
     if job_obj:
         job = copy.deepcopy(job_request)
@@ -216,8 +217,8 @@ def create_job():  # noqa
         job['backend_job_id'] = backend_jod_id
         job['compute_backend'] = compute_backend
         JOB_DB[str(job['job_id'])] = job
-        current_app.config['JOB_MONITORS'][compute_backend](
-            app=current_app._get_current_object())
+        job_monitor_cls = current_app.config['JOB_MONITORS'][compute_backend]()
+        job_monitor_cls(app=current_app._get_current_object())
         return jsonify({'job_id': job['job_id']}), 201
     else:
         return jsonify({'job': 'Could not be allocated'}), 500
@@ -368,8 +369,9 @@ def delete_job(job_id):  # noqa
                 'compute_backend',
                 current_app.config['DEFAULT_COMPUTE_BACKEND'])
             backend_job_id = retrieve_backend_job_id(job_id)
-            current_app.config['COMPUTE_BACKENDS'][compute_backend].stop(
-                backend_job_id)
+            job_manager_cls = \
+                current_app.config['COMPUTE_BACKENDS'][compute_backend]()
+            job_manager_cls.stop(backend_job_id)
             return jsonify(), 204
         except ComputingBackendSubmissionError as e:
             return jsonify(

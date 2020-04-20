@@ -12,6 +12,7 @@ from __future__ import absolute_import, print_function
 
 import uuid
 
+import mock
 import pytest
 from kubernetes.client.models.v1_container_state import V1ContainerState
 from kubernetes.client.models.v1_container_state_terminated import \
@@ -126,3 +127,19 @@ def kubernetes_job_pod():
         return job_pod
 
     return create_job_pod
+
+
+@pytest.fixture
+def mocked_job_managers():
+    """Mock and return all Job managers."""
+    kubernetes_job_manager = mock.MagicMock()
+    htcondorcern_job_manager = mock.MagicMock()
+    slurmcern_job_manager = mock.MagicMock()
+    job_managers = {
+        'kubernetes': lambda: kubernetes_job_manager,
+        'htcondorcern': lambda: htcondorcern_job_manager,
+        'slurmcern': lambda: slurmcern_job_manager,
+    }
+    with mock.patch("reana_job_controller.job_monitor."
+                    "COMPUTE_BACKENDS", job_managers):
+        yield job_managers

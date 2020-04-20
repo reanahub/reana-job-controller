@@ -19,11 +19,8 @@ from reana_commons.k8s.api_client import (current_k8s_batchv1_api_client,
 from reana_db.database import Session
 from reana_db.models import Job
 
-from reana_job_controller.htcondorcern_job_manager import \
-    HTCondorJobManagerCERN
+from reana_job_controller.config import COMPUTE_BACKENDS
 from reana_job_controller.job_db import JOB_DB
-from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
-from reana_job_controller.slurmcern_job_manager import SlurmJobManagerCERN
 from reana_job_controller.utils import SSHClient, singleton
 
 
@@ -54,6 +51,7 @@ class JobMonitorKubernetes(JobMonitor):
         super(__class__, self).__init__(
             thread_name='kubernetes_job_monitor'
         )
+        self.job_manager_cls = COMPUTE_BACKENDS['kubernetes']()
 
     def _get_remaining_jobs(self, compute_backend='kubernetes',
                             statuses_to_skip=None):
@@ -156,7 +154,7 @@ class JobMonitorKubernetes(JobMonitor):
         """
         try:
             logging.info('Cleaning Kubernetes job {} ...'.format(job_id))
-            KubernetesJobManager.stop(job_id)
+            self.job_manager_cls.stop(job_id)
             self.job_db[self.get_reana_job_id(job_id)]['deleted'] = True
         except client.rest.ApiException as e:
             logging.error(
@@ -299,6 +297,7 @@ class JobMonitorHTCondorCERN(JobMonitor):
             thread_name='htcondor_job_monitor',
             app=app
         )
+        self.job_manager_cls = COMPUTE_BACKENDS['htcondorcern']()
 
     def format_condor_job_que_query(self, backend_job_ids):
         """Format HTCondor job que query."""
@@ -344,7 +343,7 @@ class JobMonitorHTCondorCERN(JobMonitor):
                             .format(job_dict['backend_job_id'])
                         logging.error(msg)
                         future_job_history = app.htcondor_executor.submit(
-                            HTCondorJobManagerCERN.find_job_in_history,
+                            self.job_manager_cls.find_job_in_history,
                             job_dict['backend_job_id'])
                         condor_job = future_job_history.result()
                         if condor_job:
@@ -360,7 +359,7 @@ class JobMonitorHTCondorCERN(JobMonitor):
                             condor_job.get('ExitStatus'))
                         if exit_code == 0:
                             app.htcondor_executor.submit(
-                                HTCondorJobManagerCERN.spool_output,
+                                self.job_manager_cls.spool_output,
                                 job_dict['backend_job_id'])
                             job_db[job_id]['status'] = 'succeeded'
                         else:
@@ -370,7 +369,7 @@ class JobMonitorHTCondorCERN(JobMonitor):
                                                 condor_job['ClusterId']))
                             job_db[job_id]['status'] = 'failed'
                         job_logs = app.htcondor_executor.submit(
-                            HTCondorJobManagerCERN.get_logs,
+                            self.job_manager_cls.get_logs,
                             job_dict['backend_job_id'],
                             job_db[job_id]['obj'].workflow_workspace)
                         job_db[job_id]['log'] = job_logs.result()
@@ -383,7 +382,7 @@ class JobMonitorHTCondorCERN(JobMonitor):
                           ignore_hold_codes):
                         logging.info(
                             'Job was held, will delete and set as failed')
-                        HTCondorJobManagerCERN.stop(
+                        self.job_manager_cls.stop(
                             condor_job['ClusterId'])
                         job_db[job_id]['deleted'] = True
                 time.sleep(120)
@@ -415,6 +414,7 @@ class JobMonitorSlurmCERN(JobMonitor):
         super(__class__, self).__init__(
             thread_name='slurm_job_monitor'
         )
+        self.job_manager_cls = COMPUTE_BACKENDS['slurmcern']()
 
     def format_slurm_job_query(self, backend_job_ids):
         """Format Slurm job query."""
@@ -428,8 +428,8 @@ class JobMonitorSlurmCERN(JobMonitor):
         :param job_db: Dictionary which contains all running jobs.
         """
         slurm_connection = SSHClient(
-            hostname=SlurmJobManagerCERN.SLURM_HEADNODE_HOSTNAME,
-            port=SlurmJobManagerCERN.SLURM_HEADNODE_PORT,
+            hostname=self.job_manager_cls.SLURM_HEADNODE_HOSTNAME,
+            port=self.job_manager_cls.SLURM_HEADNODE_PORT,
         )
         statuses_to_skip = ['succeeded', 'failed']
         while True:
@@ -452,21 +452,21 @@ class JobMonitorSlurmCERN(JobMonitor):
                     slurm_job_id = item.split('|')[1]
                     job_id = slurm_jobs[slurm_job_id]
                     if slurm_job_status in slurmJobStatus['succeeded']:
-                        SlurmJobManagerCERN.get_outputs()
+                        self.job_manager_cls.get_outputs()
                         job_db[job_id]['status'] = 'succeeded'
                         job_db[job_id]['deleted'] = True
                         job_db[job_id]['log'] = \
-                            SlurmJobManagerCERN.get_logs(
+                            self.job_manager_cls.get_logs(
                                 backend_job_id=job_dict['backend_job_id'],
                                 workspace=job_db[
                                     job_id]['obj'].workflow_workspace)
                         store_logs(logs=job_db[job_id]['log'], job_id=job_id)
                     if slurm_job_status in slurmJobStatus['failed']:
-                        SlurmJobManagerCERN.get_outputs()
+                        self.job_manager_cls.get_outputs()
                         job_db[job_id]['status'] = 'failed'
                         job_db[job_id]['deleted'] = True
                         job_db[job_id]['log'] = \
-                            SlurmJobManagerCERN.get_logs(
+                            self.job_manager_cls.get_logs(
                                 backend_job_id=job_dict['backend_job_id'],
                                 workspace=job_db[
                                     job_id]['obj'].workflow_workspace)
@@ -501,7 +501,8 @@ def query_condor_jobs(app, backend_job_ids):
     ads = ['ClusterId', 'JobStatus', 'ExitCode', 'ExitStatus',
            'HoldReasonCode']
     query = format_condor_job_que_query(backend_job_ids)
-    schedd = HTCondorJobManagerCERN._get_schedd()
+    htcondorcern_job_manager_cls = COMPUTE_BACKENDS['htcondorcern']()
+    schedd = htcondorcern_job_manager_cls._get_schedd()
     logging.info('Querying jobs {}'.format(backend_job_ids))
     condor_jobs = schedd.xquery(requirements=query, projection=ads)
     return condor_jobs

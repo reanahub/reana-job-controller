@@ -17,7 +17,7 @@ from reana_job_controller.job_monitor import (JobMonitorHTCondorCERN,
                                               JobMonitorKubernetes)
 
 
-def test_if_singelton(app):
+def test_if_singelton(app, mocked_job_managers):
     """Test if job monitor classes are singelton."""
     with mock.patch("reana_job_controller.job_monitor.threading"):
         first_k8s_instance = JobMonitorKubernetes(app=app)
@@ -71,7 +71,7 @@ def test_kubernetes_get_job_status(k8s_phase, k8s_container_state,
         assert job_monitor_k8s.get_job_status(job_pod) == expected_reana_status
 
 
-def test_kubernetes_clean_job(app):
+def test_kubernetes_clean_job(app, mocked_job_managers):
     """Test clean jobs in the Kubernetes compute backend."""
     with mock.patch("reana_job_controller.job_monitor."
                     "threading") as threading:
@@ -82,11 +82,10 @@ def test_kubernetes_clean_job(app):
                         'status': 'succeeded',
                         'backend_job_id': str(uuid.uuid4())}
         job_monitor_k8s.job_db = {job_id: job_metadata}
-        with mock.patch("reana_job_controller.job_monitor."
-                        "KubernetesJobManager") as kjm:
-            job_monitor_k8s.clean_job(job_metadata['backend_job_id'])
-            assert kjm.stop.called_once()
-            assert job_monitor_k8s.job_db[job_id]['deleted'] is True
+        job_monitor_k8s.clean_job(job_metadata['backend_job_id'])
+        kubernetes_job_manager = mocked_job_managers['kubernetes']()
+        assert kubernetes_job_manager.stop.called_once()
+        assert job_monitor_k8s.job_db[job_id]['deleted'] is True
 
 
 @pytest.mark.parametrize(
