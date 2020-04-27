@@ -29,34 +29,13 @@ from reana_db.models import Workflow
 
 from reana_job_controller.job_manager import JobManager
 
-def detach(f):
-    """Decorator for creating a forked process"""
-    def fork(*args, **kwargs):
-        r, w = os.pipe()
-        pid = os.fork()
-        if pid: # parent
-            os.close(w)
-            r = os.fdopen(r)
-            fout = r.read()
-            return fout
-        else: # child
-            try:
-                os.close(r)
-                w = os.fdopen(w, 'w')
-                #os.setuid(int(os.environ.get('VC3USERID')))
-                user_id = pwd.getpwnam(os.getenv('USER')).pw_uid
-                os.setuid(user_id)
-                out = f(*args, **kwargs)
-                w.write(str(out))
-                w.close()
-            finally:
-                os._exit(0)
-
-    return fork
 
 @retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
-#@detach
 def submit(schedd, sub):
+    """Submit condor job to local schedd.
+
+    :param schedd: The local
+    """
     try:
         with schedd.transaction() as txn:
             clusterid = sub.queue(txn)
@@ -67,7 +46,8 @@ def submit(schedd, sub):
     return clusterid
 
 def get_input_files(workflow_workspace):
-    """Get files from workflow space
+    """Get files from workflow space.
+
     :param workflow_workspace: Workflow directory
     """
     # First, get list of input files
@@ -80,18 +60,20 @@ def get_input_files(workflow_workspace):
 
 def get_schedd():
     """Find and return the HTCondor sched.
-    :returns: htcondor schedd object."""
 
-    # Getting remote scheduler
+    :returns: htcondor schedd object.
+    """
     schedd_ad = classad.ClassAd()
     schedd_ad["MyAddress"] = os.environ.get("REANA_JOB_CONTROLLER_VC3_HTCONDOR_ADDR", None) 
     schedd = htcondor.Schedd(schedd_ad)
     return schedd
 
 def get_wrapper(workflow_workspace):
-    """Get wrapper for job. Transfer if it does not exist.
-    :param shared_path: Shared FS directory, e.g.: /var/reana."""
-    
+    """Get bash job wrapper for executing on remote HPC worker node. Transfer if it does not exist.
+
+    :param workflow_workspace: Shared FS directory, e.g.: /var/reana.
+    :type workflow_workspace: str
+    """
     wrapper = os.path.join(workflow_workspace, 'wrapper', 'job_wrapper.sh')
     local_wrapper = '/code/files/job_wrapper.sh'
     if os.path.exists(wrapper) and filecmp.cmp(local_wrapper, wrapper):
@@ -155,14 +137,10 @@ class HTCondorJobManagerVC3(JobManager):
         """Execute / submit a job with HTCondor."""
         sub = htcondor.Submit()
         sub['executable'] = self.wrapper
-        # condor arguments require double quotes to be escaped
-        #sub['arguments'] = 'exec --home .{0}:{0} docker://{1} {2}'.format(self.workflow_workspace,
-        #        self.docker_img, re.sub(r'"', '\\"', self.cmd))
         sub['arguments'] = "{0} {1} {2}".format(self.workflow_workspace,self.docker_img,
                 re.sub(r'"', '\\"', self.cmd))
         sub['Output'] = '/tmp/$(Cluster)-$(Process).out'
         sub['Error'] = '/tmp/$(Cluster)-$(Process).err'
-        #sub['transfer_input_files'] = get_input_files(self.workflow_workspace)
         sub['InitialDir'] = '/tmp'
         sub['+WantIOProxy'] = 'true'
         job_env = 'reana_workflow_dir={0}'.format(self.workflow_workspace)
@@ -176,8 +154,7 @@ class HTCondorJobManagerVC3(JobManager):
 
 
     def add_shared_volume(self, job):
-        """Add shared CephFS volume to a given job.
-        """
+        """Add shared CephFS volume to a given job."""
         pass #Not Implemented yet
 
 
@@ -185,6 +162,7 @@ class HTCondorJobManagerVC3(JobManager):
         """Stop HTCondor job execution.
     
         :param backend_job_id: HTCondor cluster ID of the job to be removed.
+        :type backend_job_id: str
         """
         try:
             schedd.act(

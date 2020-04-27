@@ -276,7 +276,7 @@ class JobMonitorHTCondorVC3(JobMonitor):
         )
 
     def query_condor_jobs(self, backend_job_ids):
-        """Query condor jobs. Return iterable"""
+        """Query condor jobs. Return iterable."""
         logging.debug("Will query jobs: {0}".format(backend_job_ids))
         schedd = self.schedd
         ads = ['ClusterId', 'JobStatus', 'ExitCode']
