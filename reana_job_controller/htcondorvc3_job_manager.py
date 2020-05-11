@@ -20,7 +20,6 @@ import filecmp
 import pwd
 
 from retrying import retry
-from reana_job_controller.variables import (MAX_JOB_RESTARTS, SHARED_VOLUME_PATH_ROOT)
 
 from kubernetes.client.rest import ApiException
 from reana_commons.config import K8S_DEFAULT_NAMESPACE
@@ -30,7 +29,10 @@ from reana_db.models import Workflow
 from reana_job_controller.job_manager import JobManager
 
 
-@retry(stop_max_attempt_number=MAX_JOB_RESTARTS)
+"""Number of retries for a job before considering it as failed."""
+MAX_NUM_RETRIES = 3
+
+@retry(stop_max_attempt_number=MAX_NUM_RETRIES)
 def submit(schedd, sub):
     """Submit condor job to local schedd.
 
@@ -147,7 +149,7 @@ class HTCondorJobManagerVC3(JobManager):
         for key, value in self.env_vars.items():
             job_env += '; {0}={1}'.format(key, value)
         sub['environment'] = job_env
-        sub['on_exit_remove'] = '(ExitBySignal == False) && ((ExitCode == 0) || (ExitCode !=0 && NumJobStarts > {0}))'.format(MAX_JOB_RESTARTS)
+        sub['on_exit_remove'] = '(ExitBySignal == False) && ((ExitCode == 0) || (ExitCode !=0 && NumJobStarts > {0}))'.format(MAX_NUM_RETRIES)
         clusterid = submit(self.schedd, sub)
         logging.warning("Submitting job clusterid: {0}".format(clusterid))
         return str(clusterid)
