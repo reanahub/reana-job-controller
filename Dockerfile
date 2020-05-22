@@ -10,8 +10,6 @@ ENV TERM=xterm
 
 RUN apt-get update && \
     apt-get install -y vim-tiny && \
-    pip install --upgrade pip && \
-    pip install htcondor==8.9.6 retrying
 
 RUN export DEBIAN_FRONTEND=noninteractive ;\
     apt-get -yq install krb5-user \
@@ -80,6 +78,5 @@ EXPOSE 5000
 
 ENV COMPUTE_BACKENDS $COMPUTE_BACKENDS
 ENV FLASK_APP reana_job_controller/app.py
-ENV REANA_LOG_LEVEL DEBUG
 
 CMD ["flask", "run", "-h", "0.0.0.0"]
