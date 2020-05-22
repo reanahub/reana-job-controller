@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2019 CERN.
+# Copyright (C) 2019, 2020 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -77,13 +77,13 @@ def get_wrapper(workflow_workspace):
     :type workflow_workspace: str
     """
     wrapper = os.path.join(workflow_workspace, 'wrapper', 'job_wrapper.sh')
-    local_wrapper = '/code/files/job_wrapper.sh'
+    local_wrapper = '/code/etc/htcondorvc3/job_wrapper.sh'
     if os.path.exists(wrapper) and filecmp.cmp(local_wrapper, wrapper):
         return wrapper
     try:
         if not os.path.isdir(os.path.dirname(wrapper)):
             os.mkdir(os.path.dirname(wrapper))
-        shutil.copy('/code/files/job_wrapper.sh', wrapper)
+        shutil.copy('/code/etc/htcondorvc3/job_wrapper.sh', wrapper)
     except Exception as e:
         logging.debug("Error transfering wrapper : {0}.".format(e))
         logging.debug("user: {0}".format(pwd.getpwuid(os.getuid()).pw_name))

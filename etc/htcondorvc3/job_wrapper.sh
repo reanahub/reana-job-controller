@@ -1,13 +1,15 @@
 #!/bin/bash
 
-# Replicate input files directory structure
+# Job wrapper for htcondorvc3. Setups up directory 
+# structure and discovers which container technology is availble.
+# Then executes the payload from reana.
 # @TODO: This could be executed 
 # in +PreCmd as a separate script.
 
-# Expected arguments from htcondor_job_manager:
-# $1: workflow_workspace
-# $2: DOCKER_IMG
-# $3 -> : cmd 
+# Expected arguments from htcondorvc3_job_manager:
+# $1    : workflow_workspace
+# $2    : DOCKER_IMG
+# $3 +  : cmd 
 
 # Defining inputs
 DOCKER_IMG=$2
