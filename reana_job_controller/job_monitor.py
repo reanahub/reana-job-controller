@@ -23,6 +23,8 @@ from reana_job_controller.htcondorcern_job_manager import \
     HTCondorJobManagerCERN
 from reana_job_controller.job_db import JOB_DB
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
+from reana_job_controller.htcondorvc3_job_manager import \
+    HTCondorJobManagerVC3
 from reana_job_controller.slurmcern_job_manager import SlurmJobManagerCERN
 from reana_job_controller.utils import SSHClient, singleton
 
@@ -260,6 +262,98 @@ class JobMonitorHTCondorCERN(JobMonitor):
                 logging.error("Unexpected error: {}".format(e), exc_info=True)
                 time.sleep(120)
 
+@singleton
+class JobMonitorHTCondorVC3(JobMonitor):
+    """HTCondor jobs monitor VC3."""
+
+    def __init__(self, app):
+        """Initialize HTCondor job monitor thread."""
+        from reana_job_controller.htcondorvc3_job_manager import get_schedd
+        self.schedd = get_schedd()
+        super(__class__, self).__init__(
+            thread_name='htcondorvc3_job_monitor',
+            app=app
+        )
+
+    def query_condor_jobs(self, backend_job_ids):
+        """Query condor jobs. Return iterable."""
+        logging.debug("Will query jobs: {0}".format(backend_job_ids))
+        schedd = self.schedd
+        ads = ['ClusterId', 'JobStatus', 'ExitCode']
+        base_query = 'ClusterId == {} ||'
+        query = ''
+        for job_id in backend_job_ids:
+            query += base_query.format(job_id)
+        query = query[:-2]
+        try:
+            condor_jobs = schedd.history(query, ads)
+            # schedd history is not sorted by ClusterId
+            # as opposed to xquery, so we need to work that around
+            # though we lose the iterator feature and get a list
+            condor_jobs = sorted(condor_jobs, key=lambda x: x['ClusterId'])
+            return condor_jobs
+        except Exception as e:
+            logging.debug(e)
+            return
+
+    def watch_jobs(self, job_db, app):
+        """Watch currently running HTCondor jobs.
+
+        :param job_db: Dictionary which contains all current jobs.
+        """
+        ads = ['ClusterId', 'JobStatus', 'ExitCode']
+        statuses_to_skip = ['succeeded', 'failed']
+        while True:
+            try:
+                logging.info('Starting a new stream request to watch Condor Jobs')
+                backend_job_ids = \
+                    [job_dict['backend_job_id'] for id, job_dict in
+                     job_db.items()
+                     if not job_db[id]['deleted'] and
+                     job_db[id]['compute_backend'] == 'htcondorvc3']
+                future_condor_jobs = app.htcondor_executor.submit(
+                    self.query_condor_jobs,
+                    backend_job_ids)
+                condor_jobs = future_condor_jobs.result()
+                for job_id, job_dict in job_db.items():
+                    if job_db[job_id]['deleted'] or \
+                       job_db[job_id]['compute_backend'] != 'htcondorvc3' or \
+                       job_db[job_id]['status'] in statuses_to_skip:
+                        continue
+                    try:
+                        logging.debug('Looking for job {} in schedd history'\
+                            .format(job_dict['backend_job_id']))
+                        condor_job = \
+                            next(job for job in condor_jobs
+                                 if str(job['ClusterId']) == str(job_dict
+                                 ['backend_job_id']))
+                    except Exception as e:
+                        # Did not match to any job in the history queue yet
+                        msg = 'Job with id {} was not found in schedd history yet.'\
+                            .format(job_dict['backend_job_id'])
+                        logging.debug(msg)
+                        logging.debug(e)
+                        continue
+                    if condor_job['JobStatus'] == condorJobStatus['Completed']:
+                        if condor_job['ExitCode'] == 0:
+                            job_db[job_id]['status'] = 'succeeded'
+                        else:
+                            logging.info(
+                                'Job job_id: {0}, condor_job_id: {1} '
+                                'failed'.format(job_id,
+                                                condor_job['ClusterId']))
+                            job_db[job_id]['status'] = 'failed'
+                        # @todo: Grab/Save logs when job either succeeds or fails.
+                        job_db[job_id]['deleted'] = True
+                    elif condor_job['JobStatus'] == condorJobStatus['Held']:
+                        logging.info('Job Was held, will delette and set as failed')
+                        HTCondorJobManagerVC3.stop(condor_job['ClusterId'])
+                        job_db[job_id]['deleted'] == True
+                time.sleep(120)
+            except Exception as e:
+                logging.error("Unexpected error: {}".format(e), exc_info=True)
+                time.sleep(120)
+                
 
 slurmJobStatus = {
     'failed': ['BOOT_FAIL', 'CANCELLED', 'DEADLINE', 'FAILED', 'NODE_FAIL',

@@ -16,17 +16,20 @@ from reana_job_controller.htcondorcern_job_manager import \
     HTCondorJobManagerCERN
 from reana_job_controller.job_monitor import (JobMonitorHTCondorCERN,
                                               JobMonitorKubernetes,
-                                              JobMonitorSlurmCERN)
+                                              JobMonitorSlurmCERN,
+                                              JobMonitorHTCondorVC3)
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 from reana_job_controller.slurmcern_job_manager import SlurmJobManagerCERN
-
-SHARED_VOLUME_PATH_ROOT = os.getenv('SHARED_VOLUME_PATH_ROOT', '/var/reana')
-"""Root path of the shared volume ."""
+from reana_job_controller.htcondorvc3_job_manager import \
+    HTCondorJobManagerVC3
+from reana_job_controller.variables import (MAX_JOB_RESTARTS,
+                                            SHARED_VOLUME_PATH_ROOT)
 
 COMPUTE_BACKENDS = {
     'kubernetes': KubernetesJobManager,
     'htcondorcern': HTCondorJobManagerCERN,
-    'slurmcern': SlurmJobManagerCERN
+    'slurmcern': SlurmJobManagerCERN,
+    'htcondorvc3' : HTCondorJobManagerVC3
 }
 """Supported job compute backends and corresponding management class."""
 
@@ -34,9 +37,9 @@ JOB_MONITORS = {
     'kubernetes': JobMonitorKubernetes,
     'htcondorcern': JobMonitorHTCondorCERN,
     'slurmcern': JobMonitorSlurmCERN,
+    'htcondorvc3': JobMonitorHTCondorVC3
 }
 """Classes responsible for monitoring specific backend jobs"""
-
 
 DEFAULT_COMPUTE_BACKEND = 'kubernetes'
 """Default job compute backend."""
@@ -68,6 +71,7 @@ This way all jobs will have ``/mydata`` mounted with the content of
 
 SUPPORTED_COMPUTE_BACKENDS = os.getenv('COMPUTE_BACKENDS',
                                        DEFAULT_COMPUTE_BACKEND).split(",")
+
 """List of supported compute backends provided as docker build arg."""
 
 KRB5_CONTAINER_IMAGE = os.getenv('KRB5_CONTAINER_IMAGE',

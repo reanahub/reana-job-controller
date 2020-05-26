@@ -29,7 +29,7 @@ def create_app(JOB_DB=None, config_mapping=None):
     app.config.from_object(config)
     if config_mapping:
         app.config.from_mapping(config_mapping)
-    if 'htcondorcern' in app.config['SUPPORTED_COMPUTE_BACKENDS']:
+    if 'htcondorcern' or 'htcondorvc3' in app.config['SUPPORTED_COMPUTE_BACKENDS']:
         app.htcondor_executor = ThreadPoolExecutor(max_workers=1)
     with app.app_context():
         app.config['OPENAPI_SPEC'] = build_openapi_spec()
