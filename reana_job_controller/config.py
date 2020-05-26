@@ -41,7 +41,7 @@ JOB_MONITORS = {
 }
 """Classes responsible for monitoring specific backend jobs"""
 
-DEFAULT_COMPUTE_BACKEND = 'htcondorvc3'
+DEFAULT_COMPUTE_BACKEND = 'kubernetes'
 """Default job compute backend."""
 
 JOB_HOSTPATH_MOUNTS = []
@@ -69,12 +69,8 @@ This way all jobs will have ``/mydata`` mounted with the content of
 ``/usr/local/share/mydata`` in the host machine.
 """
 
-# How is this set in the environment?
-# It is hardcoded in Dockerfile and there is no code
-# in workflow-controller to override that for the job-controller.
-#SUPPORTED_COMPUTE_BACKENDS = os.getenv('COMPUTE_BACKENDS',
-#                                       DEFAULT_COMPUTE_BACKEND).split(",")
-SUPPORTED_COMPUTE_BACKENDS = DEFAULT_COMPUTE_BACKEND.split(",")
+SUPPORTED_COMPUTE_BACKENDS = os.getenv('COMPUTE_BACKENDS',
+                                       DEFAULT_COMPUTE_BACKEND).split(",")
 
 """List of supported compute backends provided as docker build arg."""
 
