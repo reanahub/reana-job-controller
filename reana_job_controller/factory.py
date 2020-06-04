@@ -11,8 +11,9 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from flask import Flask
+from flask import Flask, current_app
 from reana_commons.config import REANA_LOG_FORMAT, REANA_LOG_LEVEL
+from reana_db.database import Session
 
 from reana_job_controller import config
 from reana_job_controller.spec import build_openapi_spec
@@ -26,6 +27,7 @@ def create_app(JOB_DB=None, config_mapping=None):
     )
     app = Flask(__name__)
     app.secret_key = "mega secret key"
+    app.session = Session
     app.config.from_object(config)
     if config_mapping:
         app.config.from_mapping(config_mapping)
@@ -36,5 +38,11 @@ def create_app(JOB_DB=None, config_mapping=None):
 
     from reana_job_controller.rest import blueprint  # noqa
     app.register_blueprint(blueprint, url_prefix='/')
+
+    @app.teardown_appcontext
+    def shutdown_session(response_or_exc):
+        """Close session on app teardown."""
+        current_app.session.remove()
+        return response_or_exc
 
     return app

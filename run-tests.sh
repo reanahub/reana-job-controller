@@ -27,6 +27,7 @@ Darwin*)
     docker build -t $DOCKER_IMAGE_NAME .
     RUN_TESTS_INSIDE_DOCKER="
     cd $COMPONENT_NAME &&
+    apt update &&
     apt install git -y && # Needed by check-manifest
     pip install --force-reinstall ../reana-commons ../reana-db ../pytest-reana &&
     pip install .[all] && # Install test dependencies
