@@ -14,7 +14,8 @@ import mock
 import pytest
 
 from reana_job_controller.job_monitor import (JobMonitorHTCondorCERN,
-                                              JobMonitorKubernetes)
+                                              JobMonitorKubernetes,
+                                              JobMonitorSlurmCERN)
 
 
 def test_if_singelton(app, mocked_job_managers):
@@ -26,6 +27,14 @@ def test_if_singelton(app, mocked_job_managers):
         first_htc_instance = JobMonitorHTCondorCERN(app=app)
         second_htc_instance = JobMonitorHTCondorCERN(app=app)
         assert first_htc_instance is second_htc_instance
+
+
+def test_initialisation(app):
+    """Test initialisation of HTCondor job monitor."""
+    with mock.patch("reana_job_controller.job_monitor.threading"):
+        JobMonitorHTCondorCERN(app=app)
+        JobMonitorKubernetes(app=app)
+        JobMonitorSlurmCERN(app=app)
 
 
 @pytest.mark.parametrize(

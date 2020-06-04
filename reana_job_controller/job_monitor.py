@@ -48,10 +48,10 @@ class JobMonitorKubernetes(JobMonitor):
 
     def __init__(self, app=None):
         """Initialize Kubernetes job monitor thread."""
+        self.job_manager_cls = COMPUTE_BACKENDS['kubernetes']()
         super(__class__, self).__init__(
             thread_name='kubernetes_job_monitor'
         )
-        self.job_manager_cls = COMPUTE_BACKENDS['kubernetes']()
 
     def _get_remaining_jobs(self, compute_backend='kubernetes',
                             statuses_to_skip=None):
@@ -291,13 +291,13 @@ condorJobStatus = {
 class JobMonitorHTCondorCERN(JobMonitor):
     """HTCondor jobs monitor CERN."""
 
-    def __init__(self, app):
+    def __init__(self, app=None):
         """Initialize HTCondor job monitor thread."""
+        self.job_manager_cls = COMPUTE_BACKENDS['htcondorcern']()
         super(__class__, self).__init__(
             thread_name='htcondor_job_monitor',
             app=app
         )
-        self.job_manager_cls = COMPUTE_BACKENDS['htcondorcern']()
 
     def format_condor_job_que_query(self, backend_job_ids):
         """Format HTCondor job que query."""
@@ -411,10 +411,10 @@ class JobMonitorSlurmCERN(JobMonitor):
 
     def __init__(self, app=None):
         """Initialize Slurm job monitor thread."""
+        self.job_manager_cls = COMPUTE_BACKENDS['slurmcern']()
         super(__class__, self).__init__(
             thread_name='slurm_job_monitor'
         )
-        self.job_manager_cls = COMPUTE_BACKENDS['slurmcern']()
 
     def format_slurm_job_query(self, backend_job_ids):
         """Format Slurm job query."""
