@@ -21,7 +21,7 @@ COMPUTE_BACKENDS = {
         'reana_job_controller.kubernetes_job_manager.KubernetesJobManager'
     ),
     'htcondorcern': lambda: import_string(
-        'reana_job_controller.htcondorcern_job_manager.JobManagerHTCondorCERN'
+        'reana_job_controller.htcondorcern_job_manager.HTCondorJobManagerCERN'
     ),
     'slurmcern': lambda: import_string(
         'reana_job_controller.slurmcern_job_manager.SlurmJobManagerCERN'
