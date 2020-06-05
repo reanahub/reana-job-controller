@@ -21,23 +21,21 @@ from reana_job_controller.spec import build_openapi_spec
 
 def create_app(JOB_DB=None, config_mapping=None):
     """Create REANA-Job-Controller application."""
-    logging.basicConfig(
-        level=REANA_LOG_LEVEL,
-        format=REANA_LOG_FORMAT
-    )
+    logging.basicConfig(level=REANA_LOG_LEVEL, format=REANA_LOG_FORMAT)
     app = Flask(__name__)
     app.secret_key = "mega secret key"
     app.session = Session
     app.config.from_object(config)
     if config_mapping:
         app.config.from_mapping(config_mapping)
-    if 'htcondorcern' in app.config['SUPPORTED_COMPUTE_BACKENDS']:
+    if "htcondorcern" in app.config["SUPPORTED_COMPUTE_BACKENDS"]:
         app.htcondor_executor = ThreadPoolExecutor(max_workers=1)
     with app.app_context():
-        app.config['OPENAPI_SPEC'] = build_openapi_spec()
+        app.config["OPENAPI_SPEC"] = build_openapi_spec()
 
     from reana_job_controller.rest import blueprint  # noqa
-    app.register_blueprint(blueprint, url_prefix='/')
+
+    app.register_blueprint(blueprint, url_prefix="/")
 
     @app.teardown_appcontext
     def shutdown_session(response_or_exc):

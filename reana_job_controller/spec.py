@@ -19,24 +19,19 @@ from reana_job_controller.version import __version__
 def build_openapi_spec():
     """Create OpenAPI definition."""
     spec = APISpec(
-        title='reana-job-controller',
+        title="reana-job-controller",
         version=__version__,
-        info=dict(
-            description='REANA Job Controller API'
-        ),
-        plugins=[
-            'apispec.ext.flask',
-            'apispec.ext.marshmallow',
-        ]
+        info=dict(description="REANA Job Controller API"),
+        plugins=["apispec.ext.flask", "apispec.ext.marshmallow",],
     )
 
     # Add marshmallow models to specification
-    spec.definition('Job', schema=Job)
-    spec.definition('JobRequest', schema=JobRequest)
+    spec.definition("Job", schema=Job)
+    spec.definition("JobRequest", schema=JobRequest)
 
     # Collect OpenAPI docstrings from Flask endpoints
     for key in current_app.view_functions:
-        if key != 'static' and key != 'get_openapi_spec':
+        if key != "static" and key != "get_openapi_spec":
             spec.add_path(view=current_app.view_functions[key])
 
     return spec.to_dict()

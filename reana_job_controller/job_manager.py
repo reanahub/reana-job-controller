@@ -18,12 +18,19 @@ from reana_db.models import Job as JobTable
 from reana_db.models import JobCache, JobStatus, Workflow
 
 
-class JobManager():
+class JobManager:
     """Job management interface."""
 
-    def __init__(self, docker_img='', cmd=[], prettified_cmd='', env_vars={},
-                 workflow_uuid=None, workflow_workspace=None,
-                 job_name=None):
+    def __init__(
+        self,
+        docker_img="",
+        cmd=[],
+        prettified_cmd="",
+        env_vars={},
+        workflow_uuid=None,
+        workflow_workspace=None,
+        job_name=None,
+    ):
         """Instanciates basic job.
 
         :param docker_img: Docker image.
@@ -41,7 +48,7 @@ class JobManager():
         :param job_name: Name of the job.
         :type job_name: str
         """
-        self.docker_img = docker_img or ''
+        self.docker_img = docker_img or ""
         if isinstance(cmd, str):
             self.cmd = shlex.split(cmd)
         else:
@@ -54,12 +61,14 @@ class JobManager():
 
     def execution_hook(fn):
         """Add before execution hooks and DB operations."""
+
         def wrapper(inst, *args, **kwargs):
             inst.before_execution()
             backend_job_id = fn(inst, *args, **kwargs)
             inst.create_job_in_db(backend_job_id)
             inst.cache_job()
             return backend_job_id
+
         return wrapper
 
     def before_execution(self):
@@ -106,22 +115,24 @@ class JobManager():
             workflow_uuid=self.workflow_uuid,
             status=JobStatus.created.name,
             compute_backend=self.compute_backend,
-            cvmfs_mounts=self.cvmfs_mounts or '',
+            cvmfs_mounts=self.cvmfs_mounts or "",
             shared_file_system=self.shared_file_system or False,
             docker_img=self.docker_img,
             cmd=json.dumps(self.cmd),
             env_vars=json.dumps(self.env_vars),
             deleted=False,
             job_name=self.job_name,
-            prettified_cmd=self.prettified_cmd)
+            prettified_cmd=self.prettified_cmd,
+        )
         Session.add(job_db_entry)
         Session.commit()
         self.job_id = str(job_db_entry.id_)
 
     def cache_job(self):
         """Cache a job."""
-        workflow = Session.query(Workflow).filter_by(
-            id_=self.workflow_uuid).one_or_none()
+        workflow = (
+            Session.query(Workflow).filter_by(id_=self.workflow_uuid).one_or_none()
+        )
         access_times = calculate_file_access_time(workflow.workspace_path)
         prepared_job_cache = JobCache()
         prepared_job_cache.job_id = self.job_id
@@ -135,7 +146,7 @@ class JobManager():
 
     def _extend_env_vars(self, env_vars):
         """Extend environment variables with REANA specific ones."""
-        prefix = 'REANA'
-        env_vars[prefix + '_WORKSPACE'] = self.workflow_workspace
-        env_vars[prefix + '_WORKFLOW_UUID'] = str(self.workflow_uuid)
+        prefix = "REANA"
+        env_vars[prefix + "_WORKSPACE"] = self.workflow_workspace
+        env_vars[prefix + "_WORKFLOW_UUID"] = str(self.workflow_uuid)
         return env_vars

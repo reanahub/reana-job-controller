@@ -25,7 +25,7 @@ def openapi():
 
 
 @openapi.command()
-@click.argument('output', type=click.File('w'))
+@click.argument("output", type=click.File("w"))
 @with_appcontext
 def create(output):
     """Generate OpenAPI file."""
@@ -33,5 +33,7 @@ def create(output):
     output.write(json.dumps(spec, indent=2, sort_keys=True))
     if not isinstance(output, io.TextIOWrapper):
         click.echo(
-            click.style('OpenAPI specification written to {}'.format(
-                output.name), fg='green'))
+            click.style(
+                "OpenAPI specification written to {}".format(output.name), fg="green"
+            )
+        )

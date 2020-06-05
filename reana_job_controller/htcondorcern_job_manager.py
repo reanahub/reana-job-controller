@@ -37,11 +37,21 @@ class HTCondorJobManagerCERN(JobManager):
     RETRY_WAIT_TIME = 10000
     """Wait time between retries in miliseconds."""
 
-    def __init__(self, docker_img=None, cmd=None, prettified_cmd=None,
-                 env_vars=None, workflow_uuid=None, workflow_workspace=None,
-                 cvmfs_mounts='false', shared_file_system=False,
-                 job_name=None, kerberos=False, kubernetes_uid=None,
-                 unpacked_img=False):
+    def __init__(
+        self,
+        docker_img=None,
+        cmd=None,
+        prettified_cmd=None,
+        env_vars=None,
+        workflow_uuid=None,
+        workflow_workspace=None,
+        cvmfs_mounts="false",
+        shared_file_system=False,
+        job_name=None,
+        kerberos=False,
+        kubernetes_uid=None,
+        unpacked_img=False,
+    ):
         """Instanciate HTCondor job manager.
 
         :param docker_img: Docker image.
@@ -72,7 +82,8 @@ class HTCondorJobManagerCERN(JobManager):
             env_vars=env_vars,
             workflow_uuid=workflow_uuid,
             workflow_workspace=workflow_workspace,
-            job_name=job_name)
+            job_name=job_name,
+        )
         self.compute_backend = "HTCondor"
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
@@ -85,32 +96,37 @@ class HTCondorJobManagerCERN(JobManager):
         os.chdir(self.workflow_workspace)
         initialize_krb5_token(workflow_uuid=self.workflow_uuid)
         job_ad = classad.ClassAd()
-        job_ad['JobDescription'] = \
-            self.workflow.get_full_workflow_name() + '_' + self.job_name
-        job_ad['JobMaxRetries'] = 3
-        job_ad['LeaveJobInQueue'] = classad.ExprTree(
-            '(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || '
-            '(StageOutFinish == 0))')
-        job_ad['Cmd'] = \
-            './job_wrapper.sh' if not self.unpacked_img \
-            else './job_singularity_wrapper.sh'
+        job_ad["JobDescription"] = (
+            self.workflow.get_full_workflow_name() + "_" + self.job_name
+        )
+        job_ad["JobMaxRetries"] = 3
+        job_ad["LeaveJobInQueue"] = classad.ExprTree(
+            "(JobStatus == 4) && ((StageOutFinish =?= UNDEFINED) || "
+            "(StageOutFinish == 0))"
+        )
+        job_ad["Cmd"] = (
+            "./job_wrapper.sh"
+            if not self.unpacked_img
+            else "./job_singularity_wrapper.sh"
+        )
         if not self.unpacked_img:
-            job_ad['Arguments'] = self._format_arguments()
-            job_ad['DockerImage'] = self.docker_img
-            job_ad['WantDocker'] = True
-        job_ad['Environment'] = self._format_env_vars()
-        job_ad['Out'] = classad.ExprTree(
-            'strcat("reana_job.", ClusterId, ".", ProcId, ".out")')
-        job_ad['Err'] = classad.ExprTree(
-            'strcat("reana_job.", ClusterId, ".", ProcId, ".err")')
-        job_ad['log'] = classad.ExprTree(
-            'strcat("reana_job.", ClusterId, ".err")')
-        job_ad['ShouldTransferFiles'] = 'YES'
-        job_ad['WhenToTransferOutput'] = 'ON_EXIT'
-        job_ad['TransferInput'] = self._get_input_files()
-        job_ad['TransferOutput'] = '.'
-        job_ad['PeriodicRelease'] = classad.ExprTree('(HoldReasonCode == 35)')
-        job_ad['MaxRunTime'] = 3600
+            job_ad["Arguments"] = self._format_arguments()
+            job_ad["DockerImage"] = self.docker_img
+            job_ad["WantDocker"] = True
+        job_ad["Environment"] = self._format_env_vars()
+        job_ad["Out"] = classad.ExprTree(
+            'strcat("reana_job.", ClusterId, ".", ProcId, ".out")'
+        )
+        job_ad["Err"] = classad.ExprTree(
+            'strcat("reana_job.", ClusterId, ".", ProcId, ".err")'
+        )
+        job_ad["log"] = classad.ExprTree('strcat("reana_job.", ClusterId, ".err")')
+        job_ad["ShouldTransferFiles"] = "YES"
+        job_ad["WhenToTransferOutput"] = "ON_EXIT"
+        job_ad["TransferInput"] = self._get_input_files()
+        job_ad["TransferOutput"] = "."
+        job_ad["PeriodicRelease"] = classad.ExprTree("(HoldReasonCode == 35)")
+        job_ad["MaxRunTime"] = 3600
         future = current_app.htcondor_executor.submit(self._submit, job_ad)
         clusterid = future.result()
         return clusterid
@@ -119,8 +135,7 @@ class HTCondorJobManagerCERN(JobManager):
         """Replace absolute with relative path."""
         relative_paths_command = None
         if self.workflow_workspace in cmd:
-            relative_paths_command = \
-                cmd.replace(self.workflow_workspace + '/', '')
+            relative_paths_command = cmd.replace(self.workflow_workspace + "/", "")
         return relative_paths_command
 
     def _format_arguments(self):
@@ -134,37 +149,40 @@ class HTCondorJobManagerCERN(JobManager):
         output - python \"code/helloworld.py\" --inputfile \"data/names.txt\"
                  --outputfile \"results/greetings.txt\" --sleeptime 0
         """
-        if self.workflow.type_ == 'serial':
+        if self.workflow.type_ == "serial":
             base_cmd = " ".join(self.cmd[2].split()[3:])
-        elif self.workflow.type_ == 'cwl':
-            base_cmd = self.cmd[2].replace(self.workflow_workspace,
-                                           '$_CONDOR_JOB_IWD')
-        elif self.workflow.type_ == 'yadage':
-            if 'base64' in ' '.join(self.cmd):
-                base_64_encoded_cmd = self.cmd[2].split('|')[0].split()[1]
-                decoded_cmd = \
-                    base64.b64decode(base_64_encoded_cmd).decode('utf-8')
-                base_cmd = \
-                    self._replace_absolute_paths_with_relative(
-                        decoded_cmd) or decoded_cmd
+        elif self.workflow.type_ == "cwl":
+            base_cmd = self.cmd[2].replace(self.workflow_workspace, "$_CONDOR_JOB_IWD")
+        elif self.workflow.type_ == "yadage":
+            if "base64" in " ".join(self.cmd):
+                base_64_encoded_cmd = self.cmd[2].split("|")[0].split()[1]
+                decoded_cmd = base64.b64decode(base_64_encoded_cmd).decode("utf-8")
+                base_cmd = (
+                    self._replace_absolute_paths_with_relative(decoded_cmd)
+                    or decoded_cmd
+                )
             else:
                 if self.workflow_workspace in self.cmd[2]:
-                    base_cmd = self._replace_absolute_paths_with_relative(
-                        self.cmd[2]) or self.cmd[2]
-        return 'echo {}|base64 -d'.format(
-            base64.b64encode(base_cmd.encode('utf-8')).decode('utf-8'))
+                    base_cmd = (
+                        self._replace_absolute_paths_with_relative(self.cmd[2])
+                        or self.cmd[2]
+                    )
+        return "echo {}|base64 -d".format(
+            base64.b64encode(base_cmd.encode("utf-8")).decode("utf-8")
+        )
 
     def _format_env_vars(self):
         """Return job env vars in job description format."""
-        job_env = ''
+        job_env = ""
         for key, value in self.env_vars.items():
             job_env += " {0}={1}".format(key, value)
         return job_env
 
     def _get_workflow(self):
         """Get workflow from db."""
-        workflow = Session.query(Workflow).filter_by(id_=self.workflow_uuid).\
-            one_or_none()
+        workflow = (
+            Session.query(Workflow).filter_by(id_=self.workflow_uuid).one_or_none()
+        )
         if workflow:
             return workflow
         else:
@@ -174,12 +192,10 @@ class HTCondorJobManagerCERN(JobManager):
         """Get files and dirs from workflow space."""
         input_files = []
         self._copy_wrapper_file()
-        forbidden_files = \
-            ['.job.ad', '.machine.ad', '.chirp.config']
-        skip_extensions = ('.err', '.log', '.out')
+        forbidden_files = [".job.ad", ".machine.ad", ".chirp.config"]
+        skip_extensions = (".err", ".log", ".out")
         for item in os.listdir(self.workflow_workspace):
-            if item not in forbidden_files and \
-               not item.endswith(skip_extensions):
+            if item not in forbidden_files and not item.endswith(skip_extensions):
                 input_files.append(item)
 
         return ",".join(input_files)
@@ -188,26 +204,30 @@ class HTCondorJobManagerCERN(JobManager):
         """Copy job wrapper file to workspace."""
         try:
             if not self.unpacked_img:
-                copyfile('/etc/job_wrapper.sh',
-                         os.path.join(self.workflow_workspace + '/' +
-                                      'job_wrapper.sh'))
+                copyfile(
+                    "/etc/job_wrapper.sh",
+                    os.path.join(self.workflow_workspace + "/" + "job_wrapper.sh"),
+                )
             else:
-                template = '#!/bin/bash \n' \
-                           'singularity exec ' \
-                           '--home $PWD:/srv ' \
-                           '--bind $PWD:/srv ' \
-                           '--bind /cvmfs ' \
-                           '--bind /eos ' \
-                           '{DOCKER_IMG} {CMD}'.format(
-                               DOCKER_IMG=self.docker_img,
-                               CMD=self._format_arguments() + ' | bash'
-                           )
-                f = open('job_singularity_wrapper.sh', 'w')
+                template = (
+                    "#!/bin/bash \n"
+                    "singularity exec "
+                    "--home $PWD:/srv "
+                    "--bind $PWD:/srv "
+                    "--bind /cvmfs "
+                    "--bind /eos "
+                    "{DOCKER_IMG} {CMD}".format(
+                        DOCKER_IMG=self.docker_img,
+                        CMD=self._format_arguments() + " | bash",
+                    )
+                )
+                f = open("job_singularity_wrapper.sh", "w")
                 f.write(template)
                 f.close()
         except Exception as e:
-            logging.error("Failed to copy job wrapper file: {0}".format(e),
-                          exc_info=True)
+            logging.error(
+                "Failed to copy job wrapper file: {0}".format(e), exc_info=True
+            )
             raise e
 
     @retry(stop_max_attempt_number=MAX_NUM_RETRIES, wait_fixed=RETRY_WAIT_TIME)
@@ -215,7 +235,7 @@ class HTCondorJobManagerCERN(JobManager):
         """Execute submission transaction."""
         ads = []
         schedd = HTCondorJobManagerCERN._get_schedd()
-        logging.info('Submiting job - {}'.format(job_ad))
+        logging.info("Submiting job - {}".format(job_ad))
         clusterid = schedd.submit(job_ad, 1, True, ads)
         HTCondorJobManagerCERN._spool_input(ads)
         return clusterid
@@ -223,19 +243,16 @@ class HTCondorJobManagerCERN(JobManager):
     @retry(stop_max_attempt_number=MAX_NUM_RETRIES, wait_fixed=RETRY_WAIT_TIME)
     def _spool_input(ads):
         schedd = HTCondorJobManagerCERN._get_schedd()
-        logging.info('Spooling job inputs - {}'.format(ads))
+        logging.info("Spooling job inputs - {}".format(ads))
         schedd.spool(ads)
 
     @retry(stop_max_attempt_number=MAX_NUM_RETRIES, wait_fixed=RETRY_WAIT_TIME)
     def _get_schedd():
         """Find and return the HTCondor schedd."""
-        schedd = getattr(thread_local, 'MONITOR_THREAD_SCHEDD', None)
+        schedd = getattr(thread_local, "MONITOR_THREAD_SCHEDD", None)
         if schedd is None:
-            setattr(thread_local,
-                    'MONITOR_THREAD_SCHEDD',
-                    htcondor.Schedd())
-        logging.info("Getting schedd: {}".format(
-            thread_local.MONITOR_THREAD_SCHEDD))
+            setattr(thread_local, "MONITOR_THREAD_SCHEDD", htcondor.Schedd())
+        logging.info("Getting schedd: {}".format(thread_local.MONITOR_THREAD_SCHEDD))
         return thread_local.MONITOR_THREAD_SCHEDD
 
     def stop(backend_job_id):
@@ -243,8 +260,8 @@ class HTCondorJobManagerCERN(JobManager):
         try:
             schedd = HTCondorJobManagerCERN._get_schedd()
             schedd.act(
-                htcondor.JobAction.Remove,
-                'ClusterId=={}'.format(backend_job_id))
+                htcondor.JobAction.Remove, "ClusterId=={}".format(backend_job_id)
+            )
         except Exception as e:
             logging.error(e, exc_info=True)
 
@@ -257,30 +274,31 @@ class HTCondorJobManagerCERN(JobManager):
 
     def get_logs(backend_job_id, workspace):
         """Return job logs if log files are present."""
-        stderr_file = \
-            os.path.join(workspace,
-                         'reana_job.' + str(backend_job_id) + '.0.err')
-        stdout_file = \
-            os.path.join(workspace,
-                         'reana_job.' + str(backend_job_id) + '.0.out')
+        stderr_file = os.path.join(
+            workspace, "reana_job." + str(backend_job_id) + ".0.err"
+        )
+        stdout_file = os.path.join(
+            workspace, "reana_job." + str(backend_job_id) + ".0.out"
+        )
         log_files = [stderr_file, stdout_file]
-        job_log = ''
+        job_log = ""
         try:
             for file in log_files:
                 with open(file, "r") as log_file:
                     job_log += log_file.read()
             return job_log
         except Exception as e:
-            msg = 'Job logs of {} were not found. {}'.format(backend_job_id, e)
+            msg = "Job logs of {} were not found. {}".format(backend_job_id, e)
             logging.error(msg, exc_info=True)
             return msg
 
     def find_job_in_history(backend_job_id):
         """Return job if present in condor history."""
         schedd = HTCondorJobManagerCERN._get_schedd()
-        ads = ['ClusterId', 'JobStatus', 'ExitCode', 'RemoveReason']
-        condor_it = schedd.history('ClusterId == {0}'.format(
-            backend_job_id), ads, match=1)
+        ads = ["ClusterId", "JobStatus", "ExitCode", "RemoveReason"]
+        condor_it = schedd.history(
+            "ClusterId == {0}".format(backend_job_id), ads, match=1
+        )
         try:
             condor_job = next(condor_it)
             return condor_job

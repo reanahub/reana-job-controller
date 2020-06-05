@@ -21,7 +21,7 @@ class Job(Schema):
     max_restart_count = fields.Int(required=True)
     restart_count = fields.Int(required=True)
     status = fields.Str(required=True)
-    cvmfs_mounts = fields.String(missing='')
+    cvmfs_mounts = fields.String(missing="")
 
 
 class JobRequest(Schema):
@@ -30,10 +30,10 @@ class JobRequest(Schema):
     job_name = fields.Str(required=True)
     workflow_workspace = fields.Str(required=True)
     workflow_uuid = fields.Str(required=True)
-    cmd = fields.Str(missing='')
-    prettified_cmd = fields.Str(missing='')
+    cmd = fields.Str(missing="")
+    prettified_cmd = fields.Str(missing="")
     docker_img = fields.Str(required=True)
-    cvmfs_mounts = fields.String(missing='')
+    cvmfs_mounts = fields.String(missing="")
     env_vars = fields.Dict(missing={})
     shared_file_system = fields.Bool(missing=True)
     compute_backend = fields.Str(required=False)

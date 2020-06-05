@@ -20,7 +20,7 @@ def test_openapi_spec():
     """Test OpenAPI spec validation."""
 
     current_dir = os.path.abspath(os.path.dirname(__file__))
-    with open(os.path.join(current_dir, '../docs/openapi.json')) as f:
+    with open(os.path.join(current_dir, "../docs/openapi.json")) as f:
         reana_job_controller_spec = json.load(f)
 
-    validate_json(reana_job_controller_spec, 'schemas/v2.0/schema.json')
+    validate_json(reana_job_controller_spec, "schemas/v2.0/schema.json")

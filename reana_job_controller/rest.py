@@ -15,20 +15,25 @@ import logging
 from flask import Blueprint, current_app, jsonify, request
 
 from reana_job_controller.errors import ComputingBackendSubmissionError
-from reana_job_controller.job_db import (JOB_DB, job_exists, job_is_cached,
-                                         retrieve_all_jobs,
-                                         retrieve_backend_job_id, retrieve_job,
-                                         retrieve_job_logs)
+from reana_job_controller.job_db import (
+    JOB_DB,
+    job_exists,
+    job_is_cached,
+    retrieve_all_jobs,
+    retrieve_backend_job_id,
+    retrieve_job,
+    retrieve_job_logs,
+)
 from reana_job_controller.schemas import Job, JobRequest
 from reana_job_controller.utils import update_workflow_logs
 
-blueprint = Blueprint('jobs', __name__)
+blueprint = Blueprint("jobs", __name__)
 
 job_request_schema = JobRequest()
 job_schema = Job()
 
 
-@blueprint.route('/job_cache', methods=['GET'])
+@blueprint.route("/job_cache", methods=["GET"])
 def check_if_cached():
     r"""Check if job is cached.
 
@@ -77,20 +82,26 @@ def check_if_cached():
             Request failed. Internal controller error.
 
     """
-    job_spec = json.loads(request.args['job_spec'])
-    workflow_json = json.loads(request.args['workflow_json'])
-    workflow_workspace = request.args['workflow_workspace']
+    job_spec = json.loads(request.args["job_spec"])
+    workflow_json = json.loads(request.args["workflow_json"])
+    workflow_workspace = request.args["workflow_workspace"]
     result = job_is_cached(job_spec, workflow_json, workflow_workspace)
     if result:
-        return jsonify({"cached": True,
-                        "result_path": result['result_path'],
-                        "job_id": result['job_id']}), 200
+        return (
+            jsonify(
+                {
+                    "cached": True,
+                    "result_path": result["result_path"],
+                    "job_id": result["job_id"],
+                }
+            ),
+            200,
+        )
     else:
-        return jsonify({"cached": False,
-                        "result_path": None}), 200
+        return jsonify({"cached": False, "result_path": None}), 200
 
 
-@blueprint.route('/jobs', methods=['GET'])
+@blueprint.route("/jobs", methods=["GET"])
 def get_jobs():  # noqa
     r"""Get all active jobs.
 
@@ -140,7 +151,7 @@ def get_jobs():  # noqa
     return jsonify({"jobs": retrieve_all_jobs()}), 200
 
 
-@blueprint.route('/jobs', methods=['POST'])
+@blueprint.route("/jobs", methods=["POST"])
 def create_job():  # noqa
     r"""Create a new job.
 
@@ -185,46 +196,46 @@ def create_job():  # noqa
     """
     json_data = request.get_json()
     if not json_data:
-        return jsonify({'message': 'Empty request'}), 400
+        return jsonify({"message": "Empty request"}), 400
 
     # Validate and deserialize input
     job_request, errors = job_request_schema.load(json_data)
     if errors:
         return jsonify(errors), 400
     compute_backend = job_request.get(
-        'compute_backend',
-        current_app.config['DEFAULT_COMPUTE_BACKEND'])
-    job_request.pop('compute_backend', None)
-    if compute_backend not in current_app.config['SUPPORTED_COMPUTE_BACKENDS']:
-        msg = 'Job submission failed. Backend {} is not supported.'.format(
-            compute_backend)
+        "compute_backend", current_app.config["DEFAULT_COMPUTE_BACKEND"]
+    )
+    job_request.pop("compute_backend", None)
+    if compute_backend not in current_app.config["SUPPORTED_COMPUTE_BACKENDS"]:
+        msg = "Job submission failed. Backend {} is not supported.".format(
+            compute_backend
+        )
         logging.error(msg, exc_info=True)
-        update_workflow_logs(job_request['workflow_uuid'], msg)
-        return jsonify({'job': msg}), 500
+        update_workflow_logs(job_request["workflow_uuid"], msg)
+        return jsonify({"job": msg}), 500
     with current_app.app_context():
-        job_manager_cls = \
-          current_app.config['COMPUTE_BACKENDS'][compute_backend]()
+        job_manager_cls = current_app.config["COMPUTE_BACKENDS"][compute_backend]()
         job_obj = job_manager_cls(**job_request)
     backend_jod_id = job_obj.execute()
     if job_obj:
         job = copy.deepcopy(job_request)
-        job['status'] = 'started'
-        job['restart_count'] = 0
-        job['max_restart_count'] = 3
-        job['deleted'] = False
-        job['obj'] = job_obj
-        job['job_id'] = job_obj.job_id
-        job['backend_job_id'] = backend_jod_id
-        job['compute_backend'] = compute_backend
-        JOB_DB[str(job['job_id'])] = job
-        job_monitor_cls = current_app.config['JOB_MONITORS'][compute_backend]()
+        job["status"] = "started"
+        job["restart_count"] = 0
+        job["max_restart_count"] = 3
+        job["deleted"] = False
+        job["obj"] = job_obj
+        job["job_id"] = job_obj.job_id
+        job["backend_job_id"] = backend_jod_id
+        job["compute_backend"] = compute_backend
+        JOB_DB[str(job["job_id"])] = job
+        job_monitor_cls = current_app.config["JOB_MONITORS"][compute_backend]()
         job_monitor_cls(app=current_app._get_current_object())
-        return jsonify({'job_id': job['job_id']}), 201
+        return jsonify({"job_id": job["job_id"]}), 201
     else:
-        return jsonify({'job': 'Could not be allocated'}), 500
+        return jsonify({"job": "Could not be allocated"}), 500
 
 
-@blueprint.route('/jobs/<job_id>', methods=['GET'])
+@blueprint.route("/jobs/<job_id>", methods=["GET"])
 def get_job(job_id):  # noqa
     r"""Get a job.
 
@@ -272,11 +283,10 @@ def get_job(job_id):  # noqa
         jobdict = retrieve_job(job_id)
         return jsonify(jobdict), 200
     else:
-        return jsonify({'message': 'The job {} doesn\'t exist'
-                                   .format(job_id)}), 400
+        return jsonify({"message": "The job {} doesn't exist".format(job_id)}), 400
 
 
-@blueprint.route('/jobs/<job_id>/logs', methods=['GET'])
+@blueprint.route("/jobs/<job_id>/logs", methods=["GET"])
 def get_logs(job_id):  # noqa
     r"""Job logs.
 
@@ -313,11 +323,10 @@ def get_logs(job_id):  # noqa
     if job_exists(job_id):
         return retrieve_job_logs(job_id)
     else:
-        return jsonify({'message': 'The job {} doesn\'t exist'
-                        .format(job_id)}), 404
+        return jsonify({"message": "The job {} doesn't exist".format(job_id)}), 404
 
 
-@blueprint.route('/jobs/<job_id>/', methods=['DELETE'])
+@blueprint.route("/jobs/<job_id>/", methods=["DELETE"])
 def delete_job(job_id):  # noqa
     r"""Delete a given job.
 
@@ -366,23 +375,24 @@ def delete_job(job_id):  # noqa
     if job_exists(job_id):
         try:
             compute_backend = request.args.get(
-                'compute_backend',
-                current_app.config['DEFAULT_COMPUTE_BACKEND'])
+                "compute_backend", current_app.config["DEFAULT_COMPUTE_BACKEND"]
+            )
             backend_job_id = retrieve_backend_job_id(job_id)
-            job_manager_cls = \
-                current_app.config['COMPUTE_BACKENDS'][compute_backend]()
+            job_manager_cls = current_app.config["COMPUTE_BACKENDS"][compute_backend]()
             job_manager_cls.stop(backend_job_id)
             return jsonify(), 204
         except ComputingBackendSubmissionError as e:
-            return jsonify(
-                {'message': 'Connection to compute backend failed:\n{}'
-                    .format(e)}), 502
+            return (
+                jsonify(
+                    {"message": "Connection to compute backend failed:\n{}".format(e)}
+                ),
+                502,
+            )
     else:
-        return jsonify({'message': 'The job {} doesn\'t exist'
-                       .format(job_id)}), 404
+        return jsonify({"message": "The job {} doesn't exist".format(job_id)}), 404
 
 
-@blueprint.route('/apispec', methods=['GET'])
+@blueprint.route("/apispec", methods=["GET"])
 def get_openapi_spec():
     """Get OpenAPI Spec."""
-    return jsonify(current_app.config['OPENAPI_SPEC'])
+    return jsonify(current_app.config["OPENAPI_SPEC"])

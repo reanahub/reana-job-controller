@@ -23,15 +23,13 @@ def retrieve_job(job_id):
     """
     job = JOB_DB[job_id]
     return {
-        "cmd": job['cmd']
-        if job.get('cmd') else '',
-        "cvmfs_mounts": job['cvmfs_mounts']
-        if job.get('cvmfs_mounts') else '',
-        "docker_img": job['docker_img'],
-        "job_id": job['job_id'],
-        "max_restart_count": job['max_restart_count'],
-        "restart_count": job['restart_count'],
-        "status": job['status']
+        "cmd": job["cmd"] if job.get("cmd") else "",
+        "cvmfs_mounts": job["cvmfs_mounts"] if job.get("cvmfs_mounts") else "",
+        "docker_img": job["docker_img"],
+        "job_id": job["job_id"],
+        "max_restart_count": job["max_restart_count"],
+        "restart_count": job["restart_count"],
+        "status": job["status"],
     }
 
 
@@ -41,7 +39,7 @@ def retrieve_k8s_job(job_id):
     :param job_id: String which represents the ID of the job.
     :returns: The :class:`kubernetes.client.models.v1_job.V1Job` object.
     """
-    return JOB_DB[job_id]['obj']
+    return JOB_DB[job_id]["obj"]
 
 
 def retrieve_backend_job_id(job_id):
@@ -50,7 +48,7 @@ def retrieve_backend_job_id(job_id):
     :param job_id: String which represents the ID of the job.
     :returns: job_id in a specific compute backend.
     """
-    return JOB_DB[job_id]['backend_job_id']
+    return JOB_DB[job_id]["backend_job_id"]
 
 
 def retrieve_all_jobs():
@@ -61,19 +59,21 @@ def retrieve_all_jobs():
     job_list = []
     for job_id in JOB_DB:
         job = JOB_DB[job_id]
-        job_list.append({
-            job_id: {
-                "cmd": job['cmd']
-                if job.get('cmd') else '',
-                "cvmfs_mounts": job['cvmfs_mounts']
-                if job.get('cvmfs_mounts') else [],
-                "docker_img": job['docker_img'],
-                "job_id": job['job_id'],
-                "max_restart_count": job['max_restart_count'],
-                "restart_count": job['restart_count'],
-                "status": job['status']
+        job_list.append(
+            {
+                job_id: {
+                    "cmd": job["cmd"] if job.get("cmd") else "",
+                    "cvmfs_mounts": job["cvmfs_mounts"]
+                    if job.get("cvmfs_mounts")
+                    else [],
+                    "docker_img": job["docker_img"],
+                    "job_id": job["job_id"],
+                    "max_restart_count": job["max_restart_count"],
+                    "restart_count": job["restart_count"],
+                    "status": job["status"],
+                }
             }
-        })
+        )
     return job_list
 
 
@@ -84,12 +84,13 @@ def job_is_cached(job_spec, workflow_json, workflow_workspace):
     if workspace_hash == -1:
         return None
 
-    cached_job = Session.query(JobCache).filter_by(
-        parameters=input_hash,
-        workspace_hash=workspace_hash).first()
+    cached_job = (
+        Session.query(JobCache)
+        .filter_by(parameters=input_hash, workspace_hash=workspace_hash)
+        .first()
+    )
     if cached_job:
-        return {'result_path': cached_job.result_path,
-                'job_id': cached_job.job_id}
+        return {"result_path": cached_job.result_path, "job_id": cached_job.job_id}
     else:
         return None
 
@@ -109,4 +110,4 @@ def retrieve_job_logs(job_id):
     :param job_id: UUID which identifies the job.
     :returns: Job's logs.
     """
-    return JOB_DB[job_id].get('log')
+    return JOB_DB[job_id].get("log")

@@ -15,5 +15,5 @@ from reana_job_controller.job_db import JOB_DB
 
 app = create_app(JOB_DB)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+if __name__ == "__main__":
+    app.run(host="0.0.0.0")
