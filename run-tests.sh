@@ -11,7 +11,7 @@ DOCKER_IMAGE_NAME=reanahub/$COMPONENT_NAME
 PLATFORM="$(python -c 'import platform; print(platform.system())')"
 
 RUN_TESTS="pydocstyle reana_job_controller &&
-isort -rc -c -df **/*.py &&
+black --check . &&
 check-manifest --ignore '.travis-*' &&
 FLASK_APP=reana_job_controller/app.py flask openapi create openapi.json  &&
 diff -q openapi.json docs/openapi.json &&
