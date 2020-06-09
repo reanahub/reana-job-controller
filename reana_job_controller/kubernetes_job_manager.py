@@ -22,8 +22,8 @@ from reana_commons.config import (
     CVMFS_REPOSITORIES,
     K8S_CERN_EOS_AVAILABLE,
     K8S_CERN_EOS_MOUNT_CONFIGURATION,
-    K8S_DEFAULT_NAMESPACE,
     REANA_COMPONENT_PREFIX,
+    REANA_RUNTIME_KUBERNETES_NAMESPACE,
     WORKFLOW_RUNTIME_USER_GID,
     WORKFLOW_RUNTIME_USER_UID,
 )
@@ -112,7 +112,10 @@ class KubernetesJobManager(JobManager):
         self.job = {
             "kind": "Job",
             "apiVersion": "batch/v1",
-            "metadata": {"name": backend_job_id, "namespace": K8S_DEFAULT_NAMESPACE},
+            "metadata": {
+                "name": backend_job_id,
+                "namespace": REANA_RUNTIME_KUBERNETES_NAMESPACE,
+            },
             "spec": {
                 "backoffLimit": KubernetesJobManager.MAX_NUM_JOB_RESTARTS,
                 "autoSelector": True,
@@ -194,7 +197,7 @@ class KubernetesJobManager(JobManager):
         """Submit job and return its backend id."""
         try:
             api_response = current_k8s_batchv1_api_client.create_namespaced_job(
-                namespace=K8S_DEFAULT_NAMESPACE, body=self.job
+                namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE, body=self.job
             )
             return self.job["metadata"]["name"]
         except ApiException as e:
@@ -214,7 +217,7 @@ class KubernetesJobManager(JobManager):
             propagation_policy = "Background" if asynchronous else "Foreground"
             delete_options = V1DeleteOptions(propagation_policy=propagation_policy)
             current_k8s_batchv1_api_client.delete_namespaced_job(
-                backend_job_id, K8S_DEFAULT_NAMESPACE, body=delete_options
+                backend_job_id, REANA_RUNTIME_KUBERNETES_NAMESPACE, body=delete_options
             )
         except ApiException as e:
             logging.error(

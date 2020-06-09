@@ -11,6 +11,7 @@ Version master (UNRELEASED)
 - Improves error reporting on Docker image related failures.
 - Prefixes user workflows with the configured REANA prefix.
 - Switches CVMFS to be read-only mount.
+- Instantiates jobs in the configured runtime namespace.
 - Enables running tests locally on MacOS.
 - Adds Black formatter support.
 

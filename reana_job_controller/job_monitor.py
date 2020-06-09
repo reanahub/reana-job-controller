@@ -14,6 +14,7 @@ import time
 import traceback
 
 from kubernetes import client, watch
+from reana_commons.config import REANA_RUNTIME_KUBERNETES_NAMESPACE
 from reana_commons.k8s.api_client import (
     current_k8s_batchv1_api_client,
     current_k8s_corev1_api_client,
@@ -202,10 +203,6 @@ class JobMonitorKubernetes(JobMonitor):
         """Get job pod's containers' logs."""
         try:
             pod_logs = ""
-            # job_pod = current_k8s_corev1_api_client.read_namespaced_pod(
-            #     namespace='default',
-            #     name=job_pod.metadata.name)
-            # we probably don't need this call again... FIXME
             container_statuses = job_pod.status.container_statuses + (
                 job_pod.status.init_container_statuses or []
             )
@@ -214,7 +211,7 @@ class JobMonitorKubernetes(JobMonitor):
             for container in container_statuses:
                 if container.state.terminated:
                     container_log = current_k8s_corev1_api_client.read_namespaced_pod_log(
-                        namespace="default",
+                        namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
                         name=job_pod.metadata.name,
                         container=container.name,
                     )
@@ -244,7 +241,7 @@ class JobMonitorKubernetes(JobMonitor):
                 w = watch.Watch()
                 for event in w.stream(
                     current_k8s_corev1_api_client.list_namespaced_pod,
-                    namespace="default",
+                    namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
                     label_selector="job-name",
                 ):
                     logging.info("New Pod event received: {0}".format(event["type"]))
