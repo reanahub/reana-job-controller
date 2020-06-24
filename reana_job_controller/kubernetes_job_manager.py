@@ -23,6 +23,7 @@ from reana_commons.config import (
     K8S_CERN_EOS_AVAILABLE,
     K8S_CERN_EOS_MOUNT_CONFIGURATION,
     REANA_COMPONENT_PREFIX,
+    REANA_JOB_HOSTPATH_MOUNTS,
     REANA_RUNTIME_KUBERNETES_NAMESPACE,
     WORKFLOW_RUNTIME_USER_GID,
     WORKFLOW_RUNTIME_USER_UID,
@@ -256,9 +257,12 @@ class KubernetesJobManager(JobManager):
     def add_hostpath_volumes(self):
         """Add hostPath mounts from configuration to job."""
         volumes_to_mount = []
-        for name, path in current_app.config["JOB_HOSTPATH_MOUNTS"]:
-            volume_mount = {"name": name, "mountPath": path}
-            volume = {"name": name, "hostPath": {"path": path}}
+        for mount in REANA_JOB_HOSTPATH_MOUNTS:
+            volume_mount = {
+                "name": mount["name"],
+                "mountPath": mount.get("mountPath", mount["hostPath"]),
+            }
+            volume = {"name": mount["name"], "hostPath": {"path": mount["hostPath"]}}
             volumes_to_mount.append((volume_mount, volume))
 
         self.add_volumes(volumes_to_mount)
