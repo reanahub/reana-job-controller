@@ -151,10 +151,6 @@ class KubernetesJobManager(JobManager):
         secrets_volume_mount = secrets_store.get_secrets_volume_mount_as_k8s_spec()
         job_spec["containers"][0]["volumeMounts"].append(secrets_volume_mount)
 
-        job_spec["containers"][0]["securityContext"] = client.V1PodSecurityContext(
-            run_as_group=WORKFLOW_RUNTIME_USER_GID, run_as_user=self.kubernetes_uid
-        )
-
         if self.env_vars:
             for var, value in self.env_vars.items():
                 job_spec["containers"][0]["env"].append({"name": var, "value": value})
@@ -183,6 +179,12 @@ class KubernetesJobManager(JobManager):
                     )
                 )
                 job_spec["volumes"].append(volume)
+
+        self.job["spec"]["template"]["spec"][
+            "securityContext"
+        ] = client.V1PodSecurityContext(
+            run_as_group=WORKFLOW_RUNTIME_USER_GID, run_as_user=self.kubernetes_uid
+        )
 
         if self.kerberos:
             self._add_krb5_init_container(secrets_volume_mount)
@@ -311,9 +313,6 @@ class KubernetesJobManager(JobManager):
             "name": current_app.config["KRB5_CONTAINER_NAME"],
             "imagePullPolicy": "IfNotPresent",
             "volumeMounts": [secrets_volume_mount] + volume_mounts,
-            "security_context": client.V1PodSecurityContext(
-                run_as_group=WORKFLOW_RUNTIME_USER_GID, run_as_user=self.kubernetes_uid
-            ),
         }
 
         self.job["spec"]["template"]["spec"]["volumes"].extend(
