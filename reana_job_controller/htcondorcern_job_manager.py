@@ -15,7 +15,6 @@ import threading
 from shutil import copyfile
 
 import classad
-import htcondor
 from flask import current_app
 from reana_db.database import Session
 from reana_db.models import Workflow
@@ -90,11 +89,15 @@ class HTCondorJobManagerCERN(JobManager):
         self.workflow = self._get_workflow()
         self.unpacked_img = unpacked_img
 
+        # We need to import the htcondor package later during runtime after the Kerberos environment is fully initialised.
+        # Without a valid Kerberos ticket, importing will exit with "ERROR: Unauthorized 401 - do you have authentication tokens? Error "/usr/bin/myschedd.sh |"
+        initialize_krb5_token(workflow_uuid=self.workflow_uuid)
+        globals()["htcondor"] = __import__("htcondor")
+
     @JobManager.execution_hook
     def execute(self):
         """Execute / submit a job with HTCondor."""
         os.chdir(self.workflow_workspace)
-        initialize_krb5_token(workflow_uuid=self.workflow_uuid)
         job_ad = classad.ClassAd()
         job_ad["JobDescription"] = (
             self.workflow.get_full_workflow_name() + "_" + self.job_name

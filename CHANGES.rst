@@ -14,6 +14,7 @@ Version master (UNRELEASED)
 - Instantiates jobs in the configured runtime namespace.
 - Enables running tests locally on MacOS.
 - Adds Black formatter support.
+- Amends CERN HTCondor compute backend to use the new myschedd connection library.
 
 Version 0.6.1 (2020-05-25)
 --------------------------
