@@ -11,6 +11,7 @@
 import os
 
 from reana_commons.config import REANA_COMPONENT_PREFIX
+
 from werkzeug.utils import import_string
 
 SHARED_VOLUME_PATH_ROOT = os.getenv("SHARED_VOLUME_PATH_ROOT", "/var/reana")

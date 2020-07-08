@@ -10,6 +10,8 @@
 
 from __future__ import absolute_import, print_function
 
+
+import os
 import uuid
 
 import mock
@@ -60,7 +62,7 @@ def base_app(tmp_shared_volume_path):
         "SECRET_KEY": "SECRET_KEY",
         "TESTING": True,
         "SHARED_VOLUME_PATH": tmp_shared_volume_path,
-        "SQLALCHEMY_DATABASE_URI": "sqlite://",
+        "SQLALCHEMY_DATABASE_URI": os.getenv("REANA_SQLALCHEMY_DATABASE_URI"),
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
         "ORGANIZATIONS": ["default"],
     }
