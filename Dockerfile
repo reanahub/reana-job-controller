@@ -1,16 +1,16 @@
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
 
+# Install base image and its dependencies
 FROM python:3.6-slim
-
-ENV TERM=xterm
 RUN apt-get update && \
     apt-get install -y vim-tiny && \
     pip install --upgrade pip
 
+# Install Kerberos dependencies
 RUN export DEBIAN_FRONTEND=noninteractive ;\
     apt-get -yq install krb5-user \
                         krb5-config \
@@ -19,8 +19,9 @@ RUN export DEBIAN_FRONTEND=noninteractive ;\
                         gcc;
 ADD etc/krb5.conf /etc/krb5.conf
 
-
+# Default compute backend is Kubernetes
 ARG COMPUTE_BACKENDS=kubernetes
+
 # CERN HTCondor part taken from https://gitlab.cern.ch/batch-team/condorsubmit
 RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       export DEBIAN_FRONTEND=noninteractive ;\
@@ -36,17 +37,17 @@ RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       apt-get -y remove gnupg2 wget alien; \
     fi
 
+# CERN Slurm backend requires SSH to headnode
 RUN if echo "$COMPUTE_BACKENDS" | grep -q "slurmcern"; then \
       export DEBIAN_FRONTEND=noninteractive ;\
       apt-get -yq install openssh-client \
                           --no-install-recommends; \
     fi
 
+# Add HTCondor related files
 RUN mkdir -p /etc/myschedd
 ADD etc/myschedd.yaml /etc/myschedd/
-
 ADD etc/10_cernsubmit.config /etc/condor/config.d/
-
 ADD etc/ngbauth-submit /etc/sysconfig/
 ADD etc/ngauth_batch_crypt_pub.pem /etc/
 ADD etc/cerngridca.crt /usr/local/share/ca-certificates/cerngridca.crt
@@ -55,29 +56,32 @@ ADD etc/job_wrapper.sh etc/job_wrapper.sh
 RUN chmod +x /etc/job_wrapper.sh
 RUN update-ca-certificates
 
-COPY CHANGES.rst README.rst setup.py /code/
-COPY reana_job_controller/version.py /code/reana_job_controller/
-WORKDIR /code
-RUN pip install requirements-builder && \
-    requirements-builder -l pypi setup.py | pip install -r /dev/stdin && \
-    pip uninstall -y requirements-builder
+# Install dependencies
+COPY requirements.txt /code/
+RUN pip install -r /code/requirements.txt
 
+# Copy cluster component source code
+WORKDIR /code
 COPY . /code
 
-# Debug off by default
+# Are we debugging?
 ARG DEBUG=0
-RUN if [ "${DEBUG}" -gt 0 ]; then pip install -r requirements-dev.txt; pip install -e .; else pip install .; fi;
+RUN if [ "${DEBUG}" -gt 0 ]; then pip install pip install -e ".[debug]"; else pip install .; fi;
 
-# Building with locally-checked-out shared modules?
+# Are we building with locally-checked-out shared modules?
 RUN if test -e modules/reana-commons; then pip install -e modules/reana-commons[kubernetes] --upgrade; fi
 RUN if test -e modules/reana-db; then pip install -e modules/reana-db --upgrade; fi
 
 # Check if there are broken requirements
 RUN pip check
 
+# Set useful environment variables
+ENV COMPUTE_BACKENDS=$COMPUTE_BACKENDS \
+    FLASK_APP=reana_job_controller/app.py \
+    TERM=xterm
+
+# Expose ports to clients
 EXPOSE 5000
 
-ENV COMPUTE_BACKENDS $COMPUTE_BACKENDS
-ENV FLASK_APP reana_job_controller/app.py
-
+# Run server
 CMD ["flask", "run", "-h", "0.0.0.0"]
