@@ -4,6 +4,7 @@ Changes
 Version master (UNRELEASED)
 ---------------------------
 
+- Uses python3.8
 - Pins all Python dependencies allowing to easily rebuild component images at later times.
 - Adds VOMS proxy support as a new authentication method.
 - Supports running unpacked Docker images from CVMFS on HTCondor jobs.

@@ -17,8 +17,7 @@ cache:
   - pip
 
 python:
-  - "3.6"
-  - "3.7"
+  - "3.8"
 
 services:
   - docker

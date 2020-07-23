@@ -52,7 +52,7 @@ install_requires = [
     "marshmallow>2.13.0,<=2.20.1",
     "reana-commons[kubernetes]>=0.7.0a2,<0.8.0",
     "reana-db>=0.7.0.dev20200410,<0.8.0",
-    "htcondor==8.9.2",
+    "htcondor==8.9.7",
     "retrying>=1.3.3",
     "paramiko[gssapi]>=2.6.0",
 ]
@@ -88,8 +88,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python",
         "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
