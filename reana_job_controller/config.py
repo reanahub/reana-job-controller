@@ -52,7 +52,9 @@ SUPPORTED_COMPUTE_BACKENDS = os.getenv(
 ).split(",")
 """List of supported compute backends provided as docker build arg."""
 
-KRB5_CONTAINER_IMAGE = os.getenv("KRB5_CONTAINER_IMAGE", "reanahub/reana-auth-krb5:1.0")
+KRB5_CONTAINER_IMAGE = os.getenv(
+    "KRB5_CONTAINER_IMAGE", "reanahub/reana-auth-krb5:1.0.0"
+)
 """Default docker image of KRB5 sidecar container."""
 
 KRB5_CONTAINER_NAME = "krb5"
@@ -72,7 +74,7 @@ KRB5_CONFIGMAP_NAME = os.getenv(
 """Kerberos configMap name."""
 
 VOMSPROXY_CONTAINER_IMAGE = os.getenv(
-    "VOMSPROXY_CONTAINER_IMAGE", "reanahub/reana-auth-vomsproxy"
+    "VOMSPROXY_CONTAINER_IMAGE", "reanahub/reana-auth-vomsproxy:1.0.0"
 )
 """Default docker image of VOMSPROXY sidecar container."""
 
