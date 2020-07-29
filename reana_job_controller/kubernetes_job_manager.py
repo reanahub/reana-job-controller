@@ -146,7 +146,6 @@ class KubernetesJobManager(JobManager):
         secret_env_vars = secrets_store.get_env_secrets_as_k8s_spec()
         job_spec = self.job["spec"]["template"]["spec"]
         job_spec["containers"][0]["env"].extend(secret_env_vars)
-
         job_spec["volumes"].append(secrets_store.get_file_secrets_volume_as_k8s_specs())
 
         secrets_volume_mount = secrets_store.get_secrets_volume_mount_as_k8s_spec()

@@ -1,6 +1,6 @@
-======================
- REANA-Job-Controller
-======================
+####################
+REANA-Job-Controller
+####################
 
 .. image:: https://img.shields.io/travis/reanahub/reana-job-controller.svg
    :target: https://travis-ci.org/reanahub/reana-job-controller
@@ -21,26 +21,33 @@
    :target: https://github.com/psf/black
 
 About
------
+=====
 
 REANA-Job-Controller is a component of the `REANA <http://www.reana.io/>`_
 reusable and reproducible research data analysis platform. It takes care of
 executing and managing jobs on compute clouds.
 
 Features
---------
+========
 
 - submit jobs to compute clouds
 - enquire about status of running jobs
 
+Usage
+=====
+
+The detailed information on how to install and use REANA can be found in
+`docs.reana.io <https://docs.reana.io>`_.
+
 Useful links
-------------
+============
 
-- `documentation <https://reana-job-controller.readthedocs.io/>`_
-- `releases <https://github.com/reanahub/reana-job-controller/releases>`_
-- `known issues <https://github.com/reanahub/reana-job-controller/issues>`_
-- `source code <https://github.com/reanahub/reana-job-controller>`_
+- `REANA project home page <http://www.reana.io/>`_
+- `REANA user documentation <https://docs.reana.io>`_
+- `REANA user support forum <https://forum.reana.io>`_
 
-For more information about the REANA reusable analysis platform, please see the
-`REANA project <http://www.reana.io>`_ home page and the general `REANA
-documentation <http://reana.readthedocs.io/>`_ pages.
+- `REANA-Job-Controller releases <https://reana-job-controller.readthedocs.io/en/latest#changes>`_
+- `REANA-Job-Controller docker images <https://hub.docker.com/r/reanahub/reana-job-controller>`_
+- `REANA-Job-Controller developer documentation <https://reana-job-controller.readthedocs.io/>`_
+- `REANA-Job-Controller known issues <https://github.com/reanahub/reana-job-controller/issues>`_
+- `REANA-Job-Controller source code <https://github.com/reanahub/reana-job-controller>`_
