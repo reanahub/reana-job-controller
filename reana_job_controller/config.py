@@ -53,7 +53,7 @@ SUPPORTED_COMPUTE_BACKENDS = os.getenv(
 """List of supported compute backends provided as docker build arg."""
 
 KRB5_CONTAINER_IMAGE = os.getenv(
-    "KRB5_CONTAINER_IMAGE", "reanahub/reana-auth-krb5:1.0.0"
+    "KRB5_CONTAINER_IMAGE", "reanahub/reana-auth-krb5:1.0.1"
 )
 """Default docker image of KRB5 sidecar container."""
 
