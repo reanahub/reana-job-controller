@@ -57,6 +57,12 @@
           "default": {},
           "type": "object"
         },
+        "htcondor_accounting_group": {
+          "type": "string"
+        },
+        "htcondor_max_runtime": {
+          "type": "string"
+        },
         "job_name": {
           "type": "string"
         },
