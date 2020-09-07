@@ -51,7 +51,7 @@ install_requires = [
     "fs>=2.0",
     "marshmallow>2.13.0,<=2.20.1",
     "reana-commons[kubernetes]>=0.7.0a4,<0.8.0",
-    "reana-db>=0.7.0a5,<0.8.0",
+    "reana-db>=0.7.0a6,<0.8.0",
     "htcondor==8.9.7",
     "retrying>=1.3.3",
     "paramiko[gssapi]>=2.6.0",
