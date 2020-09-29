@@ -41,7 +41,7 @@ monotonic==1.5            # via bravado
 msgpack-python==0.5.6     # via bravado
 msgpack==1.0.0            # via bravado-core
 oauthlib==3.1.0           # via requests-oauthlib
-paramiko[gssapi]==2.7.1   # via reana-job-controller (setup.py)
+paramiko[gssapi]==2.7.1   # via -r requirements.in
 psycopg2-binary==2.8.5    # via reana-db
 pyasn1-modules==0.2.8     # via google-auth
 pyasn1==0.4.8             # via paramiko, pyasn1-modules, rsa

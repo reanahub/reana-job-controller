@@ -32,6 +32,7 @@ extras_require = {
         "sphinxcontrib-redoc>=1.5.1",
     ],
     "tests": tests_require,
+    "ssh": ["paramiko[gssapi]>=2.6.0"]
 }
 
 extras_require["all"] = []
@@ -54,7 +55,6 @@ install_requires = [
     "reana-db>=0.7.0a6,<0.8.0",
     "htcondor==8.9.7",
     "retrying>=1.3.3",
-    "paramiko[gssapi]>=2.6.0",
 ]
 
 packages = find_packages()

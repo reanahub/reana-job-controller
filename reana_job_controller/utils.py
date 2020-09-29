@@ -13,7 +13,6 @@ import os
 import subprocess
 import sys
 
-import paramiko
 from reana_db.database import Session
 from reana_db.models import Workflow
 
@@ -72,6 +71,8 @@ def initialize_krb5_token(workflow_uuid):
 class SSHClient:
     """SSH Client."""
 
+    import paramiko
+
     def __init__(self, hostname=None, port=None):
         """Initialize ssh client."""
         self.hostname = hostname
@@ -80,8 +81,8 @@ class SSHClient:
 
     def establish_connection(self):
         """Establish the connection."""
-        self.ssh_client = paramiko.SSHClient()
-        self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.ssh_client = self.paramiko.SSHClient()
+        self.ssh_client.set_missing_host_key_policy(self.paramiko.AutoAddPolicy())
         self.ssh_client.connect(hostname=self.hostname, port=self.port, gss_auth=True)
 
     def exec_command(self, command):

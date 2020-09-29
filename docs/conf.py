@@ -54,6 +54,9 @@ extensions = [
     "sphinxcontrib.redoc",
 ]
 
+# Autodoc mocking to fix ReadTheDocs builds missing system dependencies
+autodoc_mock_imports = ["gssapi", "paramiko[gssapi]"]
+
 redoc = [
     {
         "page": "_static/api",
