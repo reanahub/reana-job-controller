@@ -10,6 +10,7 @@ include LICENSE
 include *.rst
 include *.sh
 include *.txt
+include *.in
 include pytest.ini
 include docs/openapi.json
 include docs/_static/reana-job-manager.xml
