@@ -1,22 +1,24 @@
 Changes
 =======
 
-Version master (UNRELEASED)
----------------------------
+Version 0.7.0 (2020-10-20)
+--------------------------
 
-- Uses python3.8
-- Pins all Python dependencies allowing to easily rebuild component images at later times.
-- Adds VOMS proxy support as a new authentication method.
-- Supports running unpacked Docker images from CVMFS on HTCondor jobs.
-- Supports pulling private images using image pull secrets.
-- Fixes HTCondor job submission retry.
-- Improves error reporting on Docker image related failures.
-- Prefixes user workflows with the configured REANA prefix.
-- Switches CVMFS to be read-only mount.
-- Instantiates jobs in the configured runtime namespace.
-- Enables running tests locally on MacOS.
-- Adds Black formatter support.
-- Amends CERN HTCondor compute backend to use the new myschedd connection library.
+- Adds support for running unpacked Docker images from CVMFS on HTCondor jobs.
+- Adds support for pulling private images using image pull secrets.
+- Adds support for VOMS proxy as a new authentication method.
+- Adds pinning of all Python dependencies allowing to easily rebuild component images at later times.
+- Fixes HTCondor job submission retry technique.
+- Changes error reporting on Docker image related failures.
+- Changes runtime pods to prefix user workflows with the configured REANA prefix.
+- Changes CVMFS to be read-only mount.
+- Changes runtime job instantiation into the configured runtime namespace.
+- Changes test suite to enable running tests locally also on macOS platform.
+- Changes CERN HTCondor compute backend to use the new ``myschedd`` connection library.
+- Changes CERN Slurm compute backend to improve job status detection.
+- Changes base image to use Python 3.8.
+- Changes code formatting to respect ``black`` coding style.
+- Changes documentation to single-page layout.
 
 Version 0.6.1 (2020-05-25)
 --------------------------
