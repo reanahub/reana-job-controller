@@ -172,7 +172,7 @@ class JobMonitorKubernetes(JobMonitor):
             logging.info("Kubernetes job id: {} failed.".format(backend_job_id))
             status = "failed"
         elif job_pod.status.phase == "Pending":
-            container_statuses = job_pod.status.container_statuses + (
+            container_statuses = (job_pod.status.container_statuses or []) + (
                 job_pod.status.init_container_statuses or []
             )
             try:
@@ -203,7 +203,7 @@ class JobMonitorKubernetes(JobMonitor):
         """Get job pod's containers' logs."""
         try:
             pod_logs = ""
-            container_statuses = job_pod.status.container_statuses + (
+            container_statuses = (job_pod.status.container_statuses or []) + (
                 job_pod.status.init_container_statuses or []
             )
 
