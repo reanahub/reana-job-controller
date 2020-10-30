@@ -210,12 +210,10 @@ class JobMonitorKubernetes(JobMonitor):
             logging.info("Grabbing pod {} logs ...".format(job_pod.metadata.name))
             for container in container_statuses:
                 if container.state.terminated:
-                    container_log = (
-                        current_k8s_corev1_api_client.read_namespaced_pod_log(
-                            namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
-                            name=job_pod.metadata.name,
-                            container=container.name,
-                        )
+                    container_log = current_k8s_corev1_api_client.read_namespaced_pod_log(
+                        namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
+                        name=job_pod.metadata.name,
+                        container=container.name,
                     )
                     pod_logs += "{}: :\n {}\n".format(container.name, container_log)
                 elif container.state.waiting:

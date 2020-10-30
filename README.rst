@@ -2,14 +2,14 @@
 REANA-Job-Controller
 ####################
 
-.. image:: https://img.shields.io/travis/reanahub/reana-job-controller.svg
-   :target: https://travis-ci.org/reanahub/reana-job-controller
+. image:: https://github.com/reanahub/reana-job-controller/workflows/CI/badge.svg
+   :target: https://github.com/reanahub/reana-job-controller/actions
 
 .. image:: https://readthedocs.org/projects/reana-job-controller/badge/?version=latest
    :target: https://reana-job-controller.readthedocs.io/en/latest/?badge=latest
 
-.. image:: https://img.shields.io/coveralls/reanahub/reana-job-controller.svg
-   :target: https://coveralls.io/r/reanahub/reana-job-controller
+.. image:: https://codecov.io/gh/reanahub/reana-job-controller/branch/master/graph/badge.svg
+   :target: https://codecov.io/gh/reanahub/reana-job-controller
 
 .. image:: https://badges.gitter.im/Join%20Chat.svg
    :target: https://gitter.im/reanahub/reana?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge
