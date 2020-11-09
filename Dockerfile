@@ -24,6 +24,7 @@ ARG COMPUTE_BACKENDS=kubernetes
 
 # CERN HTCondor part taken from https://gitlab.cern.ch/batch-team/condorsubmit
 RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
+      set -e;\
       export DEBIAN_FRONTEND=noninteractive ;\
       apt-get -yq install wget alien gnupg2 ;\
       wget -O ngbauth-submit.rpm http://linuxsoft.cern.ch/internal/repos/batch7-stable/x86_64/os/Packages/ngbauth-submit-0.23-1.el7.noarch.rpm; \
