@@ -19,6 +19,7 @@ from flask import current_app
 from reana_db.database import Session
 from reana_db.models import Workflow
 from retrying import retry
+from reana_commons.config import HTCONDOR_JOB_FLAVOURS
 
 from reana_job_controller.job_manager import JobManager
 from reana_job_controller.utils import initialize_krb5_token
@@ -50,6 +51,8 @@ class HTCondorJobManagerCERN(JobManager):
         kerberos=False,
         kubernetes_uid=None,
         unpacked_img=False,
+        htcondor_max_runtime="",
+        htcondor_accounting_group=None,
     ):
         """Instanciate HTCondor job manager.
 
@@ -73,6 +76,10 @@ class HTCondorJobManagerCERN(JobManager):
         :type job_name: str
         :unpacked_img: if unpacked_img should be used
         :type unpacked_img: bool
+        :param htcondor_max_runtime: Maximum runtime of a HTCondor job.
+        :type htcondor_max_runtime: str
+        :param htcondor_accounting_group: Accounting group of a HTCondor job.
+        :type htcondor_accounting_group: str
         """
         super(HTCondorJobManagerCERN, self).__init__(
             docker_img=docker_img,
@@ -88,6 +95,8 @@ class HTCondorJobManagerCERN(JobManager):
         self.shared_file_system = shared_file_system
         self.workflow = self._get_workflow()
         self.unpacked_img = unpacked_img
+        self.htcondor_max_runtime = htcondor_max_runtime
+        self.htcondor_accounting_group = htcondor_accounting_group
 
         # We need to import the htcondor package later during runtime after the Kerberos environment is fully initialised.
         # Without a valid Kerberos ticket, importing will exit with "ERROR: Unauthorized 401 - do you have authentication tokens? Error "/usr/bin/myschedd.sh |"
@@ -129,7 +138,14 @@ class HTCondorJobManagerCERN(JobManager):
         job_ad["TransferInput"] = self._get_input_files()
         job_ad["TransferOutput"] = "."
         job_ad["PeriodicRelease"] = classad.ExprTree("(HoldReasonCode == 35)")
-        job_ad["MaxRunTime"] = 3600
+        if self.htcondor_max_runtime in HTCONDOR_JOB_FLAVOURS.keys():
+            job_ad["JobFlavour"] = self.htcondor_max_runtime
+        elif str.isdigit(self.htcondor_max_runtime):
+            job_ad["MaxRunTime"] = int(self.htcondor_max_runtime)
+        else:
+            job_ad["MaxRunTime"] = 3600
+        if self.htcondor_accounting_group:
+            job_ad["AccountingGroup"] = self.htcondor_accounting_group
         future = current_app.htcondor_executor.submit(self._submit, job_ad)
         clusterid = future.result()
         return clusterid

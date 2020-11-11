@@ -19,7 +19,7 @@ readme = open("README.rst").read()
 history = open("CHANGES.rst").read()
 
 tests_require = [
-    "pytest-reana>=0.8.0a1,<0.9.0",
+    "pytest-reana>=0.8.0a2,<0.9.0",
 ]
 
 extras_require = {
@@ -32,7 +32,7 @@ extras_require = {
         "sphinxcontrib-redoc>=1.5.1",
     ],
     "tests": tests_require,
-    "ssh": ["paramiko[gssapi]>=2.6.0"]
+    "ssh": ["paramiko[gssapi]>=2.6.0"],
 }
 
 extras_require["all"] = []
@@ -51,8 +51,8 @@ install_requires = [
     "werkzeug>=0.16.1,<0.17",
     "fs>=2.0",
     "marshmallow>2.13.0,<=2.20.1",
-    "reana-commons[kubernetes]>=0.8.0a1,<0.9.0",
-    "reana-db>=0.8.0a1,<0.9.0",
+    "reana-commons[kubernetes]>=0.8.0a8,<0.9.0",
+    "reana-db>=0.8.0a9,<0.9.0",
     "htcondor==8.9.7",
     "retrying>=1.3.3",
 ]

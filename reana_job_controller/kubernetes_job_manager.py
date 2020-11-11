@@ -193,7 +193,9 @@ class KubernetesJobManager(JobManager):
             self._add_voms_proxy_init_container(secrets_volume_mount, secret_env_vars)
 
         if REANA_RUNTIME_KUBERNETES_NODE_LABEL:
-            self.job["spec"]["template"]["spec"]["nodeSelector"] = REANA_RUNTIME_KUBERNETES_NODE_LABEL
+            self.job["spec"]["template"]["spec"][
+                "nodeSelector"
+            ] = REANA_RUNTIME_KUBERNETES_NODE_LABEL
 
         backend_job_id = self._submit()
         return backend_job_id
