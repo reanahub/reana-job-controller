@@ -68,10 +68,14 @@ check_black () {
     black --check .
 }
 
+check_flake8 () {
+    flake8 .
+}
+
 check_openapi_spec () {
     FLASK_APP=reana_job_controller/app.py flask openapi create openapi.json
-    diff -q openapi.json docs/openapi.json 
-    rm openapi.json 
+    diff -q openapi.json docs/openapi.json
+    rm openapi.json
 }
 
 check_manifest () {
@@ -89,6 +93,10 @@ check_pytest () {
     stop_db_container
 }
 
+check_dockerfile () {
+    docker run -i --rm hadolint/hadolint < Dockerfile
+}
+
 check_docker_build () {
     docker build -t $DOCKER_IMAGE_NAME .
 }
@@ -97,6 +105,7 @@ check_all () {
     check_script
     check_pydocstyle
     check_black
+    check_flake8
     check_openapi_spec
     check_manifest
     check_sphinx
@@ -105,22 +114,26 @@ check_all () {
 check_all_darwin () {
     # Tests are run inside the docker container because there is
     # no HTCondor Python package for MacOS
+    check_dockerfile
     check_docker_build
+    clean_old_db_container
     start_db_container
     RUN_TESTS_INSIDE_DOCKER="
     cd $COMPONENT_NAME &&
     apt update && apt-get install libkrb5-dev &&
     apt install git -y &&
-    apt-get install shellcheck && 
+    apt-get install shellcheck &&
     pip install -r requirements.txt &&
     pip install -e .[all] && # Install test dependencies
     pip install black==19.10b0 &&
+    pip install flake8 &&
     pip install pydocstyle &&
     pip install check-manifest &&
     export REANA_SQLALCHEMY_DATABASE_URI=$REANA_SQLALCHEMY_DATABASE_URI &&
     ./run-tests.sh --check-all &&
     python setup.py test"
     docker run -v "$(pwd)"/..:/code -ti $DOCKER_IMAGE_NAME bash -c "eval $RUN_TESTS_INSIDE_DOCKER"
+    stop_db_container
 }
 
 if [ $# -eq 0 ]; then
@@ -129,6 +142,7 @@ if [ $# -eq 0 ]; then
     *)
         check_all
         check_pytest
+        check_dockerfile
         check_docker_build
     ;;
     esac
@@ -141,11 +155,13 @@ do
         --check-shellscript) check_script;;
         --check-pydocstyle) check_pydocstyle;;
         --check-black) check_black;;
+        --check-flake8) check_flake8;;
         --check-openapi-spec) check_openapi_spec;;
         --check-manifest) check_manifest;;
         --check-sphinx) check_sphinx;;
         --check-pytest) check_pytest;;
         --check-all) check_all;;
+        --check-dockerfile) check_dockerfile;;
         --check-docker-build) check_docker_build;;
         *)
     esac

@@ -204,7 +204,7 @@ class KubernetesJobManager(JobManager):
     def _submit(self):
         """Submit job and return its backend id."""
         try:
-            api_response = current_k8s_batchv1_api_client.create_namespaced_job(
+            current_k8s_batchv1_api_client.create_namespaced_job(
                 namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE, body=self.job
             )
             return self.job["metadata"]["name"]

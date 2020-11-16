@@ -85,7 +85,7 @@ def test_kubernetes_get_job_status(
 
 def test_kubernetes_clean_job(app, mocked_job_managers):
     """Test clean jobs in the Kubernetes compute backend."""
-    with mock.patch("reana_job_controller.job_monitor." "threading") as threading:
+    with mock.patch("reana_job_controller.job_monitor." "threading"):
         job_monitor_k8s = JobMonitorKubernetes(app=app)
         job_id = str(uuid.uuid4())
         job_metadata = {
@@ -114,7 +114,7 @@ def test_kubernetes_should_process_job(
     app, compute_backend, deleted, should_process, kubernetes_job_pod
 ):
     """Test should process job."""
-    with mock.patch("reana_job_controller.job_monitor." "threading") as threading:
+    with mock.patch("reana_job_controller.job_monitor." "threading"):
         job_monitor_k8s = JobMonitorKubernetes(app=app)
         job_id = str(uuid.uuid4())
         backend_job_id = str(uuid.uuid4())
