@@ -270,7 +270,9 @@ class HTCondorJobManagerCERN(JobManager):
         """Find and return the HTCondor schedd."""
         schedd = getattr(thread_local, "MONITOR_THREAD_SCHEDD", None)
         if schedd is None:
-            setattr(thread_local, "MONITOR_THREAD_SCHEDD", htcondor.Schedd())
+            setattr(
+                thread_local, "MONITOR_THREAD_SCHEDD", htcondor.Schedd()  # noqa: F821
+            )
         logging.info("Getting schedd: {}".format(thread_local.MONITOR_THREAD_SCHEDD))
         return thread_local.MONITOR_THREAD_SCHEDD
 
@@ -279,7 +281,8 @@ class HTCondorJobManagerCERN(JobManager):
         try:
             schedd = HTCondorJobManagerCERN._get_schedd()
             schedd.act(
-                htcondor.JobAction.Remove, "ClusterId=={}".format(backend_job_id)
+                htcondor.JobAction.Remove,  # noqa: F821
+                "ClusterId=={}".format(backend_job_id),
             )
         except Exception as e:
             logging.error(e, exc_info=True)

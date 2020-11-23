@@ -2,7 +2,7 @@
 REANA-Job-Controller
 ####################
 
-. image:: https://github.com/reanahub/reana-job-controller/workflows/CI/badge.svg
+.. image:: https://github.com/reanahub/reana-job-controller/workflows/CI/badge.svg
    :target: https://github.com/reanahub/reana-job-controller/actions
 
 .. image:: https://readthedocs.org/projects/reana-job-controller/badge/?version=latest
