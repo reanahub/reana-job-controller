@@ -74,7 +74,7 @@ check_flake8 () {
 
 check_openapi_spec () {
     FLASK_APP=reana_job_controller/app.py flask openapi create openapi.json
-    diff -q openapi.json docs/openapi.json
+    diff -q -w openapi.json docs/openapi.json
     rm openapi.json
 }
 
