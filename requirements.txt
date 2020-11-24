@@ -4,26 +4,26 @@
 #
 #    pip-compile --output-file=requirements.txt requirements.in setup.py
 #
-alembic==1.4.2            # via reana-db
+alembic==1.4.3            # via reana-db
 amqp==2.6.1               # via kombu
 apispec==0.39.0           # via reana-job-controller (setup.py)
 appdirs==1.4.4            # via fs
-attrs==19.3.0             # via jsonschema
-bcrypt==3.1.7             # via paramiko
+attrs==20.3.0             # via jsonschema
+bcrypt==3.2.0             # via paramiko
 bravado-core==5.17.0      # via bravado
 bravado==10.3.2           # via reana-commons
 cachetools==4.1.1         # via google-auth
-certifi==2020.6.20        # via kubernetes, requests
-cffi==1.14.1              # via bcrypt, cryptography, pynacl
+certifi==2020.11.8        # via kubernetes, requests
+cffi==1.14.3              # via bcrypt, cryptography, pynacl
 chardet==3.0.4            # via requests
 checksumdir==1.1.9        # via reana-commons
 click==7.1.2              # via flask, reana-commons
-cryptography==3.0         # via paramiko, reana-db
+cryptography==3.2.1       # via paramiko, reana-db
 decorator==4.4.2          # via gssapi
 flask==1.1.2              # via reana-job-controller (setup.py)
 fs==2.4.11                # via reana-commons, reana-job-controller (setup.py)
-google-auth==1.20.1       # via kubernetes
-gssapi==1.6.9             # via paramiko
+google-auth==1.23.0       # via kubernetes
+gssapi==1.6.11            # via paramiko
 htcondor==8.9.7           # via reana-job-controller (setup.py)
 idna==2.10                # via jsonschema, requests
 itsdangerous==1.1.0       # via flask
@@ -42,31 +42,31 @@ msgpack-python==0.5.6     # via bravado
 msgpack==1.0.0            # via bravado-core
 oauthlib==3.1.0           # via requests-oauthlib
 paramiko[gssapi]==2.7.1   # via -r requirements.in
-psycopg2-binary==2.8.5    # via reana-db
+psycopg2-binary==2.8.6    # via reana-db
 pyasn1-modules==0.2.8     # via google-auth
 pyasn1==0.4.8             # via paramiko, pyasn1-modules, rsa
 pycparser==2.20           # via cffi
 pynacl==1.4.0             # via paramiko
-pyrsistent==0.16.0        # via jsonschema
+pyrsistent==0.17.3        # via jsonschema
 python-dateutil==2.8.1    # via alembic, bravado, bravado-core, kubernetes
 python-editor==1.0.4      # via alembic
-pytz==2020.1              # via bravado-core, fs
+pytz==2020.4              # via bravado-core, fs
 pyyaml==5.3.1             # via apispec, bravado, bravado-core, kubernetes, reana-commons, swagger-spec-validator
-reana-commons[kubernetes]==0.8.0a9	# via reana-db, reana-job-controller (setup.py)
-reana-db==0.8.0a11	# via reana-job-controller (setup.py)
+reana-commons[kubernetes]==0.8.0a9  # via reana-db, reana-job-controller (setup.py)
+reana-db==0.8.0a11        # via reana-job-controller (setup.py)
 requests-oauthlib==1.3.0  # via kubernetes
-requests==2.24.0          # via bravado, kubernetes, requests-oauthlib
+requests==2.25.0          # via bravado, kubernetes, requests-oauthlib
 retrying==1.3.3           # via reana-job-controller (setup.py)
 rfc3987==1.3.8            # via jsonschema
 rsa==4.6                  # via google-auth
 simplejson==3.17.2        # via bravado, bravado-core
-six==1.15.0               # via bcrypt, bravado, bravado-core, cryptography, fs, google-auth, gssapi, jsonschema, kubernetes, mock, pynacl, pyrsistent, python-dateutil, retrying, sqlalchemy-utils, swagger-spec-validator, websocket-client
+six==1.15.0               # via bcrypt, bravado, bravado-core, cryptography, fs, google-auth, jsonschema, kubernetes, mock, pynacl, python-dateutil, retrying, sqlalchemy-utils, swagger-spec-validator, websocket-client
 sqlalchemy-utils==0.36.8  # via reana-db
-sqlalchemy==1.3.18        # via alembic, reana-db, sqlalchemy-utils
+sqlalchemy==1.3.20        # via alembic, reana-db, sqlalchemy-utils
 strict-rfc3339==0.7       # via jsonschema
 swagger-spec-validator==2.7.3  # via bravado-core
-typing-extensions==3.7.4.2  # via bravado
-urllib3==1.25.10          # via kubernetes, requests
+typing-extensions==3.7.4.3  # via bravado
+urllib3==1.26.2           # via kubernetes, requests
 vine==1.3.0               # via amqp
 webcolors==1.11.1         # via jsonschema
 websocket-client==0.57.0  # via kubernetes
