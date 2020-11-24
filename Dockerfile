@@ -6,7 +6,7 @@
 
 # Install base image and its dependencies
 FROM python:3.8-slim
-# hadolint ignore=DL3008, DL3009, DL3013
+# hadolint ignore=DL3008,DL3009,DL3013
 RUN apt-get update && \
     apt-get install -y --no-install-recommends vim-tiny && \
     pip install --upgrade pip
@@ -26,7 +26,7 @@ COPY etc/krb5.conf /etc/krb5.conf
 ARG COMPUTE_BACKENDS=kubernetes
 
 # CERN HTCondor part taken from https://gitlab.cern.ch/batch-team/condorsubmit
-# hadolint ignore=DL3008, DL4006
+# hadolint ignore=DL3008,DL3009,DL4006
 RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       set -e;\
       export DEBIAN_FRONTEND=noninteractive ;\
@@ -39,13 +39,12 @@ RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       echo "deb https://research.cs.wisc.edu/htcondor/debian/8.9/buster buster contrib" >>/etc/apt/sources.list; \
       apt-get update; \
       apt-get install -y --no-install-recommends condor; \
-      apt-get -y remove gnupg2 wget alien && \
-      apt-get clean && \
-      rm -rf /var/lib/apt/lists/*; \
+      apt-get -y remove gnupg2 wget alien; \
+      apt-get clean; \
     fi
 
 # CERN Slurm backend requires SSH to headnode
-# hadolint ignore=DL3008, DL4006
+# hadolint ignore=DL3008,DL4006
 RUN if echo "$COMPUTE_BACKENDS" | grep -q "slurmcern"; then \
       export DEBIAN_FRONTEND=noninteractive ;\
       apt-get -yq install openssh-client \
