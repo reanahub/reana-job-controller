@@ -119,6 +119,7 @@ class KubernetesJobManager(JobManager):
                 "namespace": REANA_RUNTIME_KUBERNETES_NAMESPACE,
             },
             "spec": {
+                "automountServiceAccountToken": False,
                 "backoffLimit": KubernetesJobManager.MAX_NUM_JOB_RESTARTS,
                 "autoSelector": True,
                 "template": {
