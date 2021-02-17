@@ -20,7 +20,7 @@ from reana_commons.k8s.api_client import (
     current_k8s_corev1_api_client,
 )
 from reana_db.database import Session
-from reana_db.models import Job
+from reana_db.models import Job, JobStatus
 
 from reana_job_controller.config import COMPUTE_BACKENDS
 from reana_job_controller.job_db import JOB_DB
@@ -257,7 +257,8 @@ class JobMonitorKubernetes(JobMonitor):
                         logs = self.get_job_logs(job_pod)
                         self.store_job_logs(reana_job_id, logs)
                         self.update_job_status(reana_job_id, job_status)
-                        self.clean_job(backend_job_id)
+                        if JobStatus.should_cleanup_job(job_status):
+                            self.clean_job(backend_job_id)
             except client.rest.ApiException as e:
                 logging.error("Error while connecting to Kubernetes API: {}".format(e))
             except Exception as e:

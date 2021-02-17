@@ -1,6 +1,12 @@
 Changes
 =======
 
+Version 0.7.3 (UNRELEASED)
+--------------------------
+
+- Adds new configuration to toggle Kubernetes user jobs clean up.
+- Changes job status ``succeeded`` to ``finished`` to use central REANA nomenclature.
+
 Version 0.7.2 (2021-02-03)
 --------------------------
 
