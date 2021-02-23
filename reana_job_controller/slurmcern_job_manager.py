@@ -137,6 +137,7 @@ class SlurmJobManagerCERN(JobManager):
             "#SBATCH --error=reana_job.%j.err \n"
             "#SBATCH --partition {partition} \n"
             "#SBATCH --time 60 \n"
+            "export PATH=$PATH:/usr/sbin \n"
             "srun {command}"
         ).format(
             partition=SlurmJobManagerCERN.SLURM_PARTITION,

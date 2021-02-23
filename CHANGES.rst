@@ -6,6 +6,7 @@ Version 0.7.3 (UNRELEASED)
 
 - Adds new configuration to toggle Kubernetes user jobs clean up.
 - Fixes HTCondor Docker networking and machine version requirement setup.
+- Fixes Slurm job submission providing the correct shell environment to run Singularity.
 - Changes HTCondor myschedd to the latest version.
 - Changes job status ``succeeded`` to ``finished`` to use central REANA nomenclature.
 
