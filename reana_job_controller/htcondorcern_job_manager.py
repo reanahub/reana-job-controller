@@ -108,6 +108,9 @@ class HTCondorJobManagerCERN(JobManager):
         """Execute / submit a job with HTCondor."""
         os.chdir(self.workflow_workspace)
         job_ad = classad.ClassAd()
+        job_ad["Requirements"] = classad.ExprTree(
+            'regexp("8.9.11", TARGET.CondorVersion)'
+        )
         job_ad["JobDescription"] = (
             self.workflow.get_full_workflow_name() + "_" + self.job_name
         )
@@ -125,6 +128,7 @@ class HTCondorJobManagerCERN(JobManager):
             job_ad["Arguments"] = self._format_arguments()
             job_ad["DockerImage"] = self.docker_img
             job_ad["WantDocker"] = True
+            job_ad["DockerNetworkType"] = "host"
         job_ad["Environment"] = self._format_env_vars()
         job_ad["Out"] = classad.ExprTree(
             'strcat("reana_job.", ClusterId, ".", ProcId, ".out")'
