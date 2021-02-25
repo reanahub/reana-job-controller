@@ -8,6 +8,7 @@ Version 0.7.3 (UNRELEASED)
 - Fixes HTCondor Docker networking and machine version requirement setup.
 - Fixes HTCondor logs and workspace files retrieval on job failure.
 - Fixes Slurm job submission providing the correct shell environment to run Singularity.
+- Fixes Slurm job command dump to take into account complex shell constructs.
 - Changes HTCondor myschedd to the latest version.
 - Changes job status ``succeeded`` to ``finished`` to use central REANA nomenclature.
 

@@ -11,6 +11,7 @@
 import base64
 import logging
 import os
+import shlex
 from stat import S_ISDIR
 
 from reana_job_controller.job_manager import JobManager
@@ -111,7 +112,6 @@ class SlurmJobManagerCERN(JobManager):
     @JobManager.execution_hook
     def execute(self):
         """Execute / submit a job with Slurm."""
-        self.cmd = self._encode_cmd(" ".join(self.cmd))
         initialize_krb5_token(workflow_uuid=self.workflow_uuid)
         self.slurm_connection = SSHClient(
             hostname=SlurmJobManagerCERN.SLURM_HEADNODE_HOSTNAME,
@@ -154,7 +154,7 @@ class SlurmJobManagerCERN(JobManager):
 
     def _dump_job_file(self):
         """Dump job file."""
-        job_template = "#!/bin/bash \n{}".format(self.cmd)
+        job_template = "#!/bin/bash \n{}".format(shlex.join(self.cmd))
         self.slurm_connection.exec_command(
             'cd {} && job="{}" && echo "$job" > {} && chmod +x {}'.format(
                 SlurmJobManagerCERN.SLURM_WORKSAPCE_PATH,
@@ -163,11 +163,6 @@ class SlurmJobManagerCERN(JobManager):
                 self.job_file,
             )
         )
-
-    def _encode_cmd(self, cmd):
-        """Encode base64 cmd."""
-        encoded_cmd = base64.b64encode(cmd.encode("utf-8")).decode("utf-8")
-        return "echo {}|base64 -d|bash".format(encoded_cmd)
 
     def _wrap_singularity_cmd(self):
         """Wrap command in singulrity."""
