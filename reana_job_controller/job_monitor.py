@@ -348,10 +348,6 @@ class JobMonitorHTCondorCERN(JobMonitor):
                             "ExitCode", condor_job.get("ExitStatus")
                         )
                         if exit_code == 0:
-                            app.htcondor_executor.submit(
-                                self.job_manager_cls.spool_output,
-                                job_dict["backend_job_id"],
-                            )
                             job_db[job_id]["status"] = "finished"
                         else:
                             logging.info(
@@ -359,6 +355,10 @@ class JobMonitorHTCondorCERN(JobMonitor):
                                 "failed".format(job_id, condor_job["ClusterId"])
                             )
                             job_db[job_id]["status"] = "failed"
+                        app.htcondor_executor.submit(
+                            self.job_manager_cls.spool_output,
+                            job_dict["backend_job_id"],
+                        ).result()
                         job_logs = app.htcondor_executor.submit(
                             self.job_manager_cls.get_logs,
                             job_dict["backend_job_id"],
