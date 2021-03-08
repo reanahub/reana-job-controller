@@ -162,33 +162,27 @@ class HTCondorJobManagerCERN(JobManager):
         return relative_paths_command
 
     def _format_arguments(self):
-        r"""Format HTCondor job execution arguments.
-
-        input  - ['bash', '-c',
-                  'cd /var/reana/users/00000000-0000-0000-0000-000000000000/
-                       workflows/e4691f78-25aa-4f90-9c3d-6873a97bdf16 ;
-                   python "code/helloworld.py" --inputfile "data/names.txt"
-                           --outputfile "results/greetings.txt" --sleeptime 0']
-        output - python \"code/helloworld.py\" --inputfile \"data/names.txt\"
-                 --outputfile \"results/greetings.txt\" --sleeptime 0
-        """
+        """Format HTCondor job execution arguments."""
         if self.workflow.type_ == "serial":
-            base_cmd = " ".join(self.cmd[2].split()[3:])
+            # Take only the user's command, removes the change directory to workflow workspace
+            # added by RWE-Serial since HTCondor implementation does not need it.
+            # E.g. "cd /path/to/workspace ; user-command" -> "user-command"
+            base_cmd = " ".join(self.cmd.split()[3:])
         elif self.workflow.type_ == "cwl":
             base_cmd = self.cmd[2].replace(self.workflow_workspace, "$_CONDOR_JOB_IWD")
         elif self.workflow.type_ == "yadage":
-            if "base64" in " ".join(self.cmd):
-                base_64_encoded_cmd = self.cmd[2].split("|")[0].split()[1]
+            if "base64" in self.cmd:
+                # E.g. echo ZWNobyAxCg==|base64 -d|bash
+                base_64_encoded_cmd = self.cmd.split("|")[0].split()[1]
                 decoded_cmd = base64.b64decode(base_64_encoded_cmd).decode("utf-8")
                 base_cmd = (
                     self._replace_absolute_paths_with_relative(decoded_cmd)
                     or decoded_cmd
                 )
             else:
-                if self.workflow_workspace in self.cmd[2]:
+                if self.workflow_workspace in self.cmd:
                     base_cmd = (
-                        self._replace_absolute_paths_with_relative(self.cmd[2])
-                        or self.cmd[2]
+                        self._replace_absolute_paths_with_relative(self.cmd) or self.cmd
                     )
         return "echo {}|base64 -d".format(
             base64.b64encode(base_cmd.encode("utf-8")).decode("utf-8")

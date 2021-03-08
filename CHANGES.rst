@@ -10,6 +10,7 @@ Version 0.7.3 (UNRELEASED)
 - Fixes Slurm job submission providing the correct shell environment to run Singularity.
 - Changes HTCondor myschedd to the latest version.
 - Changes job status ``succeeded`` to ``finished`` to use central REANA nomenclature.
+- Changes how to deserialise job commands using central REANA-Commons deserialiser function.
 
 Version 0.7.2 (2021-02-03)
 --------------------------

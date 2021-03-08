@@ -15,6 +15,7 @@ import pytest
 from flask import current_app, url_for
 from kubernetes.client.rest import ApiException
 from mock import Mock, patch
+from reana_commons.job_utils import serialise_job_command
 
 
 def test_delete_job(app, mocked_job):
@@ -82,6 +83,7 @@ def test_create_job_unsupported_backend(app, job_spec):
         fake_backend
     )
     job_spec["compute_backend"] = fake_backend
+    job_spec["cmd"] = serialise_job_command("ls")
     with app.test_client() as client:
         res = client.post(
             url_for("jobs.create_job"),

@@ -10,6 +10,7 @@
 """REANA Job Controller models."""
 
 from marshmallow import Schema, fields, pre_load
+from reana_commons.job_utils import deserialise_job_command
 
 
 class Job(Schema):
@@ -30,7 +31,7 @@ class JobRequest(Schema):
     job_name = fields.Str(required=True)
     workflow_workspace = fields.Str(required=True)
     workflow_uuid = fields.Str(required=True)
-    cmd = fields.Str(missing="")
+    cmd = fields.Function(missing="", deserialize=deserialise_job_command)
     prettified_cmd = fields.Str(missing="")
     docker_img = fields.Str(required=True)
     cvmfs_mounts = fields.String(missing="")

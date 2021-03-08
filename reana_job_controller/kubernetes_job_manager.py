@@ -127,7 +127,8 @@ class KubernetesJobManager(JobManager):
                         "containers": [
                             {
                                 "image": self.docker_img,
-                                "command": self.cmd,
+                                "command": ["bash", "-c"],
+                                "args": [self.cmd],
                                 "name": "job",
                                 "env": [],
                                 "volumeMounts": [],
