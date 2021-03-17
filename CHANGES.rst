@@ -1,7 +1,7 @@
 Changes
 =======
 
-Version 0.7.3 (UNRELEASED)
+Version 0.7.3 (2021-03-17)
 --------------------------
 
 - Adds new configuration to toggle Kubernetes user jobs clean up.
