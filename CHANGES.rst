@@ -1,6 +1,11 @@
 Changes
 =======
 
+Version 0.7.4 (UNRELEASED)
+--------------------------
+
+- Fixes Kubernetes job logs to include information about failures caused by external factors such as OOMKilled.
+
 Version 0.7.3 (2021-03-17)
 --------------------------
 

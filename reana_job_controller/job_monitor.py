@@ -216,6 +216,8 @@ class JobMonitorKubernetes(JobMonitor):
                         container=container.name,
                     )
                     pod_logs += "{}: :\n {}\n".format(container.name, container_log)
+                    if hasattr(container.state.terminated, "reason"):
+                        pod_logs += "\n{}\n".format(container.state.terminated.reason)
                 elif container.state.waiting:
                     pod_logs += "Container {} failed, error: {}".format(
                         container.name, container.state.waiting.message
