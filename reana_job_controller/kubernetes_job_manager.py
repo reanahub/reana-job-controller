@@ -35,6 +35,7 @@ from reana_commons.k8s.volumes import get_k8s_cvmfs_volume, get_shared_volume
 from reana_commons.utils import build_unique_component_name
 from retrying import retry
 
+from reana_job_controller.config import REANA_KUBERNETES_JOBS_MEMORY_LIMIT
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
 
@@ -155,6 +156,11 @@ class KubernetesJobManager(JobManager):
         if self.env_vars:
             for var, value in self.env_vars.items():
                 job_spec["containers"][0]["env"].append({"name": var, "value": value})
+
+        if REANA_KUBERNETES_JOBS_MEMORY_LIMIT:
+            job_spec["containers"][0]["resources"] = {
+                "limits": {"memory": REANA_KUBERNETES_JOBS_MEMORY_LIMIT,}
+            }
 
         self.add_hostpath_volumes()
         self.add_shared_volume()
