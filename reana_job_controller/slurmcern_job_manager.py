@@ -182,19 +182,19 @@ class SlurmJobManagerCERN(JobManager):
         )
         return base_singularity_cmd
 
-    def get_outputs():
+    def get_outputs(self):
         """Transfer job outputs to REANA."""
         os.chdir(SlurmJobManagerCERN.REANA_WORKSPACE_PATH)
         slurm_connection = SSHClient()
         sftp = slurm_connection.ssh_client.open_sftp()
-        SlurmJobManagerCERN._download_dir(
+        self._download_dir(
             sftp,
             SlurmJobManagerCERN.SLURM_WORKSPACE_PATH,
             SlurmJobManagerCERN.REANA_WORKSPACE_PATH,
         )
         sftp.close()
 
-    def _download_dir(sftp, remote_dir, local_dir):
+    def _download_dir(self, sftp, remote_dir, local_dir):
         """Download remote directory content."""
         os.path.exists(local_dir) or os.makedirs(local_dir)
         dir_items = sftp.listdir_attr(remote_dir)
@@ -202,11 +202,11 @@ class SlurmJobManagerCERN(JobManager):
             remote_path = os.path.join(remote_dir, item.filename)
             local_path = os.path.join(local_dir, item.filename)
             if S_ISDIR(item.st_mode):
-                SlurmJobManagerCERN._download_dir(sftp, remote_path, local_path)
+                self._download_dir(sftp, remote_path, local_path)
             else:
                 sftp.get(remote_path, local_path)
 
-    def get_logs(backend_job_id, workspace):
+    def get_logs(self, backend_job_id, workspace):
         """Return job logs if log files are present."""
         stderr_file = os.path.join(
             workspace, "reana_job." + str(backend_job_id) + ".err"
