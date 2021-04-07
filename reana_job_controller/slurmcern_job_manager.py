@@ -20,7 +20,7 @@ from reana_job_controller.utils import SSHClient, initialize_krb5_token
 class SlurmJobManagerCERN(JobManager):
     """Slurm job management."""
 
-    SLURM_WORKSAPCE_PATH = ""
+    SLURM_WORKSPACE_PATH = ""
     """Absolute path inside slurm head node used for submission."""
     REANA_WORKSPACE_PATH = ""
     """Absolute REANA workspace path."""
@@ -88,12 +88,12 @@ class SlurmJobManagerCERN(JobManager):
         """Transfer inputs to SLURM submit node."""
         stdout = self.slurm_connection.exec_command("pwd")
         self.slurm_home_path = SlurmJobManagerCERN.SLURM_HOME_PATH or stdout.rstrip()
-        SlurmJobManagerCERN.SLURM_WORKSAPCE_PATH = os.path.join(
+        SlurmJobManagerCERN.SLURM_WORKSPACE_PATH = os.path.join(
             self.slurm_home_path, self.workflow_workspace[1:]
         )
         SlurmJobManagerCERN.REANA_WORKSPACE_PATH = self.workflow_workspace
         self.slurm_connection.exec_command(
-            "mkdir -p {}".format(SlurmJobManagerCERN.SLURM_WORKSAPCE_PATH)
+            "mkdir -p {}".format(SlurmJobManagerCERN.SLURM_WORKSPACE_PATH)
         )
         sftp = self.slurm_connection.ssh_client.open_sftp()
         os.chdir(self.workflow_workspace)
@@ -122,7 +122,7 @@ class SlurmJobManagerCERN(JobManager):
         self._dump_job_submission_file()
         stdout = self.slurm_connection.exec_command(
             "cd {} && sbatch --parsable {}".format(
-                SlurmJobManagerCERN.SLURM_WORKSAPCE_PATH, self.job_description_file
+                SlurmJobManagerCERN.SLURM_WORKSPACE_PATH, self.job_description_file
             )
         )
         backend_job_id = stdout.rstrip()
@@ -146,7 +146,7 @@ class SlurmJobManagerCERN(JobManager):
         )
         self.slurm_connection.exec_command(
             'cd {} && job="{}" && echo "$job"> {}'.format(
-                SlurmJobManagerCERN.SLURM_WORKSAPCE_PATH,
+                SlurmJobManagerCERN.SLURM_WORKSPACE_PATH,
                 job_template,
                 self.job_description_file,
             )
@@ -157,7 +157,7 @@ class SlurmJobManagerCERN(JobManager):
         job_template = "#!/bin/bash \n{}".format(self.cmd)
         self.slurm_connection.exec_command(
             'cd {} && job="{}" && echo "$job" > {} && chmod +x {}'.format(
-                SlurmJobManagerCERN.SLURM_WORKSAPCE_PATH,
+                SlurmJobManagerCERN.SLURM_WORKSPACE_PATH,
                 job_template,
                 self.job_file,
                 self.job_file,
@@ -172,9 +172,9 @@ class SlurmJobManagerCERN(JobManager):
     def _wrap_singularity_cmd(self):
         """Wrap command in singulrity."""
         base_singularity_cmd = (
-            "singularity exec -B {SLURM_WORKSAPCE}:{REANA_WORKSPACE}"
+            "singularity exec -B {SLURM_WORKSPACE}:{REANA_WORKSPACE}"
             " docker://{DOCKER_IMG} {CMD}".format(
-                SLURM_WORKSAPCE=SlurmJobManagerCERN.SLURM_WORKSAPCE_PATH,
+                SLURM_WORKSPACE=SlurmJobManagerCERN.SLURM_WORKSPACE_PATH,
                 REANA_WORKSPACE=SlurmJobManagerCERN.REANA_WORKSPACE_PATH,
                 DOCKER_IMG=self.docker_img,
                 CMD="./" + self.job_file,
@@ -189,7 +189,7 @@ class SlurmJobManagerCERN(JobManager):
         sftp = slurm_connection.ssh_client.open_sftp()
         SlurmJobManagerCERN._download_dir(
             sftp,
-            SlurmJobManagerCERN.SLURM_WORKSAPCE_PATH,
+            SlurmJobManagerCERN.SLURM_WORKSPACE_PATH,
             SlurmJobManagerCERN.REANA_WORKSPACE_PATH,
         )
         sftp.close()
