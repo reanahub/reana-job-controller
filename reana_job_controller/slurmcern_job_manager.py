@@ -54,12 +54,12 @@ class SlurmJobManagerCERN(JobManager):
         :type docker_img: str
         :param cmd: Command to execute.
         :type cmd: list
-        :param prettified_cmd: pretified version of command to execute.
+        :param prettified_cmd: prettified version of command to execute.
         :type prettified_cmd: str
         :param env_vars: Environment variables.
         :type env_vars: dict
-        :param workflow_id: Unique workflow id.
-        :type workflow_id: str
+        :param workflow_uuid: Unique workflow id.
+        :type workflow_uuid: str
         :param workflow_workspace: Workflow workspace path.
         :type workflow_workspace: str
         :param cvmfs_mounts: list of CVMFS mounts as a string.
@@ -170,7 +170,7 @@ class SlurmJobManagerCERN(JobManager):
         return "echo {}|base64 -d|bash".format(encoded_cmd)
 
     def _wrap_singularity_cmd(self):
-        """Wrap command in singulrity."""
+        """Wrap command in singularity."""
         base_singularity_cmd = (
             "singularity exec -B {SLURM_WORKSPACE}:{REANA_WORKSPACE}"
             " docker://{DOCKER_IMG} {CMD}".format(
