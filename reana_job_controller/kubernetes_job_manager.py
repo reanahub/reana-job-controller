@@ -61,6 +61,7 @@ class KubernetesJobManager(JobManager):
         job_name=None,
         kerberos=False,
         kubernetes_uid=None,
+        kubernetes_memory_limit=None,
         unpacked_img=False,
         voms_proxy=False,
     ):
@@ -88,6 +89,8 @@ class KubernetesJobManager(JobManager):
         :type kerberos: bool
         :param kubernetes_uid: User ID for job container.
         :type kubernetes_uid: int
+        :param kubernetes_memory_limit: Memory limit for job container.
+        :type kubernetes_memory_limit: str
         :param voms_proxy: Decides if a voms-proxy certificate should be
             provided for job.
         :type voms_proxy: bool
@@ -107,10 +110,17 @@ class KubernetesJobManager(JobManager):
         self.kerberos = kerberos
         self.voms_proxy = voms_proxy
         self.set_user_id(kubernetes_uid)
+        self.kubernetes_memory_limit = kubernetes_memory_limit
 
     @JobManager.execution_hook
     def execute(self):
         """Execute a job in Kubernetes."""
+
+        def _set_job_memory_limit(job_spec, memory_limit):
+            job_spec["containers"][0]["resources"] = {
+                "limits": {"memory": memory_limit,}
+            }
+
         backend_job_id = build_unique_component_name("run-job")
         self.job = {
             "kind": "Job",
@@ -157,10 +167,10 @@ class KubernetesJobManager(JobManager):
             for var, value in self.env_vars.items():
                 job_spec["containers"][0]["env"].append({"name": var, "value": value})
 
-        if REANA_KUBERNETES_JOBS_MEMORY_LIMIT:
-            job_spec["containers"][0]["resources"] = {
-                "limits": {"memory": REANA_KUBERNETES_JOBS_MEMORY_LIMIT,}
-            }
+        if self.kubernetes_memory_limit:
+            _set_job_memory_limit(job_spec, self.kubernetes_memory_limit)
+        elif REANA_KUBERNETES_JOBS_MEMORY_LIMIT:
+            _set_job_memory_limit(job_spec, REANA_KUBERNETES_JOBS_MEMORY_LIMIT)
 
         self.add_hostpath_volumes()
         self.add_shared_volume()

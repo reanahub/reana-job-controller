@@ -69,6 +69,9 @@
         "kerberos": {
           "type": "boolean"
         },
+        "kubernetes_memory_limit": {
+          "type": "string"
+        },
         "kubernetes_uid": {
           "format": "int32",
           "type": "integer"

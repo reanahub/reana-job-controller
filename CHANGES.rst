@@ -6,6 +6,7 @@ Version 0.7.4 (UNRELEASED)
 
 - Adds configuration environment variable to set job memory limits for the Kubernetes compute backend (``REANA_KUBERNETES_JOBS_MEMORY_LIMIT``).
 - Fixes Kubernetes job log capture to include information about failures caused by external factors such as OOMKilled.
+- Adds support for specifying ``kubernetes_memory_limit`` for Kubernetes compute backend jobs.
 
 Version 0.7.3 (2021-03-17)
 --------------------------
