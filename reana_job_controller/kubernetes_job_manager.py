@@ -25,7 +25,7 @@ from reana_commons.config import (
     REANA_COMPONENT_PREFIX,
     REANA_JOB_HOSTPATH_MOUNTS,
     REANA_RUNTIME_KUBERNETES_NAMESPACE,
-    REANA_RUNTIME_KUBERNETES_NODE_LABEL,
+    REANA_RUNTIME_JOBS_KUBERNETES_NODE_LABEL,
     WORKFLOW_RUNTIME_USER_GID,
     WORKFLOW_RUNTIME_USER_UID,
 )
@@ -193,10 +193,10 @@ class KubernetesJobManager(JobManager):
         if self.voms_proxy:
             self._add_voms_proxy_init_container(secrets_volume_mount, secret_env_vars)
 
-        if REANA_RUNTIME_KUBERNETES_NODE_LABEL:
+        if REANA_RUNTIME_JOBS_KUBERNETES_NODE_LABEL:
             self.job["spec"]["template"]["spec"][
                 "nodeSelector"
-            ] = REANA_RUNTIME_KUBERNETES_NODE_LABEL
+            ] = REANA_RUNTIME_JOBS_KUBERNETES_NODE_LABEL
 
         backend_job_id = self._submit()
         return backend_job_id
