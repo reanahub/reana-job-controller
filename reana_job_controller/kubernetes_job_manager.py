@@ -29,6 +29,8 @@ from reana_commons.config import (
     WORKFLOW_RUNTIME_USER_GID,
     WORKFLOW_RUNTIME_USER_UID,
 )
+from reana_commons.errors import REANAKubernetesWrongMemoryFormat
+from reana_commons.job_utils import validate_kubernetes_memory
 from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
 from reana_commons.k8s.secrets import REANAUserSecretsStore
 from reana_commons.k8s.volumes import get_k8s_cvmfs_volume, get_shared_volume
@@ -110,7 +112,7 @@ class KubernetesJobManager(JobManager):
         self.kerberos = kerberos
         self.voms_proxy = voms_proxy
         self.set_user_id(kubernetes_uid)
-        self.kubernetes_memory_limit = kubernetes_memory_limit
+        self.set_memory_limit(kubernetes_memory_limit)
 
     @JobManager.execution_hook
     def execute(self):
@@ -420,3 +422,15 @@ class KubernetesJobManager(JobManager):
             self.kubernetes_uid = kubernetes_uid
         else:
             self.kubernetes_uid = WORKFLOW_RUNTIME_USER_UID
+
+    def set_memory_limit(self, kubernetes_memory_limit):
+        """Set memory limit for job pods. Validate if provided format is correct."""
+        if kubernetes_memory_limit and not validate_kubernetes_memory(
+            kubernetes_memory_limit
+        ):
+            msg = f"{kubernetes_memory_limit} has wrong format."
+            logging.error(
+                "Error while validating Kubernetes memory limit: {}".format(msg)
+            )
+            raise REANAKubernetesWrongMemoryFormat(msg)
+        self.kubernetes_memory_limit = kubernetes_memory_limit
