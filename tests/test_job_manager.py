@@ -18,7 +18,6 @@ from reana_db.models import Job, JobStatus
 
 from reana_job_controller.job_manager import JobManager
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
-from reana_job_controller.utils import validate_kubernetes_memory
 
 
 def test_execute_kubernetes_job(
@@ -137,27 +136,3 @@ def test_execution_hooks():
     job_manager = TestJobManger("busybox", "ls", {})
     job_manager.execute()
     assert job_manager.order_list == [1, 2, 3, 4]
-
-
-@pytest.mark.parametrize(
-    "memory,output",
-    [
-        ("100K", True),
-        ("8Mi", True),
-        ("7Gi", True),
-        ("3T", True),
-        ("50Pi", True),
-        ("2Ei", True),
-        ("1E", True),
-        ("2KI", False),
-        ("4096KiB", False),
-        ("8Kib", False),
-        ("8Mb", False),
-        ("2GB", False),
-        ("50Tb", False),
-        ("24Exabyte", False),
-    ],
-)
-def test_validate_kubernetes_memory_format(memory, output):
-    """Test validation of K8s memory format."""
-    assert validate_kubernetes_memory(memory) is output

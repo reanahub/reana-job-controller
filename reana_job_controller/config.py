@@ -93,7 +93,17 @@ IMAGE_PULL_SECRETS = os.getenv("IMAGE_PULL_SECRETS", "").split(",")
 """Docker image pull secrets which allow the usage of private images."""
 
 REANA_KUBERNETES_JOBS_MEMORY_LIMIT = os.getenv("REANA_KUBERNETES_JOBS_MEMORY_LIMIT")
-"""Maximum memory limit for user job containers. Exceeding this limit will terminate the container.
+"""Maximum default memory limit for user job containers. Exceeding this limit will terminate the container.
+
+Please see the following URL for possible values
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory.
+"""
+
+REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT = os.getenv(
+    "REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT"
+)
+"""Maximum custom memory limit that users can assign to their job containers via
+``kubernetes_memory_limit`` in reana.yaml. Exceeding this limit will terminate the container.
 
 Please see the following URL for possible values
 https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory.

@@ -29,15 +29,24 @@ from reana_commons.config import (
     WORKFLOW_RUNTIME_USER_GID,
     WORKFLOW_RUNTIME_USER_UID,
 )
-from reana_commons.errors import REANAKubernetesWrongMemoryFormat
-from reana_commons.job_utils import validate_kubernetes_memory
+from reana_commons.errors import (
+    REANAKubernetesMemoryLimitExceeded,
+    REANAKubernetesWrongMemoryFormat,
+)
+from reana_commons.job_utils import (
+    validate_kubernetes_memory,
+    kubernetes_memory_to_bytes,
+)
 from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
 from reana_commons.k8s.secrets import REANAUserSecretsStore
 from reana_commons.k8s.volumes import get_k8s_cvmfs_volume, get_shared_volume
 from reana_commons.utils import build_unique_component_name
 from retrying import retry
 
-from reana_job_controller.config import REANA_KUBERNETES_JOBS_MEMORY_LIMIT
+from reana_job_controller.config import (
+    REANA_KUBERNETES_JOBS_MEMORY_LIMIT,
+    REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT,
+)
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
 
@@ -117,12 +126,6 @@ class KubernetesJobManager(JobManager):
     @JobManager.execution_hook
     def execute(self):
         """Execute a job in Kubernetes."""
-
-        def _set_job_memory_limit(job_spec, memory_limit):
-            job_spec["containers"][0]["resources"] = {
-                "limits": {"memory": memory_limit,}
-            }
-
         backend_job_id = build_unique_component_name("run-job")
         self.job = {
             "kind": "Job",
@@ -169,11 +172,7 @@ class KubernetesJobManager(JobManager):
             for var, value in self.env_vars.items():
                 job_spec["containers"][0]["env"].append({"name": var, "value": value})
 
-        if self.kubernetes_memory_limit:
-            _set_job_memory_limit(job_spec, self.kubernetes_memory_limit)
-        elif REANA_KUBERNETES_JOBS_MEMORY_LIMIT:
-            _set_job_memory_limit(job_spec, REANA_KUBERNETES_JOBS_MEMORY_LIMIT)
-
+        self.add_memory_limit(job_spec)
         self.add_hostpath_volumes()
         self.add_shared_volume()
         self.add_eos_volume()
@@ -279,6 +278,19 @@ class KubernetesJobManager(JobManager):
                 image_pull_secrets.append({"name": secret_name})
 
         self.job["spec"]["template"]["spec"]["imagePullSecrets"] = image_pull_secrets
+
+    def add_memory_limit(self, job_spec):
+        """Add limits.memory to job accordingly."""
+
+        def _set_job_memory_limit(job_spec, memory_limit):
+            job_spec["containers"][0]["resources"] = {
+                "limits": {"memory": memory_limit,}
+            }
+
+        if self.kubernetes_memory_limit:
+            _set_job_memory_limit(job_spec, self.kubernetes_memory_limit)
+        elif REANA_KUBERNETES_JOBS_MEMORY_LIMIT:
+            _set_job_memory_limit(job_spec, REANA_KUBERNETES_JOBS_MEMORY_LIMIT)
 
     def add_hostpath_volumes(self):
         """Add hostPath mounts from configuration to job."""
@@ -425,12 +437,23 @@ class KubernetesJobManager(JobManager):
 
     def set_memory_limit(self, kubernetes_memory_limit):
         """Set memory limit for job pods. Validate if provided format is correct."""
-        if kubernetes_memory_limit and not validate_kubernetes_memory(
-            kubernetes_memory_limit
-        ):
-            msg = f"{kubernetes_memory_limit} has wrong format."
-            logging.error(
-                "Error while validating Kubernetes memory limit: {}".format(msg)
-            )
-            raise REANAKubernetesWrongMemoryFormat(msg)
+        if kubernetes_memory_limit:
+            if not validate_kubernetes_memory(kubernetes_memory_limit):
+                msg = f'The "kubernetes_memory_limit" provided {kubernetes_memory_limit} has wrong format.'
+                logging.error(
+                    "Error while validating Kubernetes memory limit: {}".format(msg)
+                )
+                raise REANAKubernetesWrongMemoryFormat(msg)
+
+            if REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT:
+                custom_job_memory_limit_bytes = kubernetes_memory_to_bytes(
+                    kubernetes_memory_limit
+                )
+                max_custom_job_memory_limit_bytes = kubernetes_memory_to_bytes(
+                    REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT
+                )
+                if custom_job_memory_limit_bytes > max_custom_job_memory_limit_bytes:
+                    msg = f'The "kubernetes_memory_limit" provided ({kubernetes_memory_limit}) exceeds the limit ({REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT}).'
+                    raise REANAKubernetesMemoryLimitExceeded(msg)
+
         self.kubernetes_memory_limit = kubernetes_memory_limit
