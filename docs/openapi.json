@@ -69,6 +69,9 @@
         "kerberos": {
           "type": "boolean"
         },
+        "kubernetes_memory_limit": {
+          "type": "string"
+        },
         "kubernetes_uid": {
           "format": "int32",
           "type": "integer"
@@ -184,7 +187,7 @@
                     "job_id": "1612a779-f3fa-4344-8819-3d12fa9b9d90",
                     "max_restart_count": 3,
                     "restart_count": 0,
-                    "status": "succeeded"
+                    "status": "finished"
                   },
                   "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20": {
                     "cmd": "date",

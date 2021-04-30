@@ -1,6 +1,24 @@
 Changes
 =======
 
+Version 0.7.4 (2021-04-28)
+--------------------------
+
+- Adds configuration environment variable to set job memory limits for the Kubernetes compute backend (``REANA_KUBERNETES_JOBS_MEMORY_LIMIT``).
+- Fixes Kubernetes job log capture to include information about failures caused by external factors such as OOMKilled.
+- Adds support for specifying ``kubernetes_memory_limit`` for Kubernetes compute backend jobs.
+
+Version 0.7.3 (2021-03-17)
+--------------------------
+
+- Adds new configuration to toggle Kubernetes user jobs clean up.
+- Fixes HTCondor Docker networking and machine version requirement setup.
+- Fixes HTCondor logs and workspace files retrieval on job failure.
+- Fixes Slurm job submission providing the correct shell environment to run Singularity.
+- Changes HTCondor myschedd to the latest version.
+- Changes job status ``succeeded`` to ``finished`` to use central REANA nomenclature.
+- Changes how to deserialise job commands using central REANA-Commons deserialiser function.
+
 Version 0.7.2 (2021-02-03)
 --------------------------
 

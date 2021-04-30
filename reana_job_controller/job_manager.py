@@ -49,10 +49,7 @@ class JobManager:
         :type job_name: str
         """
         self.docker_img = docker_img or ""
-        if isinstance(cmd, str):
-            self.cmd = shlex.split(cmd)
-        else:
-            self.cmd = cmd or []
+        self.cmd = cmd
         self.prettified_cmd = prettified_cmd
         self.workflow_uuid = workflow_uuid
         self.workflow_workspace = workflow_workspace

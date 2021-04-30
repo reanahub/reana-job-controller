@@ -10,6 +10,7 @@
 """REANA Job Controller models."""
 
 from marshmallow import Schema, fields, pre_load
+from reana_commons.job_utils import deserialise_job_command
 
 
 class Job(Schema):
@@ -30,7 +31,7 @@ class JobRequest(Schema):
     job_name = fields.Str(required=True)
     workflow_workspace = fields.Str(required=True)
     workflow_uuid = fields.Str(required=True)
-    cmd = fields.Str(missing="")
+    cmd = fields.Function(missing="", deserialize=deserialise_job_command)
     prettified_cmd = fields.Str(missing="")
     docker_img = fields.Str(required=True)
     cvmfs_mounts = fields.String(missing="")
@@ -40,6 +41,7 @@ class JobRequest(Schema):
     kerberos = fields.Bool(required=False)
     voms_proxy = fields.Bool(required=False)
     kubernetes_uid = fields.Int(required=False)
+    kubernetes_memory_limit = fields.Str(required=False)
     unpacked_img = fields.Bool(required=False)
     htcondor_max_runtime = fields.Str(required=False)
     htcondor_accounting_group = fields.Str(required=False)

@@ -69,7 +69,7 @@ def test_kubernetes_get_job_logs(
     [
         ("Pending", "ErrImagePull", "failed"),
         ("Pending", "InvalidImageName", "failed"),
-        ("Succeeded", "Completed", "succeeded"),
+        ("Succeeded", "Completed", "finished"),
         ("Failed", "Error", "failed"),
     ],
 )
@@ -91,7 +91,7 @@ def test_kubernetes_clean_job(app, mocked_job_managers):
         job_metadata = {
             "deleted": False,
             "compute_backend": "kubernetes",
-            "status": "succeeded",
+            "status": "finished",
             "backend_job_id": str(uuid.uuid4()),
         }
         job_monitor_k8s.job_db = {job_id: job_metadata}
@@ -121,7 +121,7 @@ def test_kubernetes_should_process_job(
         job_metadata = {
             "deleted": deleted,
             "compute_backend": compute_backend,
-            "status": "succeeded",
+            "status": "finished",
             "backend_job_id": backend_job_id,
         }
         job_monitor_k8s.job_db = {job_id: job_metadata}

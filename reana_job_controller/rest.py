@@ -13,6 +13,10 @@ import json
 import logging
 
 from flask import Blueprint, current_app, jsonify, request
+from reana_commons.errors import (
+    REANAKubernetesMemoryLimitExceeded,
+    REANAKubernetesWrongMemoryFormat,
+)
 
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_db import (
@@ -134,7 +138,7 @@ def get_jobs():  # noqa
                     "job_id": "1612a779-f3fa-4344-8819-3d12fa9b9d90",
                     "max_restart_count": 3,
                     "restart_count": 0,
-                    "status": "succeeded"
+                    "status": "finished"
                   },
                   "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20": {
                     "cmd": "date",
@@ -215,7 +219,12 @@ def create_job():  # noqa
         return jsonify({"job": msg}), 500
     with current_app.app_context():
         job_manager_cls = current_app.config["COMPUTE_BACKENDS"][compute_backend]()
-        job_obj = job_manager_cls(**job_request)
+        try:
+            job_obj = job_manager_cls(**job_request)
+        except REANAKubernetesMemoryLimitExceeded as e:
+            return jsonify({"message": e.message}), 403
+        except REANAKubernetesWrongMemoryFormat as e:
+            return jsonify({"message": e.message}), 400
     backend_jod_id = job_obj.execute()
     if job_obj:
         job = copy.deepcopy(job_request)

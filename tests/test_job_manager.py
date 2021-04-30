@@ -37,7 +37,7 @@ def test_execute_kubernetes_job(
     env_var_value = "value"
     expected_env_var = {env_var_key: env_var_value}
     expected_image = "busybox"
-    expected_command = ["ls"]
+    expected_command = "ls"
     monkeypatch.setenv("REANA_USER_ID", str(default_user.id_))
     job_manager = KubernetesJobManager(
         docker_img=expected_image,
@@ -68,11 +68,11 @@ def test_execute_kubernetes_job(
             body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
             env_vars = body["spec"]["template"]["spec"]["containers"][0]["env"]
             image = body["spec"]["template"]["spec"]["containers"][0]["image"]
-            command = body["spec"]["template"]["spec"]["containers"][0]["command"]
+            command = body["spec"]["template"]["spec"]["containers"][0]["args"]
             assert len(env_vars) == 3
             assert {"name": env_var_key, "value": env_var_value} in env_vars
             assert image == expected_image
-            assert command == expected_command
+            assert command == [expected_command]
 
 
 def test_stop_kubernetes_job(

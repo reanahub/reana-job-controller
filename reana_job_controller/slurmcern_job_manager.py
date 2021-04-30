@@ -111,7 +111,7 @@ class SlurmJobManagerCERN(JobManager):
     @JobManager.execution_hook
     def execute(self):
         """Execute / submit a job with Slurm."""
-        self.cmd = self._encode_cmd(" ".join(self.cmd))
+        self.cmd = self._encode_cmd(self.cmd)
         initialize_krb5_token(workflow_uuid=self.workflow_uuid)
         self.slurm_connection = SSHClient(
             hostname=SlurmJobManagerCERN.SLURM_HEADNODE_HOSTNAME,
@@ -137,6 +137,7 @@ class SlurmJobManagerCERN(JobManager):
             "#SBATCH --error=reana_job.%j.err \n"
             "#SBATCH --partition {partition} \n"
             "#SBATCH --time 60 \n"
+            "export PATH=$PATH:/usr/sbin \n"
             "srun {command}"
         ).format(
             partition=SlurmJobManagerCERN.SLURM_PARTITION,

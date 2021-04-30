@@ -1,5 +1,6 @@
 wtfis:
   endpoint: https://wtfis.cern.ch:9008
+  ro_endpoint: http://wtfis.cern.ch:9009
   resolve_url: true
 bump:
   maxrunningjobs: 8000
@@ -20,4 +21,4 @@ pools:
       - bigbird19.cern.ch
   tzero:
     standard:
-      - tbird02.cern.ch 
+      - tbird02.cern.ch
