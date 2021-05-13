@@ -30,7 +30,7 @@ from reana_job_controller.job_manager import JobManager
 
 
 """Number of retries for a job before considering it as failed."""
-MAX_NUM_RETRIES = 3
+MAX_NUM_RETRIES = 10
 
 @retry(stop_max_attempt_number=MAX_NUM_RETRIES)
 def submit(schedd, sub):
