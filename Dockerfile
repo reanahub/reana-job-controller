@@ -10,6 +10,7 @@ ENV TERM=xterm
 
 RUN apt-get update && \
     apt-get install -y vim-tiny && \
+    pip install --upgrade pip
 
 RUN export DEBIAN_FRONTEND=noninteractive ;\
     apt-get -yq install --no-install-recommends \
