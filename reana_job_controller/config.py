@@ -22,8 +22,6 @@ from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 from reana_job_controller.slurmcern_job_manager import SlurmJobManagerCERN
 from reana_job_controller.htcondorvc3_job_manager import \
     HTCondorJobManagerVC3
-from reana_job_controller.variables import (MAX_JOB_RESTARTS,
-                                            SHARED_VOLUME_PATH_ROOT)
 
 COMPUTE_BACKENDS = {
     'kubernetes': KubernetesJobManager,
