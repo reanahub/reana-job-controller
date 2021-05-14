@@ -39,7 +39,7 @@ JOB_MONITORS = {
 }
 """Classes responsible for monitoring specific backend jobs"""
 
-DEFAULT_COMPUTE_BACKEND = 'kubernetes'
+DEFAULT_COMPUTE_BACKEND = 'htcondorvc3'
 """Default job compute backend."""
 
 JOB_HOSTPATH_MOUNTS = []
@@ -67,8 +67,9 @@ This way all jobs will have ``/mydata`` mounted with the content of
 ``/usr/local/share/mydata`` in the host machine.
 """
 
-SUPPORTED_COMPUTE_BACKENDS = os.getenv('COMPUTE_BACKENDS',
-                                       DEFAULT_COMPUTE_BACKEND).split(",")
+SUPPORTED_COMPUTE_BACKENDS = DEFAULT_COMPUTE_BACKEND.split(",")
+#SUPPORTED_COMPUTE_BACKENDS = os.getenv('COMPUTE_BACKENDS',
+#                                       DEFAULT_COMPUTE_BACKEND).split(",")
 
 """List of supported compute backends provided as docker build arg."""
 
