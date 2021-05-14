@@ -12,12 +12,13 @@ RUN apt-get update && \
     apt-get install -y vim-tiny && \
 
 RUN export DEBIAN_FRONTEND=noninteractive ;\
-    apt-get -yq install krb5-user \
+    apt-get -yq install --no-install-recommends \
+                        krb5-user \
                         krb5-config \
                         libkrb5-dev \
                         libauthen-krb5-perl \
                         gcc;
-ADD etc/krb5.conf /etc/krb5.conf
+COPY etc/krb5.conf /etc/krb5.conf
 
 
 ARG COMPUTE_BACKENDS=kubernetes
