@@ -108,9 +108,6 @@ class HTCondorJobManagerCERN(JobManager):
         """Execute / submit a job with HTCondor."""
         os.chdir(self.workflow_workspace)
         job_ad = classad.ClassAd()
-        job_ad["Requirements"] = classad.ExprTree(
-            'regexp("8.9.11", TARGET.CondorVersion)'
-        )
         job_ad["JobDescription"] = (
             self.workflow.get_full_workflow_name() + "_" + self.job_name
         )

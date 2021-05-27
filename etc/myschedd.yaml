@@ -8,17 +8,17 @@ pools:
   share:
     standard:
       - bigbird08.cern.ch
-      - bigbird09.cern.ch
       - bigbird10.cern.ch
       - bigbird11.cern.ch
       - bigbird12.cern.ch
       - bigbird13.cern.ch
       - bigbird14.cern.ch
-      - bigbird15.cern.ch
       - bigbird16.cern.ch
       - bigbird17.cern.ch
       - bigbird18.cern.ch
       - bigbird19.cern.ch
+      - bigbird22.cern.ch
+      - bigbird23.cern.ch
   tzero:
     standard:
       - tbird02.cern.ch
