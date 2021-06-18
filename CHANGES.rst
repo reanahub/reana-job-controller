@@ -1,6 +1,12 @@
 Changes
 =======
 
+Version 0.7.5 (UNRELEASED)
+--------------------------
+
+- Changes HTCondor to 8.9.11.
+- Changes myschedd package and configuration to latest versions.
+
 Version 0.7.4 (2021-04-28)
 --------------------------
 

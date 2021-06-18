@@ -24,7 +24,7 @@ flask==1.1.2              # via reana-job-controller (setup.py)
 fs==2.4.13                # via reana-commons, reana-job-controller (setup.py)
 google-auth==1.30.0       # via kubernetes
 gssapi==1.6.12            # via paramiko
-htcondor==8.9.7           # via reana-job-controller (setup.py)
+htcondor==8.9.11          # via reana-job-controller (setup.py)
 idna==2.10                # via jsonschema, requests
 itsdangerous==1.1.0       # via flask
 jinja2==2.11.3            # via flask

@@ -31,8 +31,8 @@ RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       set -e;\
       export DEBIAN_FRONTEND=noninteractive ;\
       apt-get -yq install --no-install-recommends wget alien gnupg2 ;\
-      wget -O ngbauth-submit.rpm http://linuxsoft.cern.ch/internal/repos/batch7-stable/x86_64/os/Packages/ngbauth-submit-0.23-2.el7.noarch.rpm; \
-      wget -O myschedd.rpm http://linuxsoft.cern.ch/internal/repos/batch7-stable/x86_64/os/Packages/myschedd-1.7-1.el7.x86_64.rpm; \
+      wget -O ngbauth-submit.rpm http://linuxsoft.cern.ch/internal/repos/batch7-stable/x86_64/os/Packages/ngbauth-submit-0.24-3.el7.noarch.rpm; \
+      wget -O myschedd.rpm http://linuxsoft.cern.ch/internal/repos/batch7-stable/x86_64/os/Packages/myschedd-1.7-2.el7.x86_64.rpm; \
       yes | alien -i myschedd.rpm; \
       yes | alien -i ngbauth-submit.rpm; \
       wget -qO - http://research.cs.wisc.edu/htcondor/debian/HTCondor-Release.gpg.key | apt-key add -; \
