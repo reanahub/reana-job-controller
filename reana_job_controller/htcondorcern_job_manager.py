@@ -166,7 +166,7 @@ class HTCondorJobManagerCERN(JobManager):
             # E.g. "cd /path/to/workspace ; user-command" -> "user-command"
             base_cmd = " ".join(self.cmd.split()[3:])
         elif self.workflow.type_ == "cwl":
-            base_cmd = self.cmd[2].replace(self.workflow_workspace, "$_CONDOR_JOB_IWD")
+            base_cmd = self.cmd.replace(self.workflow_workspace, "$_CONDOR_JOB_IWD")
         elif self.workflow.type_ == "yadage":
             if "base64" in self.cmd:
                 # E.g. echo ZWNobyAxCg==|base64 -d|bash
