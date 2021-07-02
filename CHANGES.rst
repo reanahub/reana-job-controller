@@ -1,11 +1,12 @@
 Changes
 =======
 
-Version 0.7.5 (UNRELEASED)
+Version 0.7.5 (2021-07-05)
 --------------------------
 
 - Changes HTCondor to 8.9.11.
 - Changes myschedd package and configuration to latest versions.
+- Fixes job command formatting bug for CWL workflows on HTCondor.
 
 Version 0.7.4 (2021-04-28)
 --------------------------
