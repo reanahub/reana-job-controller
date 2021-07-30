@@ -39,7 +39,12 @@ from reana_commons.job_utils import (
 )
 from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
 from reana_commons.k8s.secrets import REANAUserSecretsStore
-from reana_commons.k8s.volumes import get_k8s_cvmfs_volume, get_shared_volume
+from reana_commons.k8s.volumes import (
+    get_k8s_cvmfs_volume,
+    get_shared_volume,
+    get_reana_shared_volume,
+    get_workspace_volume,
+)
 from reana_commons.utils import build_unique_component_name
 from retrying import retry
 
@@ -175,6 +180,7 @@ class KubernetesJobManager(JobManager):
 
         self.add_memory_limit(job_spec)
         self.add_hostpath_volumes()
+        self.add_workspace_volume()
         self.add_shared_volume()
         self.add_eos_volume()
         self.add_image_pull_secrets()
@@ -253,11 +259,16 @@ class KubernetesJobManager(JobManager):
             )
             raise ComputingBackendSubmissionError(e.reason)
 
+    def add_workspace_volume(self):
+        """Add workspace volume to a given job spec."""
+        volume_mount, volume = get_workspace_volume(self.workflow_workspace)
+        self.add_volumes([(volume_mount, volume)])
+
     def add_shared_volume(self):
         """Add shared CephFS volume to a given job spec."""
         if self.shared_file_system:
-            volume_mount, volume = get_shared_volume(self.workflow_workspace)
-            self.add_volumes([(volume_mount, volume)])
+            shared_volume = get_reana_shared_volume()
+            self.job["spec"]["template"]["spec"]["volumes"].append(shared_volume)
 
     def add_eos_volume(self):
         """Add EOS volume to a given job spec."""
