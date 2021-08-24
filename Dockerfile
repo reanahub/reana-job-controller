@@ -5,7 +5,7 @@
 # under the terms of the MIT License; see LICENSE file for more details.
 
 # Install base image and its dependencies
-FROM python:3.8-slim
+FROM python:3.8-slim-buster
 # hadolint ignore=DL3008,DL3009,DL3013
 RUN apt-get update && \
     apt-get install -y --no-install-recommends vim-tiny && \
