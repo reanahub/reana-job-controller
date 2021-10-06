@@ -254,6 +254,9 @@
           "400": {
             "description": "Request failed. The incoming data specification seems malformed."
           },
+          "404": {
+            "description": "Request failed. Some requested resources cannot be found."
+          },
           "500": {
             "description": "Request failed. Internal controller error. The job could probably not have been allocated."
           }

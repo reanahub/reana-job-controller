@@ -193,6 +193,9 @@ def create_job():  # noqa
         400:
           description: >-
             Request failed. The incoming data specification seems malformed.
+        404:
+          description: >-
+            Request failed. Some requested resources cannot be found.
         500:
           description: >-
             Request failed. Internal controller error. The job could probably
@@ -206,17 +209,16 @@ def create_job():  # noqa
     job_request, errors = job_request_schema.load(json_data)
     if errors:
         return jsonify(errors), 400
-    compute_backend = job_request.get(
+
+    compute_backend = job_request.pop(
         "compute_backend", current_app.config["DEFAULT_COMPUTE_BACKEND"]
     )
-    job_request.pop("compute_backend", None)
     if compute_backend not in current_app.config["SUPPORTED_COMPUTE_BACKENDS"]:
-        msg = "Job submission failed. Backend {} is not supported.".format(
-            compute_backend
-        )
-        logging.error(msg, exc_info=True)
+        msg = f"Job submission failed. Backend {compute_backend} is not supported."
+        logging.error(msg)
         update_workflow_logs(job_request["workflow_uuid"], msg)
-        return jsonify({"job": msg}), 500
+        return jsonify({"job": msg}), 404
+
     with current_app.app_context():
         job_manager_cls = current_app.config["COMPUTE_BACKENDS"][compute_backend]()
         try:
@@ -225,6 +227,7 @@ def create_job():  # noqa
             return jsonify({"message": e.message}), 403
         except REANAKubernetesWrongMemoryFormat as e:
             return jsonify({"message": e.message}), 400
+
     backend_jod_id = job_obj.execute()
     if job_obj:
         job = copy.deepcopy(job_request)

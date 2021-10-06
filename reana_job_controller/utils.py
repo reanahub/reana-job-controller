@@ -29,15 +29,15 @@ def singleton(cls):
     return getinstance
 
 
-def update_workflow_logs(workflow_uuid, log_message):
+def update_workflow_logs(workflow_uuid: str, log_message: str) -> None:
     """Update workflow logs."""
     try:
-        logging.info("Storing workflow logs: {}".format(workflow_uuid))
+        logging.info(f"Storing workflow logs: {workflow_uuid}")
         workflow = Session.query(Workflow).filter_by(id_=workflow_uuid).one_or_none()
         workflow.logs += "\n" + log_message
         Session.commit()
     except Exception as e:
-        logging.error("Exception while saving logs: {}".format(str(e)), exc_info=True)
+        logging.error(f"Exception while saving logs: {str(e)}", exc_info=True)
 
 
 def initialize_krb5_token(workflow_uuid):
