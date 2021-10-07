@@ -6,6 +6,7 @@ Version 0.8.0 (UNRELEASED)
 
 - Fixes auto-mounting of Kubernetes API token inside user jobs by disabling it.
 - Changes job dispatching to use only job-specific node labels.
+- Changes to PostgreSQL 12.8
 
 Version 0.7.5 (2021-07-05)
 --------------------------
