@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2021 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -34,6 +34,9 @@ extras_require = {
     "tests": tests_require,
     "ssh": ["paramiko[gssapi]>=2.6.0"],
 }
+
+# Python tests need SSH dependencies for imports
+extras_require["tests"].extend(extras_require["ssh"])
 
 extras_require["all"] = []
 for key, reqs in extras_require.items():
