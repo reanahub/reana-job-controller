@@ -19,7 +19,7 @@ readme = open("README.rst").read()
 history = open("CHANGES.rst").read()
 
 tests_require = [
-    "pytest-reana>=0.8.0a6,<0.9.0",
+    "pytest-reana>=0.8.0a7,<0.9.0",
 ]
 
 extras_require = {
@@ -54,8 +54,8 @@ install_requires = [
     "Werkzeug>=1.0.1,<2.0",
     "fs>=2.0",
     "marshmallow>2.13.0,<=2.20.1",
-    "reana-commons[kubernetes]>=0.8.0a21,<0.9.0",
-    "reana-db>=0.8.0a20,<0.9.0",
+    "reana-commons[kubernetes]>=0.8.0a31,<0.9.0",
+    "reana-db>=0.8.0a21,<0.9.0",
     "htcondor==8.9.11",
     "retrying>=1.3.3",
 ]
