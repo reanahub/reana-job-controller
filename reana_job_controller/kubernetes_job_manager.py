@@ -268,7 +268,12 @@ class KubernetesJobManager(JobManager):
         """Add shared CephFS volume to a given job spec."""
         if self.shared_file_system:
             shared_volume = get_reana_shared_volume()
-            self.job["spec"]["template"]["spec"]["volumes"].append(shared_volume)
+            # check if shared_volume is not already added
+            if not any(
+                v["name"] == shared_volume["name"]
+                for v in self.job["spec"]["template"]["spec"]["volumes"]
+            ):
+                self.job["spec"]["template"]["spec"]["volumes"].append(shared_volume)
 
     def add_eos_volume(self):
         """Add EOS volume to a given job spec."""
