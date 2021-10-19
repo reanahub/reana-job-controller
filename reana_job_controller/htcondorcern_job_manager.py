@@ -160,11 +160,17 @@ class HTCondorJobManagerCERN(JobManager):
 
     def _format_arguments(self):
         """Format HTCondor job execution arguments."""
-        if self.workflow.type_ == "serial":
+        if self.workflow.type_ in ["serial", "snakemake"]:
             # Take only the user's command, removes the change directory to workflow workspace
-            # added by RWE-Serial since HTCondor implementation does not need it.
+            # added by RWE-Serial/Snakemake since HTCondor implementation does not need it.
             # E.g. "cd /path/to/workspace ; user-command" -> "user-command"
             base_cmd = " ".join(self.cmd.split()[3:])
+            if self.workflow.type_ == "snakemake":
+                # For Snakemake workflows, also remove the workspace path from
+                # `jobfinished` and `jobfailed` touch commands.
+                base_cmd = base_cmd.replace(
+                    os.path.join(self.workflow_workspace, ""), ""
+                )
         elif self.workflow.type_ == "cwl":
             base_cmd = self.cmd.replace(self.workflow_workspace, "$_CONDOR_JOB_IWD")
         elif self.workflow.type_ == "yadage":
