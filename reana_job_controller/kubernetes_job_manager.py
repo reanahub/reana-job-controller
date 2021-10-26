@@ -127,6 +127,7 @@ class KubernetesJobManager(JobManager):
         self.voms_proxy = voms_proxy
         self.set_user_id(kubernetes_uid)
         self.set_memory_limit(kubernetes_memory_limit)
+        self.workflow_uuid = workflow_uuid
 
     @JobManager.execution_hook
     def execute(self):
@@ -144,7 +145,10 @@ class KubernetesJobManager(JobManager):
                 "backoffLimit": KubernetesJobManager.MAX_NUM_JOB_RESTARTS,
                 "autoSelector": True,
                 "template": {
-                    "metadata": {"name": backend_job_id},
+                    "metadata": {
+                        "name": backend_job_id,
+                        "labels": {"reana-workflow-uuid": self.workflow_uuid},
+                    },
                     "spec": {
                         "containers": [
                             {
