@@ -13,6 +13,7 @@ import json
 import logging
 
 from flask import Blueprint, current_app, jsonify, request
+from sqlalchemy.exc import OperationalError
 from reana_commons.errors import (
     REANAKubernetesMemoryLimitExceeded,
     REANAKubernetesWrongMemoryFormat,
@@ -225,7 +226,16 @@ def create_job():  # noqa
             return jsonify({"message": e.message}), 403
         except REANAKubernetesWrongMemoryFormat as e:
             return jsonify({"message": e.message}), 400
-    backend_jod_id = job_obj.execute()
+    try:
+        backend_jod_id = job_obj.execute()
+    except OperationalError as e:
+        msg = f"Job submission failed because of DB connection issues. \n{e}"
+        logging.error(msg, exc_info=True)
+        return jsonify({"message": msg}), 500
+    except Exception as e:
+        msg = f"Job submission failed. \n{e}"
+        logging.error(msg, exc_info=True)
+        return jsonify({"message": msg}), 500
     if job_obj:
         job = copy.deepcopy(job_request)
         job["status"] = "started"
