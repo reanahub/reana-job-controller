@@ -11,15 +11,20 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from flask import Flask, current_app
+from flask import Flask
 from reana_commons.config import REANA_LOG_FORMAT, REANA_LOG_LEVEL
-from reana_db.database import Session
+from reana_db.database import Session, engine as db_engine
 
 from reana_job_controller import config
 from reana_job_controller.spec import build_openapi_spec
 
 
-def create_app(JOB_DB=None, config_mapping=None):
+def shutdown_session(response_or_exc):
+    """Close session and remove all DB connections."""
+    db_engine.dispose()
+
+
+def create_app(config_mapping=None):
     """Create REANA-Job-Controller application."""
     logging.basicConfig(level=REANA_LOG_LEVEL, format=REANA_LOG_FORMAT)
     app = Flask(__name__)
@@ -37,10 +42,10 @@ def create_app(JOB_DB=None, config_mapping=None):
 
     app.register_blueprint(blueprint, url_prefix="/")
 
-    @app.teardown_appcontext
-    def shutdown_session(response_or_exc):
-        """Close session on app teardown."""
-        current_app.session.remove()
-        return response_or_exc
+    # Close session after each request
+    app.teardown_request(shutdown_session)
+
+    # Close session on app teardown
+    app.teardown_appcontext(shutdown_session)
 
     return app
