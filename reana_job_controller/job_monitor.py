@@ -243,7 +243,7 @@ class JobMonitorKubernetes(JobMonitor):
                 for event in w.stream(
                     current_k8s_corev1_api_client.list_namespaced_pod,
                     namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
-                    label_selector=f"reana-workflow-uuid={self.workflow_uuid}",
+                    label_selector=f"reana-run-job-workflow-uuid={self.workflow_uuid}",
                 ):
                     logging.info("New Pod event received: {0}".format(event["type"]))
                     job_pod = event["object"]
