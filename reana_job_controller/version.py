@@ -14,4 +14,4 @@ This file is imported by ``reana_job_controller.__init__`` and parsed by
 
 from __future__ import absolute_import, print_function
 
-__version__ = "0.8.0a6"
+__version__ = "0.8.0a7"
