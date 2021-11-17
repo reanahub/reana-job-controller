@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019 CERN.
+# Copyright (C) 2019, 2020, 2021 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -12,13 +12,11 @@ import logging
 import threading
 import time
 import traceback
+from typing import Optional
 
 from kubernetes import client, watch
 from reana_commons.config import REANA_RUNTIME_KUBERNETES_NAMESPACE
-from reana_commons.k8s.api_client import (
-    current_k8s_batchv1_api_client,
-    current_k8s_corev1_api_client,
-)
+from reana_commons.k8s.api_client import current_k8s_corev1_api_client
 from reana_db.database import Session
 from reana_db.models import Job, JobStatus
 
@@ -30,7 +28,7 @@ from reana_job_controller.utils import SSHClient, singleton
 class JobMonitor:
     """Job monitor interface."""
 
-    def __init__(self, thread_name, app=None):
+    def __init__(self, thread_name: str, app=None):
         """Initialize REANA job monitors."""
         self.job_event_reader_thread = threading.Thread(
             name=thread_name, target=self.watch_jobs, args=(JOB_DB, app)
@@ -48,9 +46,10 @@ class JobMonitor:
 class JobMonitorKubernetes(JobMonitor):
     """Kubernetes job monitor."""
 
-    def __init__(self, app=None):
+    def __init__(self, workflow_uuid: Optional[str] = None, **kwargs):
         """Initialize Kubernetes job monitor thread."""
         self.job_manager_cls = COMPUTE_BACKENDS["kubernetes"]()
+        self.workflow_uuid = workflow_uuid
         super(__class__, self).__init__(thread_name="kubernetes_job_monitor")
 
     def _get_remaining_jobs(self, compute_backend="kubernetes", statuses_to_skip=None):
@@ -244,7 +243,7 @@ class JobMonitorKubernetes(JobMonitor):
                 for event in w.stream(
                     current_k8s_corev1_api_client.list_namespaced_pod,
                     namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
-                    label_selector="job-name",
+                    label_selector=f"reana-run-job-workflow-uuid={self.workflow_uuid}",
                 ):
                     logging.info("New Pod event received: {0}".format(event["type"]))
                     job_pod = event["object"]
@@ -283,7 +282,7 @@ condorJobStatus = {
 class JobMonitorHTCondorCERN(JobMonitor):
     """HTCondor jobs monitor CERN."""
 
-    def __init__(self, app=None):
+    def __init__(self, app=None, **kwargs):
         """Initialize HTCondor job monitor thread."""
         self.job_manager_cls = COMPUTE_BACKENDS["htcondorcern"]()
         super(__class__, self).__init__(thread_name="htcondor_job_monitor", app=app)
@@ -416,7 +415,7 @@ slurmJobStatus = {
 class JobMonitorSlurmCERN(JobMonitor):
     """Slurm jobs monitor CERN."""
 
-    def __init__(self, app=None):
+    def __init__(self, **kwargs):
         """Initialize Slurm job monitor thread."""
         self.job_manager_cls = COMPUTE_BACKENDS["slurmcern"]()
         super(__class__, self).__init__(thread_name="slurm_job_monitor")

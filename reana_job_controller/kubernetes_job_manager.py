@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2019 CERN.
+# Copyright (C) 2019, 2020, 2021 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -127,6 +127,7 @@ class KubernetesJobManager(JobManager):
         self.voms_proxy = voms_proxy
         self.set_user_id(kubernetes_uid)
         self.set_memory_limit(kubernetes_memory_limit)
+        self.workflow_uuid = workflow_uuid
 
     @JobManager.execution_hook
     def execute(self):
@@ -144,7 +145,10 @@ class KubernetesJobManager(JobManager):
                 "backoffLimit": KubernetesJobManager.MAX_NUM_JOB_RESTARTS,
                 "autoSelector": True,
                 "template": {
-                    "metadata": {"name": backend_job_id},
+                    "metadata": {
+                        "name": backend_job_id,
+                        "labels": {"reana-run-job-workflow-uuid": self.workflow_uuid},
+                    },
                     "spec": {
                         "containers": [
                             {
@@ -268,7 +272,12 @@ class KubernetesJobManager(JobManager):
         """Add shared CephFS volume to a given job spec."""
         if self.shared_file_system:
             shared_volume = get_reana_shared_volume()
-            self.job["spec"]["template"]["spec"]["volumes"].append(shared_volume)
+            # check if shared_volume is not already added
+            if not any(
+                v["name"] == shared_volume["name"]
+                for v in self.job["spec"]["template"]["spec"]["volumes"]
+            ):
+                self.job["spec"]["template"]["spec"]["volumes"].append(shared_volume)
 
     def add_eos_volume(self):
         """Add EOS volume to a given job spec."""

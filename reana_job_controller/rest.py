@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018 CERN.
+# Copyright (C) 2018, 2019, 2020, 2021 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -13,6 +13,7 @@ import json
 import logging
 
 from flask import Blueprint, current_app, jsonify, request
+from sqlalchemy.exc import OperationalError
 from reana_commons.errors import (
     REANAKubernetesMemoryLimitExceeded,
     REANAKubernetesWrongMemoryFormat,
@@ -225,7 +226,16 @@ def create_job():  # noqa
             return jsonify({"message": e.message}), 403
         except REANAKubernetesWrongMemoryFormat as e:
             return jsonify({"message": e.message}), 400
-    backend_jod_id = job_obj.execute()
+    try:
+        backend_jod_id = job_obj.execute()
+    except OperationalError as e:
+        msg = f"Job submission failed because of DB connection issues. \n{e}"
+        logging.error(msg, exc_info=True)
+        return jsonify({"message": msg}), 500
+    except Exception as e:
+        msg = f"Job submission failed. \n{e}"
+        logging.error(msg, exc_info=True)
+        return jsonify({"message": msg}), 500
     if job_obj:
         job = copy.deepcopy(job_request)
         job["status"] = "started"
@@ -238,7 +248,10 @@ def create_job():  # noqa
         job["compute_backend"] = compute_backend
         JOB_DB[str(job["job_id"])] = job
         job_monitor_cls = current_app.config["JOB_MONITORS"][compute_backend]()
-        job_monitor_cls(app=current_app._get_current_object())
+        job_monitor_cls(
+            app=current_app._get_current_object(),
+            workflow_uuid=job_request["workflow_uuid"],
+        )
         return jsonify({"job_id": job["job_id"]}), 201
     else:
         return jsonify({"job": "Could not be allocated"}), 500

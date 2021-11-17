@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2019 CERN.
+# Copyright (C) 2019, 2020, 2021 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -9,11 +9,9 @@
 """Job Manager."""
 
 import json
-import shlex
 
-from flask import current_app
 from reana_commons.utils import calculate_file_access_time
-from reana_db.database import Session
+from reana_db.database import Session, engine as db_engine
 from reana_db.models import Job as JobTable
 from reana_db.models import JobCache, JobStatus, Workflow
 
@@ -64,6 +62,7 @@ class JobManager:
             backend_job_id = fn(inst, *args, **kwargs)
             inst.create_job_in_db(backend_job_id)
             inst.cache_job()
+            db_engine.dispose()
             return backend_job_id
 
         return wrapper
