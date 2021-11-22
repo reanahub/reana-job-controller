@@ -1,9 +1,11 @@
 Changes
 =======
 
-Version 0.8.0 (UNRELEASED)
+Version 0.8.0 (2021-11-22)
 --------------------------
 
+- Adds database connection closure after each REST API request.
+- Adds labels to job and run-batch pods to reduce k8s events to listen to for ``job-monitor``.
 - Fixes auto-mounting of Kubernetes API token inside user jobs by disabling it.
 - Changes job dispatching to use only job-specific node labels.
 - Changes to PostgreSQL 12.8
