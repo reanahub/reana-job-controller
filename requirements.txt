@@ -53,8 +53,8 @@ pyrsistent==0.18.0        # via jsonschema
 python-dateutil==2.8.2    # via bravado, bravado-core, kubernetes
 pytz==2021.3              # via bravado-core, fs
 pyyaml==5.4.1             # via apispec, bravado, bravado-core, kubernetes, reana-commons, swagger-spec-validator
-reana-commons[kubernetes]==0.8.0a37	# via reana-db, reana-job-controller (setup.py)
-reana-db==0.8.0a23	# via reana-job-controller (setup.py)
+reana-commons[kubernetes]==0.8.0	# via reana-db, reana-job-controller (setup.py)
+reana-db==0.8.0	# via reana-job-controller (setup.py)
 requests-oauthlib==1.3.0  # via kubernetes
 requests==2.26.0          # via bravado, kubernetes, requests-oauthlib
 retrying==1.3.3           # via reana-job-controller (setup.py)

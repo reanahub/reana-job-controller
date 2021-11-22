@@ -54,8 +54,8 @@ install_requires = [
     "Werkzeug>=1.0.1,<2.0",
     "fs>=2.0",
     "marshmallow>2.13.0,<=2.20.1",
-    "reana-commons[kubernetes]>=0.8.0a37,<0.9.0",
-    "reana-db>=0.8.0a23,<0.9.0",
+    "reana-commons[kubernetes]>=0.8.0,<0.9.0",
+    "reana-db>=0.8.0,<0.9.0",
     "htcondor==8.9.11",
     "retrying>=1.3.3",
 ]
