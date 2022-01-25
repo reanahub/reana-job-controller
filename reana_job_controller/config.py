@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020, 2021 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -107,4 +107,20 @@ REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT = os.getenv(
 
 Please see the following URL for possible values
 https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory.
+"""
+
+REANA_KUBERNETES_JOBS_TIMEOUT_LIMIT = os.getenv("REANA_KUBERNETES_JOBS_TIMEOUT_LIMIT")
+"""Default timeout for user's job. Exceeding this time will terminate the job.
+
+Please see the following URL for more details
+https://kubernetes.io/docs/concepts/workloads/controllers/job/#job-termination-and-cleanup.
+"""
+
+REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT = os.getenv(
+    "REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT"
+)
+"""Maximum custom timeout that users can assign to their job.
+
+Please see the following URL for more details
+https://kubernetes.io/docs/concepts/workloads/controllers/job/#job-termination-and-cleanup.
 """

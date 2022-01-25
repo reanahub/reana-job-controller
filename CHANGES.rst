@@ -1,6 +1,12 @@
 Changes
 =======
 
+Version 0.8.1 (UNRELEASED)
+---------------------------
+
+- Adds support for specifying ``kubernetes_job_timeout`` for Kubernetes compute backend jobs.
+- Adds a new condition to allow processing jobs in case of receiving multiple failed events when job containers are not in a running state.
+
 Version 0.8.0 (2021-11-22)
 --------------------------
 

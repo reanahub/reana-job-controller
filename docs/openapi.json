@@ -69,6 +69,10 @@
         "kerberos": {
           "type": "boolean"
         },
+        "kubernetes_job_timeout": {
+          "format": "int32",
+          "type": "integer"
+        },
         "kubernetes_memory_limit": {
           "type": "string"
         },
