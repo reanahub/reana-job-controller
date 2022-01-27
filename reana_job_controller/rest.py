@@ -206,7 +206,8 @@ def create_job():  # noqa
     # Validate and deserialize input
     job_request, errors = job_request_schema.load(json_data)
     if errors:
-        return jsonify(errors), 400
+        return jsonify({"message": errors}), 400
+
     compute_backend = job_request.get(
         "compute_backend", current_app.config["DEFAULT_COMPUTE_BACKEND"]
     )
