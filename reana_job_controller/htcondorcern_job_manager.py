@@ -146,6 +146,7 @@ class HTCondorJobManagerCERN(JobManager):
             job_ad["MaxRunTime"] = 3600
         if self.htcondor_accounting_group:
             job_ad["AccountingGroup"] = self.htcondor_accounting_group
+        job_ad["MY.SendCredential"] = True
         future = current_app.htcondor_executor.submit(self._submit, job_ad)
         clusterid = future.result()
         return clusterid
@@ -229,12 +230,15 @@ class HTCondorJobManagerCERN(JobManager):
                 )
             else:
                 template = (
-                    "#!/bin/bash \n"
+                    "#!/bin/bash\n"
+                    'SINGULARITY_KRB5CCNAME="FILE:/srv/$(basename $KRB5CCNAME)"\n'
                     "singularity exec "
+                    "--contain "
+                    "--ipc "
+                    "--pid "
                     "--home $PWD:/srv "
-                    "--bind $PWD:/srv "
                     "--bind /cvmfs "
-                    "--bind /eos "
+                    "--env KRB5CCNAME=$SINGULARITY_KRB5CCNAME "
                     "{DOCKER_IMG} {CMD}".format(
                         DOCKER_IMG=self.docker_img,
                         CMD=self._format_arguments() + " | bash",
@@ -253,7 +257,7 @@ class HTCondorJobManagerCERN(JobManager):
     def _submit(self, job_ad):
         """Execute submission transaction."""
         ads = []
-        schedd = HTCondorJobManagerCERN._get_schedd()
+        schedd, credd = HTCondorJobManagerCERN._get_schedd()
         logging.info("Submiting job - {}".format(job_ad))
         clusterid = schedd.submit(job_ad, 1, True, ads)
         HTCondorJobManagerCERN._spool_input(ads)
@@ -261,7 +265,7 @@ class HTCondorJobManagerCERN(JobManager):
 
     @retry(stop_max_attempt_number=MAX_NUM_RETRIES, wait_fixed=RETRY_WAIT_TIME)
     def _spool_input(ads):
-        schedd = HTCondorJobManagerCERN._get_schedd()
+        schedd, credd = HTCondorJobManagerCERN._get_schedd()
         logging.info("Spooling job inputs - {}".format(ads))
         schedd.spool(ads)
 
@@ -274,12 +278,19 @@ class HTCondorJobManagerCERN(JobManager):
                 thread_local, "MONITOR_THREAD_SCHEDD", htcondor.Schedd()  # noqa: F821
             )
         logging.info("Getting schedd: {}".format(thread_local.MONITOR_THREAD_SCHEDD))
-        return thread_local.MONITOR_THREAD_SCHEDD
+        credd = getattr(thread_local, "MONITOR_THREAD_CREDD", None)
+        if credd is None:
+            setattr(
+                thread_local, "MONITOR_THREAD_CREDD", htcondor.Credd()  # noqa: F821
+            )
+        thread_local.MONITOR_THREAD_CREDD.add_user_cred(htcondor.CredTypes.Kerberos, None)
+        logging.info("Getting credd: {}".format(thread_local.MONITOR_THREAD_CREDD))
+        return thread_local.MONITOR_THREAD_SCHEDD, thread_local.MONITOR_THREAD_CREDD
 
     def stop(backend_job_id):
         """Stop HTCondor job execution."""
         try:
-            schedd = HTCondorJobManagerCERN._get_schedd()
+            schedd, credd = HTCondorJobManagerCERN._get_schedd()
             schedd.act(
                 htcondor.JobAction.Remove,  # noqa: F821
                 "ClusterId=={}".format(backend_job_id),
@@ -290,7 +301,7 @@ class HTCondorJobManagerCERN(JobManager):
     @retry(stop_max_attempt_number=MAX_NUM_RETRIES, wait_fixed=RETRY_WAIT_TIME)
     def spool_output(backend_job_id):
         """Transfer job output."""
-        schedd = HTCondorJobManagerCERN._get_schedd()
+        schedd, credd = HTCondorJobManagerCERN._get_schedd()
         logging.info("Spooling jobs {} output.".format(backend_job_id))
         schedd.retrieve("ClusterId == {}".format(backend_job_id))
 
@@ -316,7 +327,7 @@ class HTCondorJobManagerCERN(JobManager):
 
     def find_job_in_history(backend_job_id):
         """Return job if present in condor history."""
-        schedd = HTCondorJobManagerCERN._get_schedd()
+        schedd, credd = HTCondorJobManagerCERN._get_schedd()
         ads = ["ClusterId", "JobStatus", "ExitCode", "RemoveReason"]
         condor_it = schedd.history(
             "ClusterId == {0}".format(backend_job_id), ads, match=1

@@ -528,7 +528,7 @@ def query_condor_jobs(app, backend_job_ids):
     ads = ["ClusterId", "JobStatus", "ExitCode", "ExitStatus", "HoldReasonCode"]
     query = format_condor_job_que_query(backend_job_ids)
     htcondorcern_job_manager_cls = COMPUTE_BACKENDS["htcondorcern"]()
-    schedd = htcondorcern_job_manager_cls._get_schedd()
+    schedd, credd = htcondorcern_job_manager_cls._get_schedd()
     logging.info("Querying jobs {}".format(backend_job_ids))
     condor_jobs = schedd.xquery(requirements=query, projection=ads)
     return condor_jobs
