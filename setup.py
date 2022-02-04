@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020, 2021 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -19,7 +19,7 @@ readme = open("README.rst").read()
 history = open("CHANGES.rst").read()
 
 tests_require = [
-    "pytest-reana>=0.8.0,<0.9.0",
+    "pytest-reana>=0.8.1,<0.9.0",
 ]
 
 extras_require = {
@@ -54,8 +54,8 @@ install_requires = [
     "Werkzeug>=1.0.1,<2.0",
     "fs>=2.0",
     "marshmallow>2.13.0,<=2.20.1",
-    "reana-commons[kubernetes]>=0.8.0,<0.9.0",
-    "reana-db>=0.8.0,<0.9.0",
+    "reana-commons[kubernetes]>=0.8.3,<0.9.0",
+    "reana-db>=0.8.1,<0.9.0",
     "htcondor==8.9.11",
     "retrying>=1.3.3",
 ]
