@@ -37,6 +37,8 @@ populate(){
         # In case of madminer, define files and directories to copy based on arguments
         for arg in $CMD; do
             if [ -z "${arg##*/reana/users*}" ]; then
+                # Strip single quotes
+                arg=$(echo $arg | sed  "s/'//g")
                 $_CONDOR_SCRATCH_DIR/parrot_static_run ls "/chirp/CONDOR${arg}"
                 res=$?
                 if [ $res == 0 ]; then
