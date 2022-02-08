@@ -14,6 +14,7 @@
 # Defining inputs
 DOCKER_IMG=$2
 REANA_WORKFLOW_DIR=$1
+CMD=${@:3}
 
 # Get static version of parrot.
 # Note: We depend on curl for this.
@@ -32,7 +33,23 @@ populate(){
     if [ ! -x "$_CONDOR_SCRATCH_DIR/parrot_static_run" ]; then get_parrot; fi
     mkdir -p "$_CONDOR_SCRATCH_DIR/$REANA_WORKFLOW_DIR"
     local parent="$(dirname $REANA_WORKFLOW_DIR)"
-    $_CONDOR_SCRATCH_DIR/parrot_static_run -T 30 cp --no-clobber -r "/chirp/CONDOR/$REANA_WORKFLOW_DIR" "$_CONDOR_SCRATCH_DIR/$parent"
+    if [ -z ${t##*madminer*} ]; then
+        # In case of madminer, define files and directories to copy based on arguments
+        for arg in $CMD; do
+            if [ -z "${arg##*/reana/users*}" ]; then
+                $_CONDOR_SCRATCH_DIR/parrot_static_run ls "/chirp/CONDOR${arg}"
+                res=$?
+                if [ $res == 0 ]; then
+                    local argparent=$(dirname $arg)
+                    mkdir -p "$_CONDOR_SCRATCH_DIR/$argparent"
+                    $_CONDOR_SCRATCH_DIR/parrot_static_run -T 30 cp --no-clobber -r "/chirp/CONDOR/$arg" "$_CONDOR_SCRATCH_DIR/$argparent"
+                fi
+            fi
+        done
+    else
+        # Otherwise, copy all the workflow dir
+        $_CONDOR_SCRATCH_DIR/parrot_static_run -T 30 cp --no-clobber -r "/chirp/CONDOR/$REANA_WORKFLOW_DIR" "$_CONDOR_SCRATCH_DIR/$parent"
+    fi
 }
 
 find_module(){
