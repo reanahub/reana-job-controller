@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
-#
 # This file is part of REANA.
-# Copyright (C) 2019, 2020, 2021 CERN.
+# Copyright (C) 2019, 2020, 2021, 2022 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -12,7 +10,7 @@ import ast
 import logging
 import os
 import traceback
-import uuid
+from typing import Optional
 
 from flask import current_app
 from kubernetes import client
@@ -22,7 +20,6 @@ from reana_commons.config import (
     CVMFS_REPOSITORIES,
     K8S_CERN_EOS_AVAILABLE,
     K8S_CERN_EOS_MOUNT_CONFIGURATION,
-    REANA_COMPONENT_PREFIX,
     REANA_JOB_HOSTPATH_MOUNTS,
     REANA_RUNTIME_KUBERNETES_NAMESPACE,
     REANA_RUNTIME_JOBS_KUBERNETES_NODE_LABEL,
@@ -41,7 +38,6 @@ from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
 from reana_commons.k8s.secrets import REANAUserSecretsStore
 from reana_commons.k8s.volumes import (
     get_k8s_cvmfs_volume,
-    get_shared_volume,
     get_reana_shared_volume,
     get_workspace_volume,
 )
@@ -78,10 +74,11 @@ class KubernetesJobManager(JobManager):
         kerberos=False,
         kubernetes_uid=None,
         kubernetes_memory_limit=None,
-        unpacked_img=False,
         voms_proxy=False,
+        kubernetes_job_timeout: Optional[int] = None,
+        **kwargs,
     ):
-        """Instanciate kubernetes job manager.
+        """Instantiate kubernetes job manager.
 
         :param docker_img: Docker image.
         :type docker_img: str
@@ -107,6 +104,8 @@ class KubernetesJobManager(JobManager):
         :type kubernetes_uid: int
         :param kubernetes_memory_limit: Memory limit for job container.
         :type kubernetes_memory_limit: str
+        :param kubernetes_job_timeout: Job timeout in seconds.
+        :type kubernetes_job_timeout: int
         :param voms_proxy: Decides if a voms-proxy certificate should be
             provided for job.
         :type voms_proxy: bool
@@ -128,6 +127,7 @@ class KubernetesJobManager(JobManager):
         self.set_user_id(kubernetes_uid)
         self.set_memory_limit(kubernetes_memory_limit)
         self.workflow_uuid = workflow_uuid
+        self.kubernetes_job_timeout = kubernetes_job_timeout
 
     @JobManager.execution_hook
     def execute(self):
@@ -188,6 +188,7 @@ class KubernetesJobManager(JobManager):
         self.add_shared_volume()
         self.add_eos_volume()
         self.add_image_pull_secrets()
+        self.add_kubernetes_job_timeout()
 
         if self.cvmfs_mounts != "false":
             cvmfs_map = {}
@@ -262,6 +263,13 @@ class KubernetesJobManager(JobManager):
                 "Server \n {}".format(e)
             )
             raise ComputingBackendSubmissionError(e.reason)
+
+    def add_kubernetes_job_timeout(self):
+        """Add job timeout to the job spec."""
+        if self.kubernetes_job_timeout:
+            self.job["spec"]["template"]["spec"][
+                "activeDeadlineSeconds"
+            ] = self.kubernetes_job_timeout
 
     def add_workspace_volume(self):
         """Add workspace volume to a given job spec."""

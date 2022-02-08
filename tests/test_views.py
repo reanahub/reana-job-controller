@@ -11,7 +11,6 @@
 import json
 import uuid
 
-import pytest
 from flask import current_app, url_for
 from kubernetes.client.rest import ApiException
 from mock import Mock, patch
@@ -76,6 +75,10 @@ def test_delete_job_failed_backend(app, mocked_job):
             assert res.status_code == 502
 
 
+@patch("reana_job_controller.schemas.REANA_KUBERNETES_JOBS_TIMEOUT_LIMIT", "10")
+@patch(
+    "reana_job_controller.schemas.REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT", "20"
+)
 def test_create_job_unsupported_backend(app, job_spec):
     """Test create job with unsupported backend."""
     fake_backend = "htcondorcern"

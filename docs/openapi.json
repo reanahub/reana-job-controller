@@ -69,6 +69,10 @@
         "kerberos": {
           "type": "boolean"
         },
+        "kubernetes_job_timeout": {
+          "format": "int32",
+          "type": "integer"
+        },
         "kubernetes_memory_limit": {
           "type": "string"
         },
@@ -109,7 +113,7 @@
   "info": {
     "description": "REANA Job Controller API",
     "title": "reana-job-controller",
-    "version": "0.8.0a7"
+    "version": "0.8.1"
   },
   "parameters": {},
   "paths": {

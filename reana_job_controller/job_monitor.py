@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2019, 2020, 2021 CERN.
+# Copyright (C) 2019, 2020, 2021, 2022 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -12,7 +12,7 @@ import logging
 import threading
 import time
 import traceback
-from typing import Optional
+from typing import Optional, Dict
 
 from kubernetes import client, watch
 from reana_commons.config import REANA_RUNTIME_KUBERNETES_NAMESPACE
@@ -52,7 +52,9 @@ class JobMonitorKubernetes(JobMonitor):
         self.workflow_uuid = workflow_uuid
         super(__class__, self).__init__(thread_name="kubernetes_job_monitor")
 
-    def _get_remaining_jobs(self, compute_backend="kubernetes", statuses_to_skip=None):
+    def _get_remaining_jobs(
+        self, compute_backend="kubernetes", statuses_to_skip=None
+    ) -> Dict[str, str]:
         """Get remaining jobs according to a set of conditions.
 
         :param compute_backend: For which compute backend to search remaining
@@ -78,15 +80,8 @@ class JobMonitorKubernetes(JobMonitor):
                 remaining_jobs[job_dict["backend_job_id"]] = job_id
         return remaining_jobs
 
-    def get_reana_job_id(self, backend_job_id):
-        """Get REANA job ID.
-
-        :param job_pod: Compute backend job id.
-        :type job_pod: str
-
-        :return: REANA job ID.
-        :rtype: str
-        """
+    def get_reana_job_id(self, backend_job_id: str) -> str:
+        """Get REANA job ID."""
         remaining_jobs = self._get_remaining_jobs()
         return remaining_jobs[backend_job_id]
 
@@ -122,28 +117,41 @@ class JobMonitorKubernetes(JobMonitor):
         """
         self.job_db[reana_job_id]["status"] = status
 
-    def should_process_job(self, job_pod):
+    def should_process_job(self, job_pod) -> bool:
         """Decide whether the job should be processed or not.
-
-        For a job to be processed it has to:
-        - Be a job created by this instance, that's why we check the in
-          memory DB.
-        - It has to be an active job, not having been deleted already.
-        - It has to be terminated, otherwise no status or logs can be
-          retrieved.
 
         :param job_pod: Compute backend job object (Kubernetes V1Pod
             https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1Pod.md)
-
-        :return: Boolean representing whether the job should be processed or
-            not.
-        :rtype: bool
         """
-        remaining_jobs = self._get_remaining_jobs()
+        remaining_jobs = self._get_remaining_jobs(
+            statuses_to_skip=[JobStatus.finished.name, JobStatus.failed.name]
+        )
         backend_job_id = self.get_backend_job_id(job_pod)
-        is_job_in_memory_db = self.job_db.get(remaining_jobs.get(backend_job_id))
         is_job_in_remaining_jobs = backend_job_id in remaining_jobs
-        return is_job_in_memory_db or is_job_in_remaining_jobs
+
+        job_status = self.get_job_status(job_pod)
+        is_job_completed = job_status in [
+            JobStatus.finished.name,
+            JobStatus.failed.name,
+        ]
+
+        return (
+            is_job_in_remaining_jobs
+            and is_job_completed
+            and self._all_job_containers_not_running(job_pod)
+        )
+
+    @staticmethod
+    def _get_job_container_statuses(job_pod):
+        return (job_pod.status.container_statuses or []) + (
+            job_pod.status.init_container_statuses or []
+        )
+
+    def _all_job_containers_not_running(self, job_pod) -> bool:
+        return all(
+            not container.state.running
+            for container in self._get_job_container_statuses(job_pod)
+        )
 
     def clean_job(self, job_id):
         """Clean up the created Kubernetes Job.
@@ -160,20 +168,18 @@ class JobMonitorKubernetes(JobMonitor):
             logging.error(traceback.format_exc())
             logging.error("Unexpected error: {}".format(e))
 
-    def get_job_status(self, job_pod):
+    def get_job_status(self, job_pod) -> Optional[str]:
         """Get Kubernetes based REANA job status."""
         status = None
         backend_job_id = self.get_backend_job_id(job_pod)
         if job_pod.status.phase == "Succeeded":
-            logging.info("Kubernetes_job_id: {} succeeded.".format(backend_job_id))
-            status = "finished"
+            logging.info("Kubernetes job id: {} succeeded.".format(backend_job_id))
+            status = JobStatus.finished.name
         elif job_pod.status.phase == "Failed":
             logging.info("Kubernetes job id: {} failed.".format(backend_job_id))
-            status = "failed"
+            status = JobStatus.failed.name
         elif job_pod.status.phase == "Pending":
-            container_statuses = (job_pod.status.container_statuses or []) + (
-                job_pod.status.init_container_statuses or []
-            )
+            container_statuses = self._get_job_container_statuses(job_pod)
             try:
                 for container in container_statuses:
                     reason = container.state.waiting.reason
@@ -184,7 +190,7 @@ class JobMonitorKubernetes(JobMonitor):
                                 container.name, backend_job_id
                             )
                         )
-                        status = "failed"
+                        status = JobStatus.failed.name
                     elif "InvalidImageName" in reason:
                         logging.info(
                             "Container {} in Kubernetes job {} "
@@ -192,21 +198,18 @@ class JobMonitorKubernetes(JobMonitor):
                                 container.name, backend_job_id
                             )
                         )
-                        status = "failed"
+                        status = JobStatus.failed.name
             except (AttributeError, TypeError):
                 pass
 
         return status
 
-    def get_job_logs(self, job_pod):
-        """Get job pod's containers' logs."""
+    def _get_containers_logs(self, job_pod) -> Optional[str]:
         try:
             pod_logs = ""
-            container_statuses = (job_pod.status.container_statuses or []) + (
-                job_pod.status.init_container_statuses or []
-            )
+            container_statuses = self._get_job_container_statuses(job_pod)
 
-            logging.info("Grabbing pod {} logs ...".format(job_pod.metadata.name))
+            logging.info(f"Grabbing pod {job_pod.metadata.name} logs ...")
             for container in container_statuses:
                 if container.state.terminated:
                     container_log = current_k8s_corev1_api_client.read_namespaced_pod_log(
@@ -231,6 +234,33 @@ class JobMonitorKubernetes(JobMonitor):
             logging.error("Unexpected error: {}".format(e))
             return None
 
+    def get_job_logs(self, job_pod) -> Optional[str]:
+        """Get job logs."""
+        logs = self._get_containers_logs(job_pod)
+
+        if job_pod.status.reason == "DeadlineExceeded":
+            if not logs:
+                logs = ""
+
+            backend_job_id = self.get_backend_job_id(job_pod)
+            message = f"\n{job_pod.status.reason}\nThe job was killed due to exceeding timeout"
+
+            try:
+                specified_timeout = job_pod.spec.active_deadline_seconds
+                message += f" of {specified_timeout} seconds."
+            except AttributeError:
+                message += "."
+                logging.error(
+                    f"Kubernetes job id: {backend_job_id}. Could not get job timeout from Job spec."
+                )
+
+            logs += message
+            logging.info(
+                f"Kubernetes job id: {backend_job_id} was killed due to timeout."
+            )
+
+        return logs
+
     def watch_jobs(self, job_db, app=None):
         """Open stream connection to k8s apiserver to watch all jobs status.
 
@@ -248,16 +278,16 @@ class JobMonitorKubernetes(JobMonitor):
                     logging.info("New Pod event received: {0}".format(event["type"]))
                     job_pod = event["object"]
 
-                    if not self.should_process_job(job_pod):
-                        continue
-
-                    job_status = self.get_job_status(job_pod)
-                    if job_status in ["failed", "finished"]:
+                    if self.should_process_job(job_pod):
+                        job_status = self.get_job_status(job_pod)
                         backend_job_id = self.get_backend_job_id(job_pod)
                         reana_job_id = self.get_reana_job_id(backend_job_id)
+
                         logs = self.get_job_logs(job_pod)
                         self.store_job_logs(reana_job_id, logs)
+
                         self.update_job_status(reana_job_id, job_status)
+
                         if JobStatus.should_cleanup_job(job_status):
                             self.clean_job(backend_job_id)
             except client.rest.ApiException as e:

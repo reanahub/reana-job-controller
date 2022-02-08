@@ -114,17 +114,19 @@ def test_kubernetes_should_process_job(
     app, compute_backend, deleted, should_process, kubernetes_job_pod
 ):
     """Test should process job."""
-    with mock.patch("reana_job_controller.job_monitor." "threading"):
+    with mock.patch("reana_job_controller.job_monitor.threading"):
         job_monitor_k8s = JobMonitorKubernetes(app=app)
         job_id = str(uuid.uuid4())
         backend_job_id = str(uuid.uuid4())
         job_metadata = {
             "deleted": deleted,
             "compute_backend": compute_backend,
-            "status": "finished",
+            "status": "running",
             "backend_job_id": backend_job_id,
         }
         job_monitor_k8s.job_db = {job_id: job_metadata}
-        job_pod = kubernetes_job_pod("Succeeded", "Completed", job_id=backend_job_id)
+        job_pod_event = kubernetes_job_pod(
+            "Succeeded", "Completed", job_id=backend_job_id
+        )
 
-        assert bool(job_monitor_k8s.should_process_job(job_pod)) == should_process
+        assert bool(job_monitor_k8s.should_process_job(job_pod_event)) == should_process
