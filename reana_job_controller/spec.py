@@ -22,7 +22,10 @@ def build_openapi_spec():
         title="reana-job-controller",
         version=__version__,
         info=dict(description="REANA Job Controller API"),
-        plugins=["apispec.ext.flask", "apispec.ext.marshmallow",],
+        plugins=[
+            "apispec.ext.flask",
+            "apispec.ext.marshmallow",
+        ],
     )
 
     # Add marshmallow models to specification

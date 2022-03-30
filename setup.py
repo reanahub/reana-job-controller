@@ -19,11 +19,15 @@ readme = open("README.rst").read()
 history = open("CHANGES.rst").read()
 
 tests_require = [
-    "pytest-reana>=0.9.0a1,<0.10.0",
+    "pytest-reana>=0.9.0a4,<0.10.0",
 ]
 
 extras_require = {
-    "debug": ["wdb", "ipdb", "Flask-DebugToolbar",],
+    "debug": [
+        "wdb",
+        "ipdb",
+        "Flask-DebugToolbar",
+    ],
     "docs": [
         "Sphinx>=1.5.1,<1.6",
         "sphinx-rtd-theme>=0.1.9",
@@ -55,8 +59,8 @@ install_requires = [
     "Werkzeug>=1.0.1,<2.0",
     "fs>=2.0",
     "marshmallow>2.13.0,<=2.20.1",
-    "reana-commons[kubernetes]>=0.9.0a5,<0.10.0",
-    "reana-db>=0.9.0a4,<0.10.0",
+    "reana-commons[kubernetes]>=0.9.0a6,<0.10.0",
+    "reana-db>=0.9.0a5,<0.10.0",
     "htcondor==8.9.11",
     "retrying>=1.3.3",
 ]
@@ -78,9 +82,15 @@ setup(
     author="REANA",
     author_email="info@reana.io",
     url="https://github.com/reanahub/reana-job-controller",
-    packages=["reana_job_controller",],
+    packages=[
+        "reana_job_controller",
+    ],
     zip_safe=False,
-    entry_points={"flask.commands": ["openapi = reana_job_controller.cli:openapi",],},
+    entry_points={
+        "flask.commands": [
+            "openapi = reana_job_controller.cli:openapi",
+        ],
+    },
     extras_require=extras_require,
     install_requires=install_requires,
     setup_requires=setup_requires,

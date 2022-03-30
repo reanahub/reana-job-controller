@@ -313,7 +313,9 @@ class KubernetesJobManager(JobManager):
 
         def _set_job_memory_limit(job_spec, memory_limit):
             job_spec["containers"][0]["resources"] = {
-                "limits": {"memory": memory_limit,}
+                "limits": {
+                    "memory": memory_limit,
+                }
             }
 
         if self.kubernetes_memory_limit:

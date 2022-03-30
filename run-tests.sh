@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2020, 2021 CERN.
+# Copyright (C) 2017, 2018, 2020, 2021, 2022 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -123,7 +123,7 @@ check_all_darwin () {
     apt update && apt-get -y install libkrb5-dev git shellcheck  &&
     pip install -r requirements.txt &&
     pip install -e .[all] && # Install test dependencies
-    pip install black==19.10b0 &&
+    pip install black &&
     pip install flake8 &&
     pip install pydocstyle &&
     pip install check-manifest &&

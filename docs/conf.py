@@ -62,7 +62,10 @@ redoc = [
         "page": "_static/api",
         "spec": "openapi.json",
         "embed": True,
-        "opts": {"hide-loading": True, "hide-hostname": True,},
+        "opts": {
+            "hide-loading": True,
+            "hide-hostname": True,
+        },
     }
 ]
 
