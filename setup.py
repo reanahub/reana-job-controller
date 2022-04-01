@@ -54,9 +54,9 @@ setup_requires = [
 
 install_requires = [
     "apispec>=0.21.0,<0.40",
-    "Flask>=1.0.4,<2.0",
-    "MarkupSafe>=2.0.0,<2.1.0",
-    "Werkzeug>=1.0.1,<2.0",
+    "Flask>=2.1.1",
+    "jinja2<3.1.0",
+    "Werkzeug>=2.1.0",
     "fs>=2.0",
     "marshmallow>2.13.0,<=2.20.1",
     "reana-commons[kubernetes]>=0.9.0a6,<0.10.0",
