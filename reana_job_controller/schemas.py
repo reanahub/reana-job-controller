@@ -51,6 +51,8 @@ class JobRequest(Schema):
     unpacked_img = fields.Bool(required=False)
     htcondor_max_runtime = fields.Str(required=False)
     htcondor_accounting_group = fields.Str(required=False)
+    slurm_partition = fields.Str(required=False)
+    slurm_time = fields.Str(required=False)
 
     @pre_load
     def set_kubernetes_job_timeout(self, in_data, **kwargs):

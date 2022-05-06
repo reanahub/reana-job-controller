@@ -88,6 +88,12 @@
           "default": true,
           "type": "boolean"
         },
+        "slurm_partition": {
+          "type": "string"
+        },
+        "slurm_time": {
+          "type": "string"
+        },
         "unpacked_img": {
           "type": "boolean"
         },

@@ -30,6 +30,8 @@ class SlurmJobManagerCERN(JobManager):
     """Default slurm partition."""
     SLURM_HOME_PATH = os.getenv("SLURM_HOME_PATH", "")
     """Default SLURM home path."""
+    SLURM_TIME = os.getenv("SLURM_TIME", "60")
+    """Default SLURM job timelimit."""
 
     def __init__(
         self,
@@ -45,6 +47,8 @@ class SlurmJobManagerCERN(JobManager):
         kerberos=False,
         kubernetes_uid=None,
         unpacked_img=False,
+        slurm_partition=SLURM_PARTITION,
+        slurm_time=SLURM_TIME,
         **kwargs,
     ):
         """Instanciate Slurm job manager.
@@ -67,6 +71,10 @@ class SlurmJobManagerCERN(JobManager):
         :type shared_file_system: bool
         :param job_name: Name of the job
         :type job_name: str
+        :param slurm_partition: Partition of a Slurm job.
+        :type slurm_partition: str
+        :param slurm_time: Maximum timelimit of a Slurm job.
+        :type slurm_time: str
         """
         super(SlurmJobManagerCERN, self).__init__(
             docker_img=docker_img,
@@ -82,6 +90,8 @@ class SlurmJobManagerCERN(JobManager):
         self.shared_file_system = shared_file_system
         self.job_file = "job.sh"
         self.job_description_file = "job_description.sh"
+        self.partition = slurm_partition
+        self.timelimit = slurm_time
 
     def _transfer_inputs(self):
         """Transfer inputs to SLURM submit node."""
@@ -135,11 +145,12 @@ class SlurmJobManagerCERN(JobManager):
             "#SBATCH --output=reana_job.%j.out \n"
             "#SBATCH --error=reana_job.%j.err \n"
             "#SBATCH --partition {partition} \n"
-            "#SBATCH --time 60 \n"
+            "#SBATCH --time {time} \n"
             "export PATH=$PATH:/usr/sbin \n"
             "srun {command}"
         ).format(
-            partition=SlurmJobManagerCERN.SLURM_PARTITION,
+            partition=self.partition,
+            time=self.timelimit,
             job_name=self.job_name,
             command=self._wrap_singularity_cmd(),
         )
