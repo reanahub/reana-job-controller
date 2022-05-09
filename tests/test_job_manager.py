@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2019, 2020, 2021 CERN.
+# Copyright (C) 2019, 2020, 2021, 2022 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -9,7 +9,6 @@
 """REANA-Job-Controller Job Manager tests."""
 
 import json
-import os
 import uuid
 
 import mock
@@ -20,15 +19,17 @@ from reana_job_controller.job_manager import JobManager
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 
 
+@pytest.mark.parametrize("kerberos", [False, True])
 def test_execute_kubernetes_job(
     app,
     session,
     sample_serial_workflow_in_db,
     sample_workflow_workspace,
     default_user,
-    empty_user_secrets,
+    kerberos_user_secrets,
     corev1_api_client_with_user_secrets,
     monkeypatch,
+    kerberos,
 ):
     """Test execution of Kubernetes job."""
     workflow_uuid = sample_serial_workflow_in_db.id_
@@ -45,13 +46,15 @@ def test_execute_kubernetes_job(
         env_vars=expected_env_var,
         workflow_uuid=workflow_uuid,
         workflow_workspace=workflow_workspace,
+        kerberos=kerberos,
     )
+
     with mock.patch(
         "reana_job_controller.kubernetes_job_manager." "current_k8s_batchv1_api_client"
     ) as kubernetes_client:
         with mock.patch(
             "reana_commons.k8s.secrets." "current_k8s_corev1_api_client",
-            corev1_api_client_with_user_secrets(empty_user_secrets),
+            corev1_api_client_with_user_secrets(kerberos_user_secrets),
         ):
             kubernetes_job_id = job_manager.execute()
             created_job = (
@@ -69,10 +72,17 @@ def test_execute_kubernetes_job(
             env_vars = body["spec"]["template"]["spec"]["containers"][0]["env"]
             image = body["spec"]["template"]["spec"]["containers"][0]["image"]
             command = body["spec"]["template"]["spec"]["containers"][0]["args"]
-            assert len(env_vars) == 3
+            init_containers = body["spec"]["template"]["spec"]["initContainers"]
+            if not kerberos:
+                # custom env + REANA_WORKSPACE + REANA_WORKFLOW_UUID + two secrets
+                num_env_vars = 5
+            else:
+                num_env_vars = 6
+            assert len(env_vars) == num_env_vars
             assert {"name": env_var_key, "value": env_var_value} in env_vars
             assert image == expected_image
             assert command == [expected_command]
+            assert len(init_containers) == (1 if kerberos else 0)
 
 
 def test_stop_kubernetes_job(

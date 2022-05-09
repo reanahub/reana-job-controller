@@ -35,6 +35,7 @@ from reana_commons.job_utils import (
     kubernetes_memory_to_bytes,
 )
 from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
+from reana_commons.k8s.kerberos import get_kerberos_k8s_config
 from reana_commons.k8s.secrets import REANAUserSecretsStore
 from reana_commons.k8s.volumes import (
     get_k8s_cvmfs_volume,
@@ -217,7 +218,7 @@ class KubernetesJobManager(JobManager):
         )
 
         if self.kerberos:
-            self._add_krb5_init_container(secrets_volume_mount)
+            self._add_krb5_init_container(secrets_store)
 
         if self.voms_proxy:
             self._add_voms_proxy_init_container(secrets_volume_mount, secret_env_vars)
@@ -348,61 +349,26 @@ class KubernetesJobManager(JobManager):
             ].append(volume_mount)
             self.job["spec"]["template"]["spec"]["volumes"].append(volume)
 
-    def _add_krb5_init_container(self, secrets_volume_mount):
+    def _add_krb5_init_container(self, secrets_store):
         """Add  sidecar container for a job."""
-        krb5_config_map_name = current_app.config["KRB5_CONFIGMAP_NAME"]
-        ticket_cache_volume = {"name": "krb5-cache", "emptyDir": {}}
-        krb5_config_volume = {
-            "name": "krb5-conf",
-            "configMap": {"name": krb5_config_map_name},
-        }
-        volume_mounts = [
-            {
-                "name": ticket_cache_volume["name"],
-                "mountPath": current_app.config["KRB5_TOKEN_CACHE_LOCATION"],
-            },
-            {
-                "name": krb5_config_volume["name"],
-                "mountPath": "/etc/krb5.conf",
-                "subPath": "krb5.conf",
-            },
-        ]
-        keytab_file = os.environ.get("CERN_KEYTAB")
-        cern_user = os.environ.get("CERN_USER")
-        krb5_container = {
-            "image": current_app.config["KRB5_CONTAINER_IMAGE"],
-            "command": [
-                "kinit",
-                "-kt",
-                "/etc/reana/secrets/{}".format(keytab_file),
-                "{}@CERN.CH".format(cern_user),
-            ],
-            "name": current_app.config["KRB5_CONTAINER_NAME"],
-            "imagePullPolicy": "IfNotPresent",
-            "volumeMounts": [secrets_volume_mount] + volume_mounts,
-        }
-
-        self.job["spec"]["template"]["spec"]["volumes"].extend(
-            [ticket_cache_volume, krb5_config_volume]
+        krb5_config = get_kerberos_k8s_config(
+            secrets_store,
+            kubernetes_uid=self.kubernetes_uid,
         )
+
+        self.job["spec"]["template"]["spec"]["volumes"].extend(krb5_config.volumes)
         self.job["spec"]["template"]["spec"]["containers"][0]["volumeMounts"].extend(
-            volume_mounts
+            krb5_config.volume_mounts
         )
         # Add the Kerberos token cache file location to the job container
         # so every instance of Kerberos picks it up even if it doesn't read
         # the configuration file.
-        self.job["spec"]["template"]["spec"]["containers"][0]["env"].append(
-            {
-                "name": "KRB5CCNAME",
-                "value": os.path.join(
-                    current_app.config["KRB5_TOKEN_CACHE_LOCATION"],
-                    current_app.config["KRB5_TOKEN_CACHE_FILENAME"].format(
-                        self.kubernetes_uid
-                    ),
-                ),
-            }
+        self.job["spec"]["template"]["spec"]["containers"][0]["env"].extend(
+            krb5_config.env
         )
-        self.job["spec"]["template"]["spec"]["initContainers"].append(krb5_container)
+        self.job["spec"]["template"]["spec"]["initContainers"].append(
+            krb5_config.init_container
+        )
 
     def _add_voms_proxy_init_container(self, secrets_volume_mount, secret_env_vars):
         """Add  sidecar container for a job."""

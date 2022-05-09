@@ -52,26 +52,6 @@ SUPPORTED_COMPUTE_BACKENDS = os.getenv(
 ).split(",")
 """List of supported compute backends provided as docker build arg."""
 
-KRB5_CONTAINER_IMAGE = os.getenv(
-    "KRB5_CONTAINER_IMAGE", "reanahub/reana-auth-krb5:1.0.1"
-)
-"""Default docker image of KRB5 sidecar container."""
-
-KRB5_CONTAINER_NAME = "krb5"
-"""Name of KRB5 sidecar container."""
-
-KRB5_TOKEN_CACHE_LOCATION = "/krb5_cache/"
-"""Directory of Kerberos tokens cache, shared between job & KRB5 container. It
-should match `default_ccache_name` in krb5.conf.
-"""
-
-KRB5_TOKEN_CACHE_FILENAME = "krb5_{}"
-"""Name of the Kerberos token cache file."""
-
-KRB5_CONFIGMAP_NAME = os.getenv(
-    "REANA_KRB5_CONFIGMAP_NAME", f"{REANA_COMPONENT_PREFIX}-krb5-conf"
-)
-"""Kerberos configMap name."""
 
 VOMSPROXY_CONTAINER_IMAGE = os.getenv(
     "VOMSPROXY_CONTAINER_IMAGE", "reanahub/reana-auth-vomsproxy:1.0.0"
