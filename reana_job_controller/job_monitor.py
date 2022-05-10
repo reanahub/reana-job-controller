@@ -20,7 +20,14 @@ from reana_commons.k8s.api_client import current_k8s_corev1_api_client
 from reana_db.database import Session
 from reana_db.models import Job, JobStatus
 
-from reana_job_controller.config import COMPUTE_BACKENDS
+from reana_job_controller.config import (
+    COMPUTE_BACKENDS,
+    SLURM_HEADNODE_HOSTNAME,
+    SLURM_HEADNODE_PORT,
+    SLURM_SSH_TIMEOUT,
+    SLURM_SSH_BANNER_TIMEOUT,
+    SLURM_SSH_AUTH_TIMEOUT,
+)
 from reana_job_controller.job_db import JOB_DB
 from reana_job_controller.utils import SSHClient, singleton
 
@@ -458,8 +465,11 @@ class JobMonitorSlurmCERN(JobMonitor):
         :param job_db: Dictionary which contains all running jobs.
         """
         slurm_connection = SSHClient(
-            hostname=self.job_manager_cls.SLURM_HEADNODE_HOSTNAME,
-            port=self.job_manager_cls.SLURM_HEADNODE_PORT,
+            hostname=SLURM_HEADNODE_HOSTNAME,
+            port=SLURM_HEADNODE_PORT,
+            timeout=SLURM_SSH_TIMEOUT,
+            banner_timeout=SLURM_SSH_BANNER_TIMEOUT,
+            auth_timeout=SLURM_SSH_AUTH_TIMEOUT,
         )
         statuses_to_skip = ["finished", "failed"]
         while True:

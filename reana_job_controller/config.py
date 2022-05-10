@@ -104,3 +104,30 @@ REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT = os.getenv(
 Please see the following URL for more details
 https://kubernetes.io/docs/concepts/workloads/controllers/job/#job-termination-and-cleanup.
 """
+
+SLURM_HEADNODE_HOSTNAME = os.getenv("SLURM_HOSTNAME", "hpc-batch.cern.ch")
+"""Hostname of SLURM head-node used for job management via SSH."""
+
+SLURM_HEADNODE_PORT = os.getenv("SLURM_CLUSTER_PORT", "22")
+"""Port of SLURM head node."""
+
+SLURM_PARTITION = os.getenv("SLURM_PARTITION", "inf-short")
+"""Default slurm partition."""
+
+SLURM_JOB_TIMELIMIT = os.getenv("SLURM_JOB_TIMELIMIT", "60")
+"""Default SLURM job timelimit.
+
+Acceptable time formats include "minutes", "minutes:seconds", "hours:minutes:seconds", "days-hours",
+"days-hours:minutes" and "days-hours:minutes:seconds". A time limit of zero means that no time limit
+will be imposed. Please see the following URL for more details
+https://slurm.schedmd.com/sbatch.html (-t, --time)
+"""
+
+SLURM_SSH_TIMEOUT = float(os.getenv("SLURM_SSH_TIMEOUT", "60"))
+"""Seconds to wait for SLURM SSH TCP connection."""
+
+SLURM_SSH_BANNER_TIMEOUT = float(os.getenv("SLURM_SSH_BANNER_TIMEOUT", "60"))
+"""Seconds to wait for SLURM SSH banner to be presented."""
+
+SLURM_SSH_AUTH_TIMEOUT = float(os.getenv("SLURM_SSH_AUTH_TIMEOUT", "60"))
+"""Seconds to wait for SLURM SSH authentication response."""

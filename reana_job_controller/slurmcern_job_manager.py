@@ -13,6 +13,15 @@ from stat import S_ISDIR
 
 from reana_job_controller.job_manager import JobManager
 from reana_job_controller.utils import SSHClient, initialize_krb5_token
+from reana_job_controller.config import (
+    SLURM_HEADNODE_HOSTNAME,
+    SLURM_HEADNODE_PORT,
+    SLURM_PARTITION,
+    SLURM_JOB_TIMELIMIT,
+    SLURM_SSH_TIMEOUT,
+    SLURM_SSH_BANNER_TIMEOUT,
+    SLURM_SSH_AUTH_TIMEOUT,
+)
 
 
 class SlurmJobManagerCERN(JobManager):
@@ -22,16 +31,8 @@ class SlurmJobManagerCERN(JobManager):
     """Absolute path inside slurm head node used for submission."""
     REANA_WORKSPACE_PATH = ""
     """Absolute REANA workspace path."""
-    SLURM_HEADNODE_HOSTNAME = os.getenv("SLURM_HOSTNAME", "hpc-batch.cern.ch")
-    """Hostname of SLURM head-node used for job management via SSH."""
-    SLURM_HEADNODE_PORT = os.getenv("SLURM_CLUSTER_PORT", "22")
-    """Port of SLURM head node."""
-    SLURM_PARTITION = os.getenv("SLURM_PARTITION", "inf-short")
-    """Default slurm partition."""
     SLURM_HOME_PATH = os.getenv("SLURM_HOME_PATH", "")
     """Default SLURM home path."""
-    SLURM_TIME = os.getenv("SLURM_TIME", "60")
-    """Default SLURM job timelimit."""
 
     def __init__(
         self,
@@ -44,11 +45,8 @@ class SlurmJobManagerCERN(JobManager):
         cvmfs_mounts="false",
         shared_file_system=False,
         job_name=None,
-        kerberos=False,
-        kubernetes_uid=None,
-        unpacked_img=False,
         slurm_partition=SLURM_PARTITION,
-        slurm_time=SLURM_TIME,
+        slurm_job_timelimit=SLURM_JOB_TIMELIMIT,
         **kwargs,
     ):
         """Instanciate Slurm job manager.
@@ -61,8 +59,8 @@ class SlurmJobManagerCERN(JobManager):
         :type prettified_cmd: str
         :param env_vars: Environment variables.
         :type env_vars: dict
-        :param workflow_id: Unique workflow id.
-        :type workflow_id: str
+        :param workflow_uuid: Unique workflow id.
+        :type workflow_uuid: str
         :param workflow_workspace: Workflow workspace path.
         :type workflow_workspace: str
         :param cvmfs_mounts: list of CVMFS mounts as a string.
@@ -73,8 +71,8 @@ class SlurmJobManagerCERN(JobManager):
         :type job_name: str
         :param slurm_partition: Partition of a Slurm job.
         :type slurm_partition: str
-        :param slurm_time: Maximum timelimit of a Slurm job.
-        :type slurm_time: str
+        :param slurm_job_timelimit: Maximum timelimit of a Slurm job.
+        :type slurm_job_timelimit: str
         """
         super(SlurmJobManagerCERN, self).__init__(
             docker_img=docker_img,
@@ -91,7 +89,8 @@ class SlurmJobManagerCERN(JobManager):
         self.job_file = "job.sh"
         self.job_description_file = "job_description.sh"
         self.partition = slurm_partition
-        self.timelimit = slurm_time
+        self.timelimit = slurm_job_timelimit
+        self.img_type_docker = self._is_img_type_docker()
 
     def _transfer_inputs(self):
         """Transfer inputs to SLURM submit node."""
@@ -116,6 +115,7 @@ class SlurmJobManagerCERN(JobManager):
                     os.path.join(dirpath, file),
                     os.path.join(self.slurm_home_path, dirpath[1:], file),
                 )
+        sftp.close()
 
     @JobManager.execution_hook
     def execute(self):
@@ -123,10 +123,14 @@ class SlurmJobManagerCERN(JobManager):
         self.cmd = self._encode_cmd(self.cmd)
         initialize_krb5_token(workflow_uuid=self.workflow_uuid)
         self.slurm_connection = SSHClient(
-            hostname=SlurmJobManagerCERN.SLURM_HEADNODE_HOSTNAME,
-            port=SlurmJobManagerCERN.SLURM_HEADNODE_PORT,
+            hostname=SLURM_HEADNODE_HOSTNAME,
+            port=SLURM_HEADNODE_PORT,
+            timeout=SLURM_SSH_TIMEOUT,
+            banner_timeout=SLURM_SSH_BANNER_TIMEOUT,
+            auth_timeout=SLURM_SSH_AUTH_TIMEOUT,
         )
         self._transfer_inputs()
+        self._pull_image()
         self._dump_job_file()
         self._dump_job_submission_file()
         stdout = self.slurm_connection.exec_command(
@@ -136,6 +140,22 @@ class SlurmJobManagerCERN(JobManager):
         )
         backend_job_id = stdout.rstrip()
         return backend_job_id
+
+    def _is_img_type_docker(self):
+        return not any(img_type in self.docker_img for img_type in [".sif", "cvmfs"])
+
+    def _pull_image(self):
+        """Pull a Docker image using Singularity."""
+        if self.img_type_docker:
+            self.slurm_connection.exec_command(
+                f"cd {self.SLURM_WORKSAPCE_PATH} && singularity pull docker://{self.docker_img}"
+            )
+
+    def _get_container(self):
+        """Get container image."""
+        if self.img_type_docker:
+            return self.docker_img.split("/", 1)[-1].replace(":", "_") + ".sif"
+        return self.docker_img
 
     def _dump_job_submission_file(self):
         """Dump job submission file to the Slurm submit node."""
@@ -183,10 +203,10 @@ class SlurmJobManagerCERN(JobManager):
         """Wrap command in singulrity."""
         base_singularity_cmd = (
             "singularity exec -B {SLURM_WORKSAPCE}:{REANA_WORKSPACE}"
-            " docker://{DOCKER_IMG} {CMD}".format(
+            " {IMAGE} {CMD}".format(
                 SLURM_WORKSAPCE=SlurmJobManagerCERN.SLURM_WORKSAPCE_PATH,
                 REANA_WORKSPACE=SlurmJobManagerCERN.REANA_WORKSPACE_PATH,
-                DOCKER_IMG=self.docker_img,
+                IMAGE=self._get_container(),
                 CMD="./" + self.job_file,
             )
         )

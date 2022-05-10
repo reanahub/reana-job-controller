@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017-2019 CERN.
+# Copyright (C) 2017-2019, 2022 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -45,6 +45,7 @@ def initialize_krb5_token(workflow_uuid):
     cern_user = os.environ.get("CERN_USER")
     keytab_file = os.environ.get("CERN_KEYTAB")
     cmd = "kinit -kt /etc/reana/secrets/{} {}@CERN.CH".format(keytab_file, cern_user)
+
     if cern_user:
         try:
             subprocess.check_output(cmd, shell=True)
@@ -73,17 +74,34 @@ class SSHClient:
 
     import paramiko
 
-    def __init__(self, hostname=None, port=None):
+    def __init__(
+        self,
+        hostname=None,
+        port=None,
+        timeout=None,
+        banner_timeout=None,
+        auth_timeout=None,
+    ):
         """Initialize ssh client."""
         self.hostname = hostname
         self.port = port
+        self.timeout = timeout
+        self.banner_timeout = banner_timeout
+        self.auth_timeout = auth_timeout
         self.establish_connection()
 
     def establish_connection(self):
         """Establish the connection."""
         self.ssh_client = self.paramiko.SSHClient()
         self.ssh_client.set_missing_host_key_policy(self.paramiko.AutoAddPolicy())
-        self.ssh_client.connect(hostname=self.hostname, port=self.port, gss_auth=True)
+        self.ssh_client.connect(
+            hostname=self.hostname,
+            port=self.port,
+            gss_auth=True,
+            timeout=self.timeout,
+            banner_timeout=self.banner_timeout,
+            auth_timeout=self.auth_timeout,
+        )
 
     def exec_command(self, command):
         """Execute command and return exit code."""
