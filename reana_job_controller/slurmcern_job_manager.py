@@ -26,7 +26,7 @@ class SlurmJobManagerCERN(JobManager):
     """Hostname of SLURM head-node used for job management via SSH."""
     SLURM_HEADNODE_PORT = os.getenv("SLURM_CLUSTER_PORT", "22")
     """Port of SLURM head node."""
-    SLURM_PARTITION = os.getenv("SLURM_PARTITION", "batch-short")
+    SLURM_PARTITION = os.getenv("SLURM_PARTITION", "inf-short")
     """Default slurm partition."""
     SLURM_HOME_PATH = os.getenv("SLURM_HOME_PATH", "")
     """Default SLURM home path."""
