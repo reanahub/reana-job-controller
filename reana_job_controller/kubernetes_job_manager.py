@@ -164,6 +164,7 @@ class KubernetesJobManager(JobManager):
                         "initContainers": [],
                         "volumes": [],
                         "restartPolicy": "Never",
+                        "enableServiceLinks": False,
                     },
                 },
             },
