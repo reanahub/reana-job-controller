@@ -54,7 +54,7 @@ SUPPORTED_COMPUTE_BACKENDS = os.getenv(
 
 
 VOMSPROXY_CONTAINER_IMAGE = os.getenv(
-    "VOMSPROXY_CONTAINER_IMAGE", "reanahub/reana-auth-vomsproxy:1.0.0"
+    "VOMSPROXY_CONTAINER_IMAGE", "reanahub/reana-auth-vomsproxy:1.1.0"
 )
 """Default docker image of VOMSPROXY sidecar container."""
 
