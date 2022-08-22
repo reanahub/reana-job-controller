@@ -7,6 +7,7 @@ Version 0.9.0 (UNRELEASED)
 - Adds support for specifying ``slurm_partition`` and ``slurm_time`` for Slurm compute backend jobs.
 - Changes ``reana-auth-vomsproxy`` sidecar to latest version to support accessing ESCAPE VOMS.
 - Changes default Slurm partition to ``inf-short``.
+- Changes to PostgreSQL 12.10.
 
 Version 0.8.1 (2022-02-07)
 ---------------------------
@@ -21,7 +22,7 @@ Version 0.8.0 (2021-11-22)
 - Adds labels to job and run-batch pods to reduce k8s events to listen to for ``job-monitor``.
 - Fixes auto-mounting of Kubernetes API token inside user jobs by disabling it.
 - Changes job dispatching to use only job-specific node labels.
-- Changes to PostgreSQL 12.8
+- Changes to PostgreSQL 12.8.
 
 Version 0.7.5 (2021-07-05)
 --------------------------
