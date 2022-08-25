@@ -84,6 +84,9 @@
           "default": "",
           "type": "string"
         },
+        "rucio": {
+          "type": "boolean"
+        },
         "shared_file_system": {
           "default": true,
           "type": "boolean"

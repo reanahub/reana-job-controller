@@ -4,6 +4,7 @@ Authors
 The list of contributors in alphabetical order:
 
 - `Adelina Lintuluoto <https://orcid.org/0000-0002-0726-1452>`_
+- `Agisilaos Kounelis <https://orcid.org/0000-0001-9312-3189>`_
 - `Anton Khodak <https://orcid.org/0000-0003-3263-4553>`_
 - `Diego Rodriguez <https://orcid.org/0000-0003-0649-2002>`_
 - `Dinos Kousidis <https://orcid.org/0000-0002-4914-4289>`_

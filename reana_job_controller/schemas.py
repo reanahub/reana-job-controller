@@ -45,6 +45,7 @@ class JobRequest(Schema):
     compute_backend = fields.Str(required=False)
     kerberos = fields.Bool(required=False)
     voms_proxy = fields.Bool(required=False)
+    rucio = fields.Bool(required=False)
     kubernetes_uid = fields.Int(required=False)
     kubernetes_memory_limit = fields.Str(required=False)
     kubernetes_job_timeout = fields.Int(required=False)

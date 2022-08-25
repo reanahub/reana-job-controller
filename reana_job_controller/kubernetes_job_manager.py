@@ -76,6 +76,7 @@ class KubernetesJobManager(JobManager):
         kubernetes_uid=None,
         kubernetes_memory_limit=None,
         voms_proxy=False,
+        rucio=False,
         kubernetes_job_timeout: Optional[int] = None,
         **kwargs,
     ):
@@ -110,6 +111,9 @@ class KubernetesJobManager(JobManager):
         :param voms_proxy: Decides if a voms-proxy certificate should be
             provided for job.
         :type voms_proxy: bool
+        :param rucio: Decides if a rucio environment should be provided
+            for job.
+        :type rucio: bool
         """
         super(KubernetesJobManager, self).__init__(
             docker_img=docker_img,
@@ -125,6 +129,7 @@ class KubernetesJobManager(JobManager):
         self.shared_file_system = shared_file_system
         self.kerberos = kerberos
         self.voms_proxy = voms_proxy
+        self.rucio = rucio
         self.set_user_id(kubernetes_uid)
         self.set_memory_limit(kubernetes_memory_limit)
         self.workflow_uuid = workflow_uuid
@@ -223,6 +228,9 @@ class KubernetesJobManager(JobManager):
 
         if self.voms_proxy:
             self._add_voms_proxy_init_container(secrets_volume_mount, secret_env_vars)
+
+        if self.rucio:
+            self._add_rucio_init_container(secrets_volume_mount, secret_env_vars)
 
         if REANA_RUNTIME_JOBS_KUBERNETES_NODE_LABEL:
             self.job["spec"]["template"]["spec"][
@@ -351,7 +359,7 @@ class KubernetesJobManager(JobManager):
             self.job["spec"]["template"]["spec"]["volumes"].append(volume)
 
     def _add_krb5_init_container(self, secrets_store):
-        """Add  sidecar container for a job."""
+        """Add sidecar container for a job."""
         krb5_config = get_kerberos_k8s_config(
             secrets_store,
             kubernetes_uid=self.kubernetes_uid,
@@ -372,7 +380,7 @@ class KubernetesJobManager(JobManager):
         )
 
     def _add_voms_proxy_init_container(self, secrets_volume_mount, secret_env_vars):
-        """Add  sidecar container for a job."""
+        """Add sidecar container for a job."""
         ticket_cache_volume = {"name": "voms-proxy-cache", "emptyDir": {}}
         volume_mounts = [
             {
@@ -424,6 +432,64 @@ class KubernetesJobManager(JobManager):
 
         self.job["spec"]["template"]["spec"]["initContainers"].append(
             voms_proxy_container
+        )
+
+    def _add_rucio_init_container(self, secrets_volume_mount, secret_env_vars):
+        """Add sidecar container for a job."""
+        ticket_cache_volume = {"name": "rucio-cache", "emptyDir": {}}
+        volume_mounts = [
+            {
+                "name": ticket_cache_volume["name"],
+                "mountPath": current_app.config["RUCIO_CACHE_LOCATION"],
+            }
+        ]
+
+        rucio_config_file_path = os.path.join(
+            current_app.config["RUCIO_CACHE_LOCATION"],
+            current_app.config["RUCIO_CFG_CACHE_FILENAME"],
+        )
+
+        cern_bundle_path = os.path.join(
+            current_app.config["RUCIO_CACHE_LOCATION"],
+            current_app.config["RUCIO_CERN_BUNDLE_CACHE_FILENAME"],
+        )
+
+        rucio_account = os.environ.get("RUCIO_USERNAME")
+        voms_proxy_vo = os.environ.get("VONAME")
+
+        rucio_config_container = {
+            "image": current_app.config["RUCIO_CONTAINER_IMAGE"],
+            "command": ["/bin/bash"],
+            "args": [
+                "-c",
+                "export RUCIO_CFG_ACCOUNT={rucio_account} \
+                    RUCIO_CFG_RUCIO_HOST=https://{voms_proxy_vo}-rucio.cern.ch \
+                    RUCIO_CFG_AUTH_HOST=https://{voms_proxy_vo}-rucio-auth.cern.ch; \
+                cp /etc/pki/tls/certs/CERN-bundle.pem {cern_bundle_path}; \
+                j2 /opt/user/rucio.cfg.j2 > {rucio_config_file_path}".format(
+                    rucio_account=rucio_account,
+                    voms_proxy_vo=voms_proxy_vo,
+                    cern_bundle_path=cern_bundle_path,
+                    rucio_config_file_path=rucio_config_file_path,
+                ),
+            ],
+            "name": current_app.config["RUCIO_CONTAINER_NAME"],
+            "imagePullPolicy": "IfNotPresent",
+            "volumeMounts": [secrets_volume_mount] + volume_mounts,
+            "env": secret_env_vars,
+        }
+
+        self.job["spec"]["template"]["spec"]["volumes"].extend([ticket_cache_volume])
+        self.job["spec"]["template"]["spec"]["containers"][0]["volumeMounts"].extend(
+            volume_mounts
+        )
+
+        self.job["spec"]["template"]["spec"]["containers"][0]["env"].append(
+            {"name": "RUCIO_CONFIG", "value": rucio_config_file_path}
+        )
+
+        self.job["spec"]["template"]["spec"]["initContainers"].append(
+            rucio_config_container
         )
 
     def set_user_id(self, kubernetes_uid):

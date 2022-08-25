@@ -4,6 +4,7 @@ Changes
 Version 0.9.0 (UNRELEASED)
 --------------------------
 
+- Adds support for Rucio
 - Adds support for specifying ``slurm_partition`` and ``slurm_time`` for Slurm compute backend jobs.
 - Changes ``reana-auth-vomsproxy`` sidecar to latest version to support accessing ESCAPE VOMS.
 - Changes default Slurm partition to ``inf-short``.
