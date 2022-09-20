@@ -6,7 +6,7 @@ Version 0.9.0 (UNRELEASED)
 
 - Adds support for Rucio
 - Adds support for specifying ``slurm_partition`` and ``slurm_time`` for Slurm compute backend jobs.
-- Changes ``reana-auth-vomsproxy`` sidecar to latest version to support accessing ESCAPE VOMS.
+- Changes ``reana-auth-vomsproxy`` sidecar to the latest stable version to support client-side proxy file generation technique and ESCAPE VOMS.
 - Changes default Slurm partition to ``inf-short``.
 - Changes to PostgreSQL 12.10.
 

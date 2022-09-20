@@ -394,30 +394,72 @@ class KubernetesJobManager(JobManager):
             current_app.config["VOMSPROXY_CERT_CACHE_FILENAME"],
         )
 
-        voms_proxy_vo = os.environ.get("VONAME")
+        voms_proxy_vo = os.environ.get("VONAME", "")
+        voms_proxy_user_file = os.environ.get("VOMSPROXY_FILE", "")
 
-        voms_proxy_container = {
-            "image": current_app.config["VOMSPROXY_CONTAINER_IMAGE"],
-            "command": ["/bin/bash"],
-            "args": [
-                "-c",
-                "cp /etc/reana/secrets/userkey.pem /tmp/userkey.pem; \
-                     chmod 400 /tmp/userkey.pem; \
-                     echo $VOMSPROXY_PASS | base64 -d | voms-proxy-init \
-                     --voms {voms_proxy_vo} --key /tmp/userkey.pem \
-                     --cert $(readlink -f /etc/reana/secrets/usercert.pem) \
-                     --pwstdin --out {voms_proxy_file_path}; \
-                     chown {kubernetes_uid} {voms_proxy_file_path}".format(
-                    voms_proxy_vo=voms_proxy_vo.lower(),
-                    voms_proxy_file_path=voms_proxy_file_path,
-                    kubernetes_uid=self.kubernetes_uid,
-                ),
-            ],
-            "name": current_app.config["VOMSPROXY_CONTAINER_NAME"],
-            "imagePullPolicy": "IfNotPresent",
-            "volumeMounts": [secrets_volume_mount] + volume_mounts,
-            "env": secret_env_vars,
-        }
+        if voms_proxy_user_file:
+            # multi-user deployment mode, where we rely on VOMS proxy file supplied by the user
+            voms_proxy_container = {
+                "image": current_app.config["VOMSPROXY_CONTAINER_IMAGE"],
+                "command": ["/bin/bash"],
+                "args": [
+                    "-c",
+                    'if [ ! -f "/etc/reana/secrets/{voms_proxy_user_file}" ]; then \
+                        echo "[ERROR] VOMSPROXY_FILE {voms_proxy_user_file} does not exist in user secrets."; \
+                        exit; \
+                     fi; \
+                     cp /etc/reana/secrets/{voms_proxy_user_file} {voms_proxy_file_path}; \
+                     chown {kubernetes_uid} {voms_proxy_file_path}'.format(
+                        voms_proxy_user_file=voms_proxy_user_file,
+                        voms_proxy_file_path=voms_proxy_file_path,
+                        kubernetes_uid=self.kubernetes_uid,
+                    ),
+                ],
+                "name": current_app.config["VOMSPROXY_CONTAINER_NAME"],
+                "imagePullPolicy": "IfNotPresent",
+                "volumeMounts": [secrets_volume_mount] + volume_mounts,
+                "env": secret_env_vars,
+            }
+        else:
+            # single-user deployment mode, where we generate VOMS proxy file in the sidecar from user secrets
+            voms_proxy_container = {
+                "image": current_app.config["VOMSPROXY_CONTAINER_IMAGE"],
+                "command": ["/bin/bash"],
+                "args": [
+                    "-c",
+                    'if [ ! -f "/etc/reana/secrets/userkey.pem" ]; then \
+                        echo "[ERROR] File userkey.pem does not exist in user secrets."; \
+                        exit; \
+                     fi; \
+                     if [ ! -f "/etc/reana/secrets/usercert.pem" ]; then \
+                        echo "[ERROR] File usercert.pem does not exist in user secrets."; \
+                        exit; \
+                     fi; \
+                     if [ -z "$VOMSPROXY_PASS" ]; then \
+                        echo "[ERROR] Environment variable VOMSPROXY_PASS is not set in user secrets."; \
+                        exit; \
+                     fi; \
+                     if [ -z "$VONAME" ]; then \
+                        echo "[ERROR] Environment variable VONAME is not set in user secrets."; \
+                        exit; \
+                     fi; \
+                     cp /etc/reana/secrets/userkey.pem /tmp/userkey.pem; \
+                         chmod 400 /tmp/userkey.pem; \
+                         echo $VOMSPROXY_PASS | base64 -d | voms-proxy-init \
+                         --voms {voms_proxy_vo} --key /tmp/userkey.pem \
+                         --cert $(readlink -f /etc/reana/secrets/usercert.pem) \
+                         --pwstdin --out {voms_proxy_file_path}; \
+                         chown {kubernetes_uid} {voms_proxy_file_path}'.format(
+                        voms_proxy_vo=voms_proxy_vo.lower(),
+                        voms_proxy_file_path=voms_proxy_file_path,
+                        kubernetes_uid=self.kubernetes_uid,
+                    ),
+                ],
+                "name": current_app.config["VOMSPROXY_CONTAINER_NAME"],
+                "imagePullPolicy": "IfNotPresent",
+                "volumeMounts": [secrets_volume_mount] + volume_mounts,
+                "env": secret_env_vars,
+            }
 
         self.job["spec"]["template"]["spec"]["volumes"].extend([ticket_cache_volume])
         self.job["spec"]["template"]["spec"]["containers"][0]["volumeMounts"].extend(
@@ -454,19 +496,27 @@ class KubernetesJobManager(JobManager):
             current_app.config["RUCIO_CERN_BUNDLE_CACHE_FILENAME"],
         )
 
-        rucio_account = os.environ.get("RUCIO_USERNAME")
-        voms_proxy_vo = os.environ.get("VONAME")
+        rucio_account = os.environ.get("RUCIO_USERNAME", "")
+        voms_proxy_vo = os.environ.get("VONAME", "")
 
         rucio_config_container = {
             "image": current_app.config["RUCIO_CONTAINER_IMAGE"],
             "command": ["/bin/bash"],
             "args": [
                 "-c",
-                "export RUCIO_CFG_ACCOUNT={rucio_account} \
+                'if [ -z "$VONAME" ]; then \
+                    echo "[ERROR] Environment variable VONAME is not set in user secrets."; \
+                    exit; \
+                 fi; \
+                 if [ -z "$RUCIO_USERNAME" ]; then \
+                    echo "[ERROR] Environment variable RUCIO_USERNAME is not set in user secrets."; \
+                    exit; \
+                 fi; \
+                 export RUCIO_CFG_ACCOUNT={rucio_account} \
                     RUCIO_CFG_RUCIO_HOST=https://{voms_proxy_vo}-rucio.cern.ch \
                     RUCIO_CFG_AUTH_HOST=https://{voms_proxy_vo}-rucio-auth.cern.ch; \
                 cp /etc/pki/tls/certs/CERN-bundle.pem {cern_bundle_path}; \
-                j2 /opt/user/rucio.cfg.j2 > {rucio_config_file_path}".format(
+                j2 /opt/user/rucio.cfg.j2 > {rucio_config_file_path}'.format(
                     rucio_account=rucio_account,
                     voms_proxy_vo=voms_proxy_vo,
                     cern_bundle_path=cern_bundle_path,
