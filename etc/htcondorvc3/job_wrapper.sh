@@ -20,7 +20,7 @@ CMD=${@:3}
 # Note: We depend on curl for this.
 # Assumed to be available on HPC worker nodes (might need to transfer a static version otherwise).
 get_parrot(){
-    curl --retry 5 -o parrot_static_run http://download.virtualclusters.org/builder-files/parrot_static_run_v7.0.11 > /dev/null 2>&1 
+    curl --retry 5 -o parrot_static_run https://s3.ssl-hep.org/vc3-repository-70e707f3-6df8-41f6-adb2-fa5ecba1548d/builder-files/parrot_static_run_v7.0.11 > /dev/null 2>&1 
     if [ -e "parrot_static_run" ]; then
         chmod +x parrot_static_run
     else
