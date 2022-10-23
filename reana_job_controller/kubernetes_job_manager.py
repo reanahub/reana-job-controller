@@ -147,7 +147,6 @@ class KubernetesJobManager(JobManager):
                 "namespace": REANA_RUNTIME_KUBERNETES_NAMESPACE,
             },
             "spec": {
-                "automountServiceAccountToken": False,
                 "backoffLimit": KubernetesJobManager.MAX_NUM_JOB_RESTARTS,
                 "autoSelector": True,
                 "template": {
@@ -156,6 +155,7 @@ class KubernetesJobManager(JobManager):
                         "labels": {"reana-run-job-workflow-uuid": self.workflow_uuid},
                     },
                     "spec": {
+                        "automountServiceAccountToken": False,
                         "containers": [
                             {
                                 "image": self.docker_img,
