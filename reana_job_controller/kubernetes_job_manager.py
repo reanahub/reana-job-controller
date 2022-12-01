@@ -20,6 +20,7 @@ from reana_commons.config import (
     CVMFS_REPOSITORIES,
     K8S_CERN_EOS_AVAILABLE,
     K8S_CERN_EOS_MOUNT_CONFIGURATION,
+    KRB5_STATUS_FILE_LOCATION,
     REANA_JOB_HOSTPATH_MOUNTS,
     REANA_RUNTIME_KUBERNETES_NAMESPACE,
     REANA_RUNTIME_JOBS_KUBERNETES_NODE_LABEL,
@@ -224,7 +225,7 @@ class KubernetesJobManager(JobManager):
         )
 
         if self.kerberos:
-            self._add_krb5_init_container(secrets_store)
+            self._add_krb5_containers(secrets_store)
 
         if self.voms_proxy:
             self._add_voms_proxy_init_container(secrets_volume_mount, secret_env_vars)
@@ -358,8 +359,8 @@ class KubernetesJobManager(JobManager):
             ].append(volume_mount)
             self.job["spec"]["template"]["spec"]["volumes"].append(volume)
 
-    def _add_krb5_init_container(self, secrets_store):
-        """Add sidecar container for a job."""
+    def _add_krb5_containers(self, secrets_store):
+        """Add krb5 init and renew containers for a job."""
         krb5_config = get_kerberos_k8s_config(
             secrets_store,
             kubernetes_uid=self.kubernetes_uid,
@@ -375,9 +376,20 @@ class KubernetesJobManager(JobManager):
         self.job["spec"]["template"]["spec"]["containers"][0]["env"].extend(
             krb5_config.env
         )
+        # Add Kerberos init container used to generate ticket
         self.job["spec"]["template"]["spec"]["initContainers"].append(
             krb5_config.init_container
         )
+
+        # Add Kerberos renew container to renew ticket periodically for long-running jobs
+        self.job["spec"]["template"]["spec"]["containers"].append(
+            krb5_config.renew_container
+        )
+
+        # Extend the main job command to create a file after it's finished
+        self.job["spec"]["template"]["spec"]["containers"][0]["args"] = [
+            f"trap 'touch {KRB5_STATUS_FILE_LOCATION}' EXIT; " + self.cmd
+        ]
 
     def _add_voms_proxy_init_container(self, secrets_volume_mount, secret_env_vars):
         """Add sidecar container for a job."""

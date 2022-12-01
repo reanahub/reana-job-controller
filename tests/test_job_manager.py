@@ -14,6 +14,7 @@ import uuid
 import mock
 import pytest
 from reana_db.models import Job, JobStatus
+from reana_commons.config import KRB5_INIT_CONTAINER_NAME, KRB5_RENEW_CONTAINER_NAME
 
 from reana_job_controller.job_manager import JobManager
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
@@ -69,20 +70,27 @@ def test_execute_kubernetes_job(
             assert created_job.status == JobStatus.created
             kubernetes_client.create_namespaced_job.assert_called_once()
             body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
-            env_vars = body["spec"]["template"]["spec"]["containers"][0]["env"]
-            image = body["spec"]["template"]["spec"]["containers"][0]["image"]
-            command = body["spec"]["template"]["spec"]["containers"][0]["args"]
             init_containers = body["spec"]["template"]["spec"]["initContainers"]
-            if not kerberos:
-                # custom env + REANA_WORKSPACE + REANA_WORKFLOW_UUID + two secrets
-                num_env_vars = 5
-            else:
-                num_env_vars = 6
-            assert len(env_vars) == num_env_vars
+            containers = body["spec"]["template"]["spec"]["containers"]
+            env_vars = containers[0]["env"]
+            image = containers[0]["image"]
+            command = containers[0]["args"]
             assert {"name": env_var_key, "value": env_var_value} in env_vars
             assert image == expected_image
-            assert command == [expected_command]
-            assert len(init_containers) == (1 if kerberos else 0)
+            if kerberos:
+                assert len(containers) == 2  # main job + sidecar
+                assert len(init_containers) == 1
+                assert init_containers[0]["name"] == KRB5_INIT_CONTAINER_NAME
+                assert len(env_vars) == 6  # KRB5CCNAME is added
+                assert "trap" in command[0] and expected_command in command[0]
+                assert "kinit -R" in containers[1]["args"][0]
+                assert containers[1]["name"] == KRB5_RENEW_CONTAINER_NAME
+            else:
+                assert len(containers) == 1
+                assert len(init_containers) == 0
+                # custom env + REANA_WORKSPACE + REANA_WORKFLOW_UUID + two secrets
+                assert len(env_vars) == 5
+                assert command == [expected_command]
 
 
 def test_stop_kubernetes_job(
