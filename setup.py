@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2023 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -29,10 +29,10 @@ extras_require = {
         "Flask-DebugToolbar",
     ],
     "docs": [
-        "Sphinx>=1.5.1,<1.6",
+        "Sphinx>=1.5.1",
         "sphinx-rtd-theme>=0.1.9",
         "sphinxcontrib-httpdomain>=1.5.0",
-        "sphinxcontrib-openapi>=0.3.0,<0.4.0",
+        "sphinxcontrib-openapi>=0.8.0",
         "sphinxcontrib-redoc>=1.5.1",
     ],
     "tests": tests_require,
@@ -59,8 +59,8 @@ install_requires = [
     "Werkzeug>=2.1.0",
     "fs>=2.0",
     "marshmallow>2.13.0,<=2.20.1",
-    "reana-commons[kubernetes]>=0.9.0a17,<0.10.0",
-    "reana-db>=0.9.0a9,<0.10.0",
+    "reana-commons[kubernetes]>=0.9.1,<0.10.0",
+    "reana-db>=0.9.1,<0.10.0",
     "htcondor==8.9.11",
     "retrying>=1.3.3",
 ]
