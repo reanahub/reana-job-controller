@@ -1,10 +1,10 @@
 Changes
 =======
 
-Version 0.9.0 (UNRELEASED)
+Version 0.9.0 (2023-01-20)
 --------------------------
 
-- Adds support for Rucio
+- Adds support for Rucio authentication for workflow jobs.
 - Adds support for specifying ``slurm_partition`` and ``slurm_time`` for Slurm compute backend jobs.
 - Adds Kerberos sidecar container to renew ticket periodically for long-running jobs.
 - Changes ``reana-auth-vomsproxy`` sidecar to the latest stable version to support client-side proxy file generation technique and ESCAPE VOMS.
