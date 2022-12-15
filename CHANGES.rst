@@ -10,6 +10,7 @@ Version 0.9.0 (UNRELEASED)
 - Changes ``reana-auth-vomsproxy`` sidecar to the latest stable version to support client-side proxy file generation technique and ESCAPE VOMS.
 - Changes default Slurm partition to ``inf-short``.
 - Changes to PostgreSQL 12.13.
+- Changes the base image of the component to Ubuntu 20.04 LTS and reduces final Docker image size by removing build-time dependencies.
 
 Version 0.8.1 (2022-02-07)
 ---------------------------

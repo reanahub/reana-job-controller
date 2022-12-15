@@ -1,0 +1,11 @@
+CONDOR_HOST = tweetybird03.cern.ch, tweetybird04.cern.ch
+
+SKIP_LOCAL_CONFIG_FILE=$ENV(SKIP_LOCAL_CONFIG_FILE:FALSE)
+if ! $(SKIP_LOCAL_CONFIG_FILE)
+    LOCAL_CONFIG_FILE = /usr/bin/myschedd.sh |
+endif
+
+SEC_CLIENT_AUTHENTICATION_METHODS = KERBEROS
+SEC_CREDENTIAL_PRODUCER = /usr/bin/batch_krb5_credential
+FILESYSTEM_DOMAIN = cern.ch
+UID_DOMAIN = cern.ch

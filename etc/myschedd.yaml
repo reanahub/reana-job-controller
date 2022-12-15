@@ -13,12 +13,20 @@ pools:
       - bigbird12.cern.ch
       - bigbird13.cern.ch
       - bigbird14.cern.ch
+      - bigbird15.cern.ch
       - bigbird16.cern.ch
       - bigbird17.cern.ch
       - bigbird18.cern.ch
       - bigbird19.cern.ch
       - bigbird22.cern.ch
       - bigbird23.cern.ch
+      - bigbird25.cern.ch
+      - bigbird26.cern.ch
+      - bigbird27.cern.ch
+      - bigbird28.cern.ch
   tzero:
     standard:
       - tbird02.cern.ch
+  spool:
+    standard:
+      - batfink02.cern.ch
