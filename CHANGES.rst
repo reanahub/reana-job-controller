@@ -9,7 +9,7 @@ Version 0.9.0 (UNRELEASED)
 - Adds Kerberos sidecar container to renew ticket periodically for long-running jobs.
 - Changes ``reana-auth-vomsproxy`` sidecar to the latest stable version to support client-side proxy file generation technique and ESCAPE VOMS.
 - Changes default Slurm partition to ``inf-short``.
-- Changes to PostgreSQL 12.10.
+- Changes to PostgreSQL 12.13.
 
 Version 0.8.1 (2022-02-07)
 ---------------------------

@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2020, 2021, 2022 CERN.
+# Copyright (C) 2017, 2018, 2020, 2021, 2022, 2023 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -45,7 +45,7 @@ clean_old_db_container () {
 
 start_db_container () {
     echo '==> [INFO] Starting DB container...'
-    docker run --rm --name postgres__reana-job-controller -p 5432:5432 -e POSTGRES_PASSWORD=mysecretpassword -d postgres:12.10
+    docker run --rm --name postgres__reana-job-controller -p 5432:5432 -e POSTGRES_PASSWORD=mysecretpassword -d postgres:12.13
     _check_ready "Postgres" _db_check
     db_container_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' postgres__reana-job-controller)
     export REANA_SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://postgres:mysecretpassword@$db_container_ip/postgres
