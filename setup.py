@@ -36,7 +36,7 @@ extras_require = {
         "sphinxcontrib-redoc>=1.5.1",
     ],
     "tests": tests_require,
-    "ssh": ["paramiko[gssapi]>=2.6.0"],
+    "ssh": ["paramiko[gssapi]>=3.0.0"],
 }
 
 # Python tests need SSH dependencies for imports
