@@ -1,6 +1,12 @@
 Changes
 =======
 
+Version 0.9.1 (UNRELEASED)
+--------------------------
+
+- Fixes intermittent Slurm connection issues by DNS-resolving the Slurm head node IPv4 address before establishing connections.
+- Changes Paramiko to version 3.0.0.
+
 Version 0.9.0 (2023-01-20)
 --------------------------
 

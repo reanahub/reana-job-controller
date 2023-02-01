@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017-2019, 2022 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2022, 2023 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -10,6 +10,7 @@
 
 import logging
 import os
+import socket
 import subprocess
 import sys
 
@@ -83,24 +84,36 @@ class SSHClient:
         auth_timeout=None,
     ):
         """Initialize ssh client."""
-        self.hostname = hostname
+        if hostname:
+            # resolve IPv4 address of DNS load-balanced Slurm nodes to ease connection troubles
+            try:
+                self.hostname = socket.gethostbyname_ex(hostname)[2][0]
+            except Exception:
+                self.hostname = hostname
+        else:
+            self.hostname = hostname
         self.port = port
         self.timeout = timeout
         self.banner_timeout = banner_timeout
         self.auth_timeout = auth_timeout
+        self.ssh_client = self.paramiko.SSHClient()
+        self.ssh_client.set_missing_host_key_policy(self.paramiko.AutoAddPolicy())
         self.establish_connection()
 
     def establish_connection(self):
         """Establish the connection."""
-        self.ssh_client = self.paramiko.SSHClient()
-        self.ssh_client.set_missing_host_key_policy(self.paramiko.AutoAddPolicy())
+        # self.paramiko.util.log_to_file('/tmp/paramiko.log')
         self.ssh_client.connect(
             hostname=self.hostname,
-            port=self.port,
-            gss_auth=True,
-            timeout=self.timeout,
-            banner_timeout=self.banner_timeout,
+            allow_agent=False,
             auth_timeout=self.auth_timeout,
+            banner_timeout=self.banner_timeout,
+            gss_auth=True,
+            gss_host=self.hostname,
+            gss_trust_dns=True,
+            look_for_keys=False,
+            port=self.port,
+            timeout=self.timeout,
         )
 
     def exec_command(self, command):
