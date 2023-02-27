@@ -170,7 +170,7 @@ class JobMonitorKubernetes(JobMonitor):
             self.job_manager_cls.stop(job_id)
             self.job_db[self.get_reana_job_id(job_id)]["deleted"] = True
         except client.rest.ApiException as e:
-            logging.error("Error while connecting to Kubernetes API: {}".format(e))
+            logging.error(f"Error from Kubernetes API while cleaning up job: {e}")
         except Exception as e:
             logging.error(traceback.format_exc())
             logging.error("Unexpected error: {}".format(e))
@@ -236,7 +236,7 @@ class JobMonitorKubernetes(JobMonitor):
 
             return pod_logs
         except client.rest.ApiException as e:
-            logging.error("Error while connecting to Kubernetes API: {}".format(e))
+            logging.error(f"Error from Kubernetes API while getting job logs: {e}")
             return None
         except Exception as e:
             logging.error(traceback.format_exc())
@@ -276,7 +276,7 @@ class JobMonitorKubernetes(JobMonitor):
         :param job_db: Dictionary which contains all current jobs.
         """
         while True:
-            logging.debug("Starting a new stream request to watch Jobs")
+            logging.info("Starting a new stream request to watch Jobs")
             try:
                 w = watch.Watch()
                 for event in w.stream(
@@ -300,7 +300,9 @@ class JobMonitorKubernetes(JobMonitor):
                         if JobStatus.should_cleanup_job(job_status):
                             self.clean_job(backend_job_id)
             except client.rest.ApiException as e:
-                logging.error("Error while connecting to Kubernetes API: {}".format(e))
+                logging.error(
+                    f"Error from Kubernetes API while watching jobs pods: {e}"
+                )
             except Exception as e:
                 logging.error(traceback.format_exc())
                 logging.error("Unexpected error: {}".format(e))

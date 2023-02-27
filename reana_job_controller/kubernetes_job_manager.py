@@ -1,5 +1,5 @@
 # This file is part of REANA.
-# Copyright (C) 2019, 2020, 2021, 2022 CERN.
+# Copyright (C) 2019, 2020, 2021, 2022, 2023 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -250,7 +250,9 @@ class KubernetesJobManager(JobManager):
             )
             return self.job["metadata"]["name"]
         except ApiException as e:
-            logging.error("Error while connecting to Kubernetes" " API: {}".format(e))
+            logging.error(
+                f"An error has occurred while connecting to Kubernetes API to submit a job: {e}"
+            )
         except Exception as e:
             logging.error(traceback.format_exc())
             logging.debug("Unexpected error: {}".format(e))
@@ -270,8 +272,7 @@ class KubernetesJobManager(JobManager):
             )
         except ApiException as e:
             logging.error(
-                "An error has occurred while connecting to Kubernetes API "
-                "Server \n {}".format(e)
+                f"An error has occurred while connecting to Kubernetes API to stop a job: {e}"
             )
             raise ComputingBackendSubmissionError(e.reason)
 
