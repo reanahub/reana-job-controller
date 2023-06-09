@@ -49,9 +49,9 @@ RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       yes | alien -i myschedd.rpm; \
       yes | alien -i ngbauth-submit.rpm; \
       rm -rf myschedd.rpm ngbauth-submit.rpm; \
-      wget -qO - https://research.cs.wisc.edu/htcondor/ubuntu/HTCondor-Release.gpg.key | apt-key add -; \
-      echo "deb http://research.cs.wisc.edu/htcondor/ubuntu/8.9/focal focal contrib" >> /etc/apt/sources.list; \
-      echo "deb-src http://research.cs.wisc.edu/htcondor/ubuntu/8.9/focal focal contrib" >> /etc/apt/sources.list; \
+      wget -qO - https://research.cs.wisc.edu/htcondor/repo/keys/HTCondor-9.0-Key | apt-key add -; \
+      echo "deb https://research.cs.wisc.edu/htcondor/repo/ubuntu/9.0 focal main" >> /etc/apt/sources.list; \
+      echo "deb-src https://research.cs.wisc.edu/htcondor/repo/ubuntu/9.0 focal main" >> /etc/apt/sources.list; \
       apt-get update -y; \
       apt-get install --no-install-recommends -y condor; \
       apt-get remove -y gnupg2 wget alien; \
