@@ -15,6 +15,7 @@ include .flake8
 include pytest.ini
 include docs/openapi.json
 include docs/_static/reana-job-manager.xml
+exclude .readthedocs.yaml
 prune docs/_build
 recursive-include reana_job_controller *.json
 recursive-include docs *.py
