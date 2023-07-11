@@ -13,7 +13,7 @@ set -o errexit
 set -o nounset
 
 COMPONENT_NAME=reana-job-controller
-DOCKER_IMAGE_NAME=reanahub/$COMPONENT_NAME
+DOCKER_IMAGE_NAME=docker.io/reanahub/$COMPONENT_NAME
 PLATFORM="$(python -c 'import platform; print(platform.system())')"
 
 # Verify that db container is running before continuing
@@ -45,7 +45,7 @@ clean_old_db_container () {
 
 start_db_container () {
     echo '==> [INFO] Starting DB container...'
-    docker run --rm --name postgres__reana-job-controller -p 5432:5432 -e POSTGRES_PASSWORD=mysecretpassword -d postgres:12.13
+    docker run --rm --name postgres__reana-job-controller -p 5432:5432 -e POSTGRES_PASSWORD=mysecretpassword -d docker.io/library/postgres:12.13
     _check_ready "Postgres" _db_check
     db_container_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' postgres__reana-job-controller)
     export REANA_SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://postgres:mysecretpassword@$db_container_ip/postgres
@@ -94,7 +94,7 @@ check_pytest () {
 }
 
 check_dockerfile () {
-    docker run -i --rm hadolint/hadolint:v1.18.2 < Dockerfile
+    docker run -i --rm docker.io/hadolint/hadolint:v1.18.2 < Dockerfile
 }
 
 check_docker_build () {

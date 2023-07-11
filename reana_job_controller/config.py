@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2023 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -54,7 +54,7 @@ SUPPORTED_COMPUTE_BACKENDS = os.getenv(
 
 
 VOMSPROXY_CONTAINER_IMAGE = os.getenv(
-    "VOMSPROXY_CONTAINER_IMAGE", "reanahub/reana-auth-vomsproxy:1.2.0"
+    "VOMSPROXY_CONTAINER_IMAGE", "docker.io/reanahub/reana-auth-vomsproxy:1.2.0"
 )
 """Default docker image of VOMSPROXY sidecar container."""
 
@@ -70,7 +70,7 @@ VOMSPROXY_CERT_CACHE_FILENAME = "x509up_proxy"
 """Name of the voms-proxy certificate cache file."""
 
 RUCIO_CONTAINER_IMAGE = os.getenv(
-    "RUCIO_CONTAINER_IMAGE", "reanahub/reana-auth-rucio:1.0.0"
+    "RUCIO_CONTAINER_IMAGE", "docker.io/reanahub/reana-auth-rucio:1.0.0"
 )
 """Default docker image of RUCIO sidecar container."""
 

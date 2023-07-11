@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2019, 2020, 2021, 2022 CERN.
+# Copyright (C) 2019, 2020, 2021, 2022, 2023 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -38,7 +38,7 @@ def test_execute_kubernetes_job(
     env_var_key = "key"
     env_var_value = "value"
     expected_env_var = {env_var_key: env_var_value}
-    expected_image = "busybox"
+    expected_image = "docker.io/library/busybox"
     expected_command = "ls"
     monkeypatch.setenv("REANA_USER_ID", str(default_user.id_))
     job_manager = KubernetesJobManager(
@@ -108,7 +108,7 @@ def test_stop_kubernetes_job(
     workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
     expected_env_var_name = "env_var"
     expected_env_var_value = "value"
-    expected_image = "busybox"
+    expected_image = "docker.io/library/busybox"
     expected_command = ["ls"]
     monkeypatch.setenv("REANA_USER_ID", str(default_user.id_))
     job_manager = KubernetesJobManager(
@@ -151,6 +151,6 @@ def test_execution_hooks():
         def cache_job(self):
             self.order_list.append(4)
 
-    job_manager = TestJobManger("busybox", "ls", {})
+    job_manager = TestJobManger("docker.io/library/busybox", "ls", {})
     job_manager.execute()
     assert job_manager.order_list == [1, 2, 3, 4]

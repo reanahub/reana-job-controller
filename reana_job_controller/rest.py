@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2018, 2019, 2020, 2021, 2022 CERN.
+# Copyright (C) 2018, 2019, 2020, 2021, 2022, 2023 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -135,7 +135,7 @@ def get_jobs():  # noqa
                   "1612a779-f3fa-4344-8819-3d12fa9b9d90": {
                     "cmd": "date",
                     "cvmfs_mounts": ['atlas.cern.ch', 'atlas-condb.cern.ch'],
-                    "docker_img": "busybox",
+                    "docker_img": "docker.io/library/busybox",
                     "job_id": "1612a779-f3fa-4344-8819-3d12fa9b9d90",
                     "max_restart_count": 3,
                     "restart_count": 0,
@@ -144,7 +144,7 @@ def get_jobs():  # noqa
                   "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20": {
                     "cmd": "date",
                     "cvmfs_mounts": ['atlas.cern.ch', 'atlas-condb.cern.ch'],
-                    "docker_img": "busybox",
+                    "docker_img": "docker.io/library/busybox",
                     "job_id": "2e4bbc1d-db5e-4ee0-9701-6e2b1ba55c20",
                     "max_restart_count": 3,
                     "restart_count": 0,
@@ -289,7 +289,7 @@ def get_job(job_id):  # noqa
               "job": {
                 "cmd": "date",
                 "cvmfs_mounts": ['atlas.cern.ch', 'atlas-condb.cern.ch'],
-                "docker_img": "busybox",
+                "docker_img": "docker.io/library/busybox",
                 "job_id": "cdcf48b1-c2f3-4693-8230-b066e088c6ac",
                 "max_restart_count": 3,
                 "restart_count": 0,
