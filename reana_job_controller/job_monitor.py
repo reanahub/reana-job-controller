@@ -127,6 +127,8 @@ class JobMonitorKubernetes(JobMonitor):
     def should_process_job(self, job_pod) -> bool:
         """Decide whether the job should be processed or not.
 
+        Each job is processed only once, when it reaches a final state (either `failed` or `finished`).
+
         :param job_pod: Compute backend job object (Kubernetes V1Pod
             https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1Pod.md)
         """
@@ -142,22 +144,12 @@ class JobMonitorKubernetes(JobMonitor):
             JobStatus.failed.name,
         ]
 
-        return (
-            is_job_in_remaining_jobs
-            and is_job_completed
-            and self._all_job_containers_not_running(job_pod)
-        )
+        return is_job_in_remaining_jobs and is_job_completed
 
     @staticmethod
     def _get_job_container_statuses(job_pod):
         return (job_pod.status.container_statuses or []) + (
             job_pod.status.init_container_statuses or []
-        )
-
-    def _all_job_containers_not_running(self, job_pod) -> bool:
-        return all(
-            not container.state.running
-            for container in self._get_job_container_statuses(job_pod)
         )
 
     def clean_job(self, job_id):
@@ -218,7 +210,11 @@ class JobMonitorKubernetes(JobMonitor):
 
             logging.info(f"Grabbing pod {job_pod.metadata.name} logs ...")
             for container in container_statuses:
-                if container.state.terminated:
+                # If we are here, it means that either all the containers have finished
+                # running or there has been some sort of failure. For this reason we get
+                # the logs of all containers, even if they are still running, as the job
+                # will not continue running after this anyway.
+                if container.state.terminated or container.state.running:
                     container_log = (
                         current_k8s_corev1_api_client.read_namespaced_pod_log(
                             namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
@@ -230,6 +226,7 @@ class JobMonitorKubernetes(JobMonitor):
                     if hasattr(container.state.terminated, "reason"):
                         pod_logs += "\n{}\n".format(container.state.terminated.reason)
                 elif container.state.waiting:
+                    # No need to fetch logs, as the container has not started yet.
                     pod_logs += "Container {} failed, error: {}".format(
                         container.name, container.state.waiting.message
                     )
@@ -287,6 +284,8 @@ class JobMonitorKubernetes(JobMonitor):
                     logging.info("New Pod event received: {0}".format(event["type"]))
                     job_pod = event["object"]
 
+                    # Each job is processed once, when reaching a final state
+                    # (either successfully or not)
                     if self.should_process_job(job_pod):
                         job_status = self.get_job_status(job_pod)
                         backend_job_id = self.get_backend_job_id(job_pod)
