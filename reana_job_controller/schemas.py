@@ -36,7 +36,9 @@ class JobRequest(Schema):
     job_name = fields.Str(required=True)
     workflow_workspace = fields.Str(required=True)
     workflow_uuid = fields.Str(required=True)
-    cmd = fields.Function(missing="", deserialize=deserialise_job_command)
+    cmd = fields.Function(
+        missing="", deserialize=deserialise_job_command, type="string"
+    )
     prettified_cmd = fields.Str(missing="")
     docker_img = fields.Str(required=True)
     cvmfs_mounts = fields.String(missing="")

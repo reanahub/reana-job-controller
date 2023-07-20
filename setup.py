@@ -19,7 +19,7 @@ readme = open("README.rst").read()
 history = open("CHANGES.rst").read()
 
 tests_require = [
-    "pytest-reana>=0.9.0a7,<0.10.0",
+    "pytest-reana>=0.9.1a1,<0.10.0",
 ]
 
 extras_require = {
@@ -53,13 +53,15 @@ setup_requires = [
 ]
 
 install_requires = [
-    "apispec>=0.21.0,<0.40",
+    # apispec>=4.0 drops support for marshmallow<3
+    "apispec[yaml]>=3.0,<4.0",
+    "apispec-webframeworks",
     "Flask>=2.1.1,<2.2.0",
     "jinja2<3.1.0",
     "Werkzeug>=2.1.0",
     "fs>=2.0",
     "marshmallow>2.13.0,<=2.20.1",
-    "reana-commons[kubernetes]>=0.9.3a3,<0.10.0",
+    "reana-commons[kubernetes]>=0.9.3a4,<0.10.0",
     "reana-db>=0.9.1,<0.10.0",
     "htcondor==9.0.17",
     "retrying>=1.3.3",

@@ -124,7 +124,6 @@
     "title": "reana-job-controller",
     "version": "0.9.1a2"
   },
-  "parameters": {},
   "paths": {
     "/apispec": {},
     "/job_cache": {
@@ -413,6 +412,5 @@
       }
     }
   },
-  "swagger": "2.0",
-  "tags": []
+  "swagger": "2.0"
 }
