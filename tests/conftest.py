@@ -10,13 +10,13 @@
 
 from __future__ import absolute_import, print_function
 
-
 import os
 import uuid
 
 import mock
 import pytest
 from kubernetes.client.models.v1_container_state import V1ContainerState
+from kubernetes.client.models.v1_container_state_running import V1ContainerStateRunning
 from kubernetes.client.models.v1_container_state_terminated import (
     V1ContainerStateTerminated,
 )
@@ -73,71 +73,75 @@ def base_app(tmp_shared_volume_path):
 @pytest.fixture
 def kubernetes_job_pod():
     """Create a mocked Kubernetes job pod."""
-    phases_to_container_state = {
-        "Pending": {
-            "InvalidImageName": V1ContainerState(
-                waiting=V1ContainerStateWaiting(
-                    message=(
-                        'Failed to apply default image tag "img@#": '
-                        'couldn\'t parse image reference "img@#": '
-                        "invalid reference format"
-                    ),
-                    reason="InvalidImageName",
-                )
-            ),
-            "ErrImagePull": V1ContainerState(
-                waiting=V1ContainerStateWaiting(
-                    message=(
-                        "rpc error: code = Unknown desc = Error "
-                        "response from daemon: pull access denied for "
-                        "private/image, repository does not "
-                        "exist or may require docker login: denied:"
-                        "requested access to the resource is denied"
-                    ),
-                    reason="ErrImagePull",
-                )
-            ),
-        },
-        "Succeeded": {
-            "Completed": V1ContainerState(
-                terminated=V1ContainerStateTerminated(exit_code=0, reason="Completed")
+    reason_to_container_state = {
+        "InvalidImageName": V1ContainerState(
+            waiting=V1ContainerStateWaiting(
+                message=(
+                    'Failed to apply default image tag "img@#": '
+                    'couldn\'t parse image reference "img@#": '
+                    "invalid reference format"
+                ),
+                reason="InvalidImageName",
             )
-        },
-        "Failed": {
-            "Error": V1ContainerState(
-                terminated=V1ContainerStateTerminated(exit_code=127, reason="Error")
+        ),
+        "ErrImagePull": V1ContainerState(
+            waiting=V1ContainerStateWaiting(
+                message=(
+                    "rpc error: code = Unknown desc = Error "
+                    "response from daemon: pull access denied for "
+                    "private/image, repository does not "
+                    "exist or may require docker login: denied:"
+                    "requested access to the resource is denied"
+                ),
+                reason="ErrImagePull",
             )
-        },
+        ),
+        "Completed": V1ContainerState(
+            terminated=V1ContainerStateTerminated(exit_code=0, reason="Completed")
+        ),
+        "OOMKilled": V1ContainerState(
+            terminated=V1ContainerStateTerminated(exit_code=0, reason="OOMKilled")
+        ),
+        "Error": V1ContainerState(
+            terminated=V1ContainerStateTerminated(exit_code=127, reason="Error")
+        ),
+        "Running": V1ContainerState(running=V1ContainerStateRunning()),
     }
 
-    def create_job_pod(phase, container_state, init_container_state=None, job_id=None):
+    def create_job_pod(phase, container_states, init_container_state=None, job_id=None):
         job_pod = MagicMock()
         job_pod.metadata.labels = {"job-name": job_id or str(uuid.uuid4())}
 
-        if phase not in phases_to_container_state.keys():
+        valid_phases = ["Pending", "Running", "Succeeded", "Failed"]
+        if phase not in valid_phases:
             raise ValueError(
-                f"{phase} is not a valid pod phase, "
-                f"use one of {phases_to_container_state}"
+                f"{phase} is not a valid pod phase, use one of {valid_phases}"
             )
+
         job_pod.status = V1PodStatus(phase=phase)
+        job_pod.status.container_statuses = []
 
-        main_container_status = V1ContainerStatus(
-            image="ubuntu:latest",
-            image_id=str(uuid.uuid4()),
-            ready=False,
-            state=phases_to_container_state[phase][container_state],
-            restart_count=0,
-            name="job",
-        )
+        if not isinstance(container_states, list):
+            container_states = [container_states]
 
-        job_pod.status.container_statuses = [main_container_status]
+        for state in container_states:
+            job_pod.status.container_statuses.append(
+                V1ContainerStatus(
+                    image="ubuntu:latest",
+                    image_id=str(uuid.uuid4()),
+                    ready=False,
+                    state=reason_to_container_state[state],
+                    restart_count=0,
+                    name="job",
+                )
+            )
 
         if init_container_state:
             init_container_status = V1ContainerStatus(
                 image="ubuntu:latest",
                 image_id=str(uuid.uuid4()),
                 ready=False,
-                state=phases_to_container_state[phase][container_state],
+                state=reason_to_container_state[init_container_state],
                 restart_count=0,
                 name="authz",
             )

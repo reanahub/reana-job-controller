@@ -71,6 +71,7 @@ def test_kubernetes_get_job_logs(
         ("Pending", "InvalidImageName", "failed"),
         ("Succeeded", "Completed", "finished"),
         ("Failed", "Error", "failed"),
+        ("Pending", ["Running", "ErrImagePull"], "failed"),
     ],
 )
 def test_kubernetes_get_job_status(

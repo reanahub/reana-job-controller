@@ -179,27 +179,27 @@ class JobMonitorKubernetes(JobMonitor):
             status = JobStatus.failed.name
         elif job_pod.status.phase == "Pending":
             container_statuses = self._get_job_container_statuses(job_pod)
-            try:
-                for container in container_statuses:
+            for container in container_statuses:
+                try:
                     reason = container.state.waiting.reason
-                    if "ErrImagePull" in reason:
-                        logging.info(
-                            "Container {} in Kubernetes job {} "
-                            "failed to fetch image.".format(
-                                container.name, backend_job_id
-                            )
-                        )
-                        status = JobStatus.failed.name
-                    elif "InvalidImageName" in reason:
-                        logging.info(
-                            "Container {} in Kubernetes job {} "
-                            "failed due to invalid image name.".format(
-                                container.name, backend_job_id
-                            )
-                        )
-                        status = JobStatus.failed.name
-            except (AttributeError, TypeError):
-                pass
+                except AttributeError:
+                    reason = None
+
+                if not reason:
+                    continue
+
+                if "ErrImagePull" in reason:
+                    logging.info(
+                        f"Container {container.name} in Kubernetes job {backend_job_id} "
+                        "failed to fetch image."
+                    )
+                    status = JobStatus.failed.name
+                elif "InvalidImageName" in reason:
+                    logging.info(
+                        f"Container {container.name} in Kubernetes job {backend_job_id} "
+                        "failed due to invalid image name."
+                    )
+                    status = JobStatus.failed.name
 
         return status
 
