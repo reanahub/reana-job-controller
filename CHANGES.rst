@@ -6,6 +6,7 @@ Version 0.9.1 (UNRELEASED)
 
 - Fixes intermittent Slurm connection issues by DNS-resolving the Slurm head node IPv4 address before establishing connections.
 - Fixes deletion of failed jobs not being performed when Kerberos is enabled.
+- Fixes job monitoring to consider OOM-killed jobs as failed.
 - Changes Paramiko to version 3.0.0.
 - Changes HTCondor to version 9.0.17 (LTS).
 

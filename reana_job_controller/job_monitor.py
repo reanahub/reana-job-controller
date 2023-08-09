@@ -171,14 +171,37 @@ class JobMonitorKubernetes(JobMonitor):
         """Get Kubernetes based REANA job status."""
         status = None
         backend_job_id = self.get_backend_job_id(job_pod)
+        container_statuses = self._get_job_container_statuses(job_pod)
+
         if job_pod.status.phase == "Succeeded":
-            logging.info("Kubernetes job id: {} succeeded.".format(backend_job_id))
-            status = JobStatus.finished.name
+            # checking that all the containers are `Completed`, as sometimes there
+            # can be `OOMKilled` containers that are considered as successful
+            for container in container_statuses:
+                try:
+                    reason = container.state.terminated.reason
+                except AttributeError:
+                    reason = None
+                if not reason:
+                    logging.info(
+                        f"No termination reason for container {container.name} in "
+                        f"Kubernetes job {backend_job_id}, assuming successful."
+                    )
+                elif reason != "Completed":
+                    logging.info(
+                        f"Kubernetes job id: {backend_job_id} failed, phase 'Succeeded' but "
+                        f"container '{container.name}' was terminated because of '{reason}'."
+                    )
+                    status = JobStatus.failed.name
+
+            if not status:
+                logging.info("Kubernetes job id: {} succeeded.".format(backend_job_id))
+                status = JobStatus.finished.name
+
         elif job_pod.status.phase == "Failed":
             logging.info("Kubernetes job id: {} failed.".format(backend_job_id))
             status = JobStatus.failed.name
+
         elif job_pod.status.phase == "Pending":
-            container_statuses = self._get_job_container_statuses(job_pod)
             for container in container_statuses:
                 try:
                     reason = container.state.waiting.reason
