@@ -48,6 +48,10 @@ start_db_container () {
     docker run --rm --name postgres__reana-job-controller -p 5432:5432 -e POSTGRES_PASSWORD=mysecretpassword -d docker.io/library/postgres:12.13
     _check_ready "Postgres" _db_check
     db_container_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' postgres__reana-job-controller)
+    if [[ -z $db_container_ip ]]; then
+        # container does not have an IP when using podman
+        db_container_ip="localhost"
+    fi
     export REANA_SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://postgres:mysecretpassword@$db_container_ip/postgres
 }
 
