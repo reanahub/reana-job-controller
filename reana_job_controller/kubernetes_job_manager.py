@@ -511,6 +511,12 @@ class KubernetesJobManager(JobManager):
 
         rucio_account = os.environ.get("RUCIO_USERNAME", "")
         voms_proxy_vo = os.environ.get("VONAME", "")
+        rucio_host = os.environ.get(
+            "RUCIO_RUCIO_HOST", f"https://{voms_proxy_vo}-rucio.cern.ch"
+        )
+        rucio_auth_host = os.environ.get(
+            "RUCIO_AUTH_HOST", f"https://{voms_proxy_vo}-rucio-auth.cern.ch"
+        )
 
         rucio_config_container = {
             "image": current_app.config["RUCIO_CONTAINER_IMAGE"],
@@ -526,10 +532,13 @@ class KubernetesJobManager(JobManager):
                     exit; \
                  fi; \
                  export RUCIO_CFG_ACCOUNT={rucio_account} \
-                    RUCIO_CFG_RUCIO_HOST=https://{voms_proxy_vo}-rucio.cern.ch \
-                    RUCIO_CFG_AUTH_HOST=https://{voms_proxy_vo}-rucio-auth.cern.ch; \
+                    RUCIO_CFG_CLIENT_VO={voms_proxy_vo} \
+                    RUCIO_CFG_RUCIO_HOST={rucio_host} \
+                    RUCIO_CFG_AUTH_HOST={rucio_auth_host}; \
                 cp /etc/pki/tls/certs/CERN-bundle.pem {cern_bundle_path}; \
                 j2 /opt/user/rucio.cfg.j2 > {rucio_config_file_path}'.format(
+                    rucio_host=rucio_host,
+                    rucio_auth_host=rucio_auth_host,
                     rucio_account=rucio_account,
                     voms_proxy_vo=voms_proxy_vo,
                     cern_bundle_path=cern_bundle_path,
