@@ -9,6 +9,7 @@ Version 0.9.1 (UNRELEASED)
 - Fixes job monitoring to consider OOM-killed jobs as failed.
 - Changes Paramiko to version 3.0.0.
 - Changes HTCondor to version 9.0.17 (LTS).
+- Changes Rucio authentication helper to version 1.1.0.
 
 Version 0.9.0 (2023-01-20)
 --------------------------
