@@ -511,12 +511,18 @@ class KubernetesJobManager(JobManager):
 
         rucio_account = os.environ.get("RUCIO_USERNAME", "")
         voms_proxy_vo = os.environ.get("VONAME", "")
-        rucio_host = os.environ.get(
-            "RUCIO_RUCIO_HOST", f"https://{voms_proxy_vo}-rucio.cern.ch"
-        )
-        rucio_auth_host = os.environ.get(
-            "RUCIO_AUTH_HOST", f"https://{voms_proxy_vo}-rucio-auth.cern.ch"
-        )
+
+        # Detect Rucio hosts from VO names
+        if voms_proxy_vo == "atlas":
+            rucio_host = "https://voatlasrucio-server-prod.cern.ch"
+            rucio_auth_host = "https://voatlasrucio-auth-prod.cern.ch"
+        else:
+            rucio_host = f"https://{voms_proxy_vo}-rucio.cern.ch"
+            rucio_auth_host = f"https://{voms_proxy_vo}-rucio-auth.cern.ch"
+
+        # Allow overriding detected Rucio hosts by user-provided environment variables
+        rucio_host = os.environ.get("RUCIO_RUCIO_HOST", rucio_host)
+        rucio_auth_host = os.environ.get("RUCIO_AUTH_HOST", rucio_auth_host)
 
         rucio_config_container = {
             "image": current_app.config["RUCIO_CONTAINER_IMAGE"],
