@@ -1,5 +1,5 @@
 # This file is part of REANA.
-# Copyright (C) 2019, 2020, 2021, 2022 CERN.
+# Copyright (C) 2019, 2020, 2021, 2022, 2023 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -154,7 +154,7 @@ class SlurmJobManagerCERN(JobManager):
     def _get_container(self):
         """Get container image."""
         if self.img_type_docker:
-            return self.docker_img.split("/", 1)[-1].replace(":", "_") + ".sif"
+            return self.docker_img.split("/")[-1].replace(":", "_") + ".sif"
         return self.docker_img
 
     def _dump_job_submission_file(self):
