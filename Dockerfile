@@ -44,8 +44,8 @@ RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       set -e; \
       apt-get update -y; \
       apt-get install --no-install-recommends -y wget alien gnupg2 rand; \
-      wget -O ngbauth-submit.rpm https://linuxsoft.cern.ch/internal/repos/batch8s-stable/x86_64/os/Packages/ngbauth-submit-0.26-2.el8s.noarch.rpm; \
-      wget -O myschedd.rpm https://linuxsoft.cern.ch/internal/repos/batch8s-stable/x86_64/os/Packages/myschedd-1.9-2.el8s.x86_64.rpm; \
+      wget -O ngbauth-submit.rpm https://linuxsoft.cern.ch/internal/repos/batch8s-stable/x86_64/os/Packages/n/ngbauth-submit-0.26-2.el8s.noarch.rpm; \
+      wget -O myschedd.rpm https://linuxsoft.cern.ch/internal/repos/batch8s-stable/x86_64/os/Packages/m/myschedd-1.9-2.el8s.x86_64.rpm; \
       yes | alien -i myschedd.rpm; \
       yes | alien -i ngbauth-submit.rpm; \
       rm -rf myschedd.rpm ngbauth-submit.rpm; \
