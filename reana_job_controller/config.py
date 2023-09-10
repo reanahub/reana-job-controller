@@ -70,7 +70,7 @@ VOMSPROXY_CERT_CACHE_FILENAME = "x509up_proxy"
 """Name of the voms-proxy certificate cache file."""
 
 RUCIO_CONTAINER_IMAGE = os.getenv(
-    "RUCIO_CONTAINER_IMAGE", "docker.io/reanahub/reana-auth-rucio:1.1.0"
+    "RUCIO_CONTAINER_IMAGE", "docker.io/reanahub/reana-auth-rucio:1.1.1"
 )
 """Default docker image of RUCIO sidecar container."""
 
