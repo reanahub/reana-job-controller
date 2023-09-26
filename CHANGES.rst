@@ -1,15 +1,20 @@
 Changes
 =======
 
-Version 0.9.1 (UNRELEASED)
+Version 0.9.1 (2023-09-27)
 --------------------------
 
+- Adds unique error messages to Kubernetes job monitor to more easily identify source of problems.
+- Changes Paramiko to version 3.0.0.
+- Changes HTCondor to version 9.0.17 (LTS).
+- Changes Rucio authentication helper to version 1.1.1 allowing users to override the Rucio server and authentication hosts independently of VO name.
 - Fixes intermittent Slurm connection issues by DNS-resolving the Slurm head node IPv4 address before establishing connections.
 - Fixes deletion of failed jobs not being performed when Kerberos is enabled.
 - Fixes job monitoring to consider OOM-killed jobs as failed.
-- Changes Paramiko to version 3.0.0.
-- Changes HTCondor to version 9.0.17 (LTS).
-- Changes Rucio authentication helper to version 1.1.1.
+- Fixes Slurm command generation issues when using fully-qualified image names.
+- Fixes location of HTCondor build dependencies.
+- Fixes detection of default Rucio server and authentication host for ATLAS VO.
+- Fixes container image names to be Podman-compatible.
 
 Version 0.9.0 (2023-01-20)
 --------------------------
