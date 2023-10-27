@@ -61,7 +61,7 @@ install_requires = [
     "apispec-webframeworks",
     "Flask>=2.1.1,<2.2.0",
     "jinja2<3.1.0",
-    "Werkzeug>=2.1.0",
+    "Werkzeug>=2.1.0,<3.0",
     "fs>=2.0",
     "marshmallow>2.13.0,<=2.20.1",
     "reana-commons[kubernetes]>=0.9.3,<0.10.0",
