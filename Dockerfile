@@ -7,6 +7,9 @@
 # Use Ubuntu LTS base image
 FROM docker.io/library/ubuntu:20.04
 
+# Recognise target architecture
+ARG TARGETARCH
+
 # Use default answers in installation commands
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -44,8 +47,8 @@ RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       set -e; \
       apt-get update -y; \
       apt-get install --no-install-recommends -y wget alien gnupg2 rand; \
-      wget -O ngbauth-submit.rpm https://linuxsoft.cern.ch/internal/repos/batch8s-stable/x86_64/os/Packages/n/ngbauth-submit-0.26-2.el8s.noarch.rpm; \
-      wget -O myschedd.rpm https://linuxsoft.cern.ch/internal/repos/batch8s-stable/x86_64/os/Packages/m/myschedd-1.9-2.el8s.x86_64.rpm; \
+      wget -q -O ngbauth-submit.rpm https://linuxsoft.cern.ch/internal/repos/batch8s-stable/x86_64/os/Packages/n/ngbauth-submit-0.26-2.el8s.noarch.rpm; \
+      wget -q -O myschedd.rpm https://linuxsoft.cern.ch/internal/repos/batch8s-stable/x86_64/os/Packages/m/myschedd-1.9-2.el8s.x86_64.rpm; \
       yes | alien -i myschedd.rpm; \
       yes | alien -i ngbauth-submit.rpm; \
       rm -rf myschedd.rpm ngbauth-submit.rpm; \
@@ -72,9 +75,9 @@ COPY etc/ngbauth-submit /etc/sysconfig/
 COPY etc/ngauth_batch_crypt_pub.pem /etc/
 COPY etc/cerngridca.crt /usr/local/share/ca-certificates/cerngridca.crt
 COPY etc/cernroot.crt /usr/local/share/ca-certificates/cernroot.crt
-COPY etc/job_wrapper.sh etc/job_wrapper.sh
-RUN chmod +x /etc/job_wrapper.sh
-RUN update-ca-certificates
+COPY etc/job_wrapper.sh /etc/job_wrapper.sh
+RUN chmod +x /etc/job_wrapper.sh && \
+    update-ca-certificates
 
 # Copy cluster component source code
 WORKDIR /code
@@ -82,12 +85,25 @@ COPY . /code
 
 # Are we debugging?
 ARG DEBUG=0
-RUN if [ "${DEBUG}" -gt 0 ]; then pip install -e ".[debug]"; else pip install .; fi;
+# hadolint ignore=DL3013,DL4006,SC1075
+RUN if [ "${DEBUG}" -gt 0 ]; then \
+      if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
+        pip install --no-cache-dir -e ".[debug,htcondor]"; \
+      else \
+        pip install --no-cache-dir -e ".[debug]"; \
+      fi \
+    else \
+      if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
+        pip install --no-cache-dir ".[htcondor]"; \
+      else \
+        pip install --no-cache-dir .; \
+      fi \
+    fi
 
 # Are we building with locally-checked-out shared modules?
 # hadolint ignore=SC2102
-RUN if test -e modules/reana-commons; then pip install -e modules/reana-commons[kubernetes] --upgrade; fi
-RUN if test -e modules/reana-db; then pip install -e modules/reana-db --upgrade; fi
+RUN if test -e modules/reana-commons; then pip install --no-cache-dir -e modules/reana-commons[kubernetes] --upgrade; fi
+RUN if test -e modules/reana-db; then pip install --no-cache-dir -e modules/reana-db --upgrade; fi
 
 # Check for any broken Python dependencies
 RUN pip check

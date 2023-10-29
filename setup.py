@@ -35,6 +35,9 @@ extras_require = {
         "sphinxcontrib-openapi>=0.8.0",
         "sphinxcontrib-redoc>=1.5.1",
     ],
+    "htcondor": [
+        "htcondor==9.0.17",
+    ],
     "tests": tests_require,
     "ssh": ["paramiko[gssapi]>=3.0.0"],
 }
@@ -63,7 +66,6 @@ install_requires = [
     "marshmallow>2.13.0,<=2.20.1",
     "reana-commons[kubernetes]>=0.9.3,<0.10.0",
     "reana-db>=0.9.2,<0.10.0",
-    "htcondor==9.0.17",
     "retrying>=1.3.3",
 ]
 
