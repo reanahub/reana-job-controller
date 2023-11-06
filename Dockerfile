@@ -26,6 +26,7 @@ RUN apt-get update -y && \
       libauthen-krb5-perl \
       libkrb5-dev \
       openssh-client \
+      python3-gssapi \
       python3-pip \
       python3.8 \
       python3.8-dev \
