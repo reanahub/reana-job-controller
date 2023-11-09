@@ -13,9 +13,8 @@ import uuid
 
 import mock
 import pytest
-from reana_db.models import Job, JobStatus
 from reana_commons.config import KRB5_INIT_CONTAINER_NAME, KRB5_RENEW_CONTAINER_NAME
-
+from reana_db.models import Job, JobStatus
 from reana_job_controller.job_manager import JobManager
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 
@@ -26,7 +25,7 @@ def test_execute_kubernetes_job(
     session,
     sample_serial_workflow_in_db,
     sample_workflow_workspace,
-    default_user,
+    user0,
     kerberos_user_secrets,
     corev1_api_client_with_user_secrets,
     monkeypatch,
@@ -40,7 +39,7 @@ def test_execute_kubernetes_job(
     expected_env_var = {env_var_key: env_var_value}
     expected_image = "docker.io/library/busybox"
     expected_command = "ls"
-    monkeypatch.setenv("REANA_USER_ID", str(default_user.id_))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
     job_manager = KubernetesJobManager(
         docker_img=expected_image,
         cmd=expected_command,
@@ -99,7 +98,7 @@ def test_stop_kubernetes_job(
     sample_serial_workflow_in_db,
     sample_workflow_workspace,
     empty_user_secrets,
-    default_user,
+    user0,
     corev1_api_client_with_user_secrets,
     monkeypatch,
 ):
@@ -110,7 +109,7 @@ def test_stop_kubernetes_job(
     expected_env_var_value = "value"
     expected_image = "docker.io/library/busybox"
     expected_command = ["ls"]
-    monkeypatch.setenv("REANA_USER_ID", str(default_user.id_))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
     job_manager = KubernetesJobManager(
         docker_img=expected_image,
         cmd=expected_command,
