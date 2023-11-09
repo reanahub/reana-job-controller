@@ -234,13 +234,14 @@ class KubernetesJobManager(JobManager):
                 namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE, body=self.job
             )
             return self.job["metadata"]["name"]
-        except ApiException as e:
-            logging.error(
-                f"An error has occurred while connecting to Kubernetes API to submit a job: {e}"
+        except ApiException:
+            logging.exception(
+                "An error has occurred while connecting to the Kubernetes API to submit a job"
             )
-        except Exception as e:
-            logging.error(traceback.format_exc())
-            logging.debug("Unexpected error: {}".format(e))
+            raise
+        except Exception:
+            logging.exception("Unexpected error while submitting a job")
+            raise
 
     def stop(backend_job_id, asynchronous=True):
         """Stop Kubernetes job execution.

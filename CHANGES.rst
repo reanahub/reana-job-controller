@@ -6,6 +6,7 @@ Version 0.9.2 (UNRELEASED)
 
 - Changes CVMFS support to allow users to automatically mount any available repository.
 - Fixes container image building on the arm64 architecture.
+- Fixes the creation of Kubernetes jobs by retrying in case of error and by correctly handling the error after reaching the retry limit.
 
 Version 0.9.1 (2023-09-27)
 --------------------------
