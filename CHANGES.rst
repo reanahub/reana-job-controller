@@ -4,6 +4,7 @@ Changes
 Version 0.9.2 (UNRELEASED)
 --------------------------
 
+- Changes CVMFS support to allow users to automatically mount any available repository.
 - Fixes container image building on the arm64 architecture.
 
 Version 0.9.1 (2023-09-27)

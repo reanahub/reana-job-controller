@@ -17,7 +17,6 @@ from kubernetes import client
 from kubernetes.client.models.v1_delete_options import V1DeleteOptions
 from kubernetes.client.rest import ApiException
 from reana_commons.config import (
-    CVMFS_REPOSITORIES,
     K8S_CERN_EOS_AVAILABLE,
     K8S_CERN_EOS_MOUNT_CONFIGURATION,
     KRB5_STATUS_FILE_LOCATION,
@@ -39,7 +38,7 @@ from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
 from reana_commons.k8s.kerberos import get_kerberos_k8s_config
 from reana_commons.k8s.secrets import REANAUserSecretsStore
 from reana_commons.k8s.volumes import (
-    get_k8s_cvmfs_volume,
+    get_k8s_cvmfs_volumes,
     get_reana_shared_volume,
     get_workspace_volume,
 )
@@ -199,24 +198,10 @@ class KubernetesJobManager(JobManager):
         self.add_kubernetes_job_timeout()
 
         if self.cvmfs_mounts != "false":
-            cvmfs_map = {}
-            for cvmfs_mount_path in ast.literal_eval(self.cvmfs_mounts):
-                if cvmfs_mount_path in CVMFS_REPOSITORIES:
-                    cvmfs_map[CVMFS_REPOSITORIES[cvmfs_mount_path]] = cvmfs_mount_path
-
-            for repository, mount_path in cvmfs_map.items():
-                volume = get_k8s_cvmfs_volume(repository)
-
-                (
-                    job_spec["containers"][0]["volumeMounts"].append(
-                        {
-                            "name": volume["name"],
-                            "mountPath": "/cvmfs/{}".format(mount_path),
-                            "readOnly": volume["readOnly"],
-                        }
-                    )
-                )
-                job_spec["volumes"].append(volume)
+            cvmfs_repositories = ast.literal_eval(self.cvmfs_mounts)
+            volume_mounts, volumes = get_k8s_cvmfs_volumes(cvmfs_repositories)
+            job_spec["containers"][0]["volumeMounts"].extend(volume_mounts)
+            job_spec["volumes"].extend(volumes)
 
         self.job["spec"]["template"]["spec"][
             "securityContext"
