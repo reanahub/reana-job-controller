@@ -203,10 +203,13 @@ class JobMonitorKubernetes(JobMonitor):
 
         elif job_pod.status.phase == "Pending":
             for container in container_statuses:
+                reason = None
+                message = None
                 try:
                     reason = container.state.waiting.reason
+                    message = container.state.waiting.message
                 except AttributeError:
-                    reason = None
+                    pass
 
                 if not reason:
                     continue
@@ -221,6 +224,12 @@ class JobMonitorKubernetes(JobMonitor):
                     logging.info(
                         f"Container {container.name} in Kubernetes job {backend_job_id} "
                         "failed due to invalid image name."
+                    )
+                    status = JobStatus.failed.name
+                elif "CreateContainerConfigError" in reason:
+                    logging.info(
+                        f"Container {container.name} in Kubernetes job {backend_job_id} "
+                        f"failed due to container configuration error: {message}"
                     )
                     status = JobStatus.failed.name
 
