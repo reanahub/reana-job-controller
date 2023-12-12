@@ -124,3 +124,15 @@ EXPOSE 5000
 
 # Run server
 CMD ["flask", "run", "-h", "0.0.0.0"]
+
+# Set image labels
+LABEL org.opencontainers.image.authors="team@reanahub.io"
+LABEL org.opencontainers.image.created="2023-12-12"
+LABEL org.opencontainers.image.description="REANA reproducible analysis platform - job controller component"
+LABEL org.opencontainers.image.documentation="https://reana-job-controller.readthedocs.io/"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.source="https://github.com/reanahub/reana-job-controller"
+LABEL org.opencontainers.image.title="reana-job-controller"
+LABEL org.opencontainers.image.url="https://github.com/reanahub/reana-job-controller"
+LABEL org.opencontainers.image.vendor="reanahub"
+LABEL org.opencontainers.image.version="0.9.2"

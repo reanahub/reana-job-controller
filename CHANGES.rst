@@ -4,6 +4,7 @@ Changes
 Version 0.9.2 (UNRELEASED)
 --------------------------
 
+- Adds metadata labels to Dockerfile.
 - Changes CVMFS support to allow users to automatically mount any available repository.
 - Fixes container image building on the arm64 architecture.
 - Fixes the creation of Kubernetes jobs by retrying in case of error and by correctly handling the error after reaching the retry limit.
