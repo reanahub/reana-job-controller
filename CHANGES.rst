@@ -1,10 +1,11 @@
 Changes
 =======
 
-Version 0.9.2 (UNRELEASED)
+Version 0.9.2 (2023-12-12)
 --------------------------
 
 - Adds metadata labels to Dockerfile.
+- Adds automated multi-platform container image building for amd64 and arm64 architectures.
 - Changes CVMFS support to allow users to automatically mount any available repository.
 - Fixes container image building on the arm64 architecture.
 - Fixes the creation of Kubernetes jobs by retrying in case of error and by correctly handling the error after reaching the retry limit.
