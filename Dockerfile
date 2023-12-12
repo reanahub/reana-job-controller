@@ -107,9 +107,21 @@ RUN if [ "${DEBUG}" -gt 0 ]; then \
     fi
 
 # Are we building with locally-checked-out shared modules?
-# hadolint ignore=SC2102
-RUN if test -e modules/reana-commons; then pip install --no-cache-dir -e modules/reana-commons[kubernetes] --upgrade; fi
-RUN if test -e modules/reana-db; then pip install --no-cache-dir -e modules/reana-db --upgrade; fi
+# hadolint ignore=DL3013
+RUN if test -e modules/reana-commons; then \
+      if [ "${DEBUG}" -gt 0 ]; then \
+        pip install --no-cache-dir -e "modules/reana-commons[kubernetes]" --upgrade; \
+      else \
+        pip install --no-cache-dir "modules/reana-commons[kubernetes]" --upgrade; \
+      fi \
+    fi; \
+    if test -e modules/reana-db; then \
+      if [ "${DEBUG}" -gt 0 ]; then \
+        pip install --no-cache-dir -e "modules/reana-db" --upgrade; \
+      else \
+        pip install --no-cache-dir "modules/reana-db" --upgrade; \
+      fi \
+    fi
 
 # Check for any broken Python dependencies
 RUN pip check
