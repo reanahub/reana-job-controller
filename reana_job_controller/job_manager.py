@@ -92,11 +92,14 @@ class JobManager:
         """
         raise NotImplementedError
 
-    def get_logs(self):
-        """Get job log.
+    @classmethod
+    def get_logs(cls, backend_job_id, **kwargs):
+        """Return job logs if log files are present.
 
-        :returns: stderr, stdout of a job.
-        :rtype: dict
+        :param backend_job_id: ID of the job in the backend.
+        :param kwargs: Additional parameters needed to fetch logs.
+            These depend on the chosen compute backend.
+        :return: String containing the job logs.
         """
         raise NotImplementedError
 

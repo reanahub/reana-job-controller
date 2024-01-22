@@ -29,6 +29,7 @@ from reana_job_controller.config import (
     SLURM_SSH_AUTH_TIMEOUT,
 )
 from reana_job_controller.job_db import JOB_DB, store_job_logs, update_job_status
+from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 from reana_job_controller.utils import SSHClient, singleton
 
 
@@ -214,70 +215,6 @@ class JobMonitorKubernetes(JobMonitor):
 
         return status
 
-    def _get_containers_logs(self, job_pod) -> Optional[str]:
-        try:
-            pod_logs = ""
-            container_statuses = self._get_job_container_statuses(job_pod)
-
-            logging.info(f"Grabbing pod {job_pod.metadata.name} logs ...")
-            for container in container_statuses:
-                # If we are here, it means that either all the containers have finished
-                # running or there has been some sort of failure. For this reason we get
-                # the logs of all containers, even if they are still running, as the job
-                # will not continue running after this anyway.
-                if container.state.terminated or container.state.running:
-                    container_log = (
-                        current_k8s_corev1_api_client.read_namespaced_pod_log(
-                            namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
-                            name=job_pod.metadata.name,
-                            container=container.name,
-                        )
-                    )
-                    pod_logs += "{}: :\n {}\n".format(container.name, container_log)
-                    if hasattr(container.state.terminated, "reason"):
-                        pod_logs += "\n{}\n".format(container.state.terminated.reason)
-                elif container.state.waiting:
-                    # No need to fetch logs, as the container has not started yet.
-                    pod_logs += "Container {} failed, error: {}".format(
-                        container.name, container.state.waiting.message
-                    )
-
-            return pod_logs
-        except client.rest.ApiException as e:
-            logging.error(f"Error from Kubernetes API while getting job logs: {e}")
-            return None
-        except Exception as e:
-            logging.error(traceback.format_exc())
-            logging.error("Unexpected error: {}".format(e))
-            return None
-
-    def get_job_logs(self, job_pod) -> Optional[str]:
-        """Get job logs."""
-        logs = self._get_containers_logs(job_pod)
-
-        if job_pod.status.reason == "DeadlineExceeded":
-            if not logs:
-                logs = ""
-
-            backend_job_id = self.get_backend_job_id(job_pod)
-            message = f"\n{job_pod.status.reason}\nThe job was killed due to exceeding timeout"
-
-            try:
-                specified_timeout = job_pod.spec.active_deadline_seconds
-                message += f" of {specified_timeout} seconds."
-            except AttributeError:
-                message += "."
-                logging.error(
-                    f"Kubernetes job id: {backend_job_id}. Could not get job timeout from Job spec."
-                )
-
-            logs += message
-            logging.info(
-                f"Kubernetes job id: {backend_job_id} was killed due to timeout."
-            )
-
-        return logs
-
     def watch_jobs(self, job_db, app=None):
         """Open stream connection to k8s apiserver to watch all jobs status.
 
@@ -302,7 +239,9 @@ class JobMonitorKubernetes(JobMonitor):
                         backend_job_id = self.get_backend_job_id(job_pod)
                         reana_job_id = self.get_reana_job_id(backend_job_id)
 
-                        logs = self.get_job_logs(job_pod)
+                        logs = self.job_manager_cls.get_logs(
+                            backend_job_id, job_pod=job_pod
+                        )
 
                         store_job_logs(reana_job_id, logs)
                         update_job_status(reana_job_id, job_status)
@@ -310,7 +249,7 @@ class JobMonitorKubernetes(JobMonitor):
                         if JobStatus.should_cleanup_job(job_status):
                             self.clean_job(backend_job_id)
             except client.rest.ApiException as e:
-                logging.error(
+                logging.exception(
                     f"Error from Kubernetes API while watching jobs pods: {e}"
                 )
             except Exception as e:
@@ -414,7 +353,7 @@ class JobMonitorHTCondorCERN(JobMonitor):
                         job_logs = app.htcondor_executor.submit(
                             self.job_manager_cls.get_logs,
                             job_dict["backend_job_id"],
-                            job_db[job_id]["obj"].workflow_workspace,
+                            workspace=job_db[job_id]["obj"].workflow_workspace,
                         )
                         logs = job_logs.result()
                         store_job_logs(job_id, logs)

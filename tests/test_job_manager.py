@@ -154,3 +154,28 @@ def test_execution_hooks():
     job_manager = TestJobManger("docker.io/library/busybox", "ls", {})
     job_manager.execute()
     assert job_manager.order_list == [1, 2, 3, 4]
+
+
+@pytest.mark.parametrize(
+    "k8s_phase,k8s_container_state,k8s_logs,pod_logs",
+    [
+        ("Pending", "ErrImagePull", "pull access denied", None),
+        ("Pending", "InvalidImageName", "couldn't parse image", None),
+        ("Succeeded", "Completed", None, "job finished"),
+        ("Failed", "Error", None, "job failed"),
+    ],
+)
+def test_kubernetes_get_job_logs(
+    k8s_phase, k8s_container_state, k8s_logs, pod_logs, app, kubernetes_job_pod
+):
+    """Test retrieval of job logs."""
+    k8s_corev1_api_client = mock.MagicMock()
+    k8s_corev1_api_client.read_namespaced_pod_log = lambda **kwargs: pod_logs
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_corev1_api_client",
+        k8s_corev1_api_client,
+    ):
+        job_pod = kubernetes_job_pod(k8s_phase, k8s_container_state)
+        assert (k8s_logs or pod_logs) in KubernetesJobManager.get_logs(
+            job_pod.metadata.labels["job-name"], job_pod=job_pod
+        )
