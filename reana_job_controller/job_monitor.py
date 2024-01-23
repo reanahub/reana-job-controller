@@ -113,7 +113,11 @@ class JobMonitorKubernetes(JobMonitor):
             https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1Pod.md)
         """
         remaining_jobs = self._get_remaining_jobs(
-            statuses_to_skip=[JobStatus.finished.name, JobStatus.failed.name]
+            statuses_to_skip=[
+                JobStatus.finished.name,
+                JobStatus.failed.name,
+                JobStatus.stopped.name,
+            ]
         )
         backend_job_id = self.get_backend_job_id(job_pod)
         is_job_in_remaining_jobs = backend_job_id in remaining_jobs
@@ -291,7 +295,7 @@ class JobMonitorHTCondorCERN(JobMonitor):
         :param job_db: Dictionary which contains all current jobs.
         """
         ignore_hold_codes = [35, 16]
-        statuses_to_skip = ["finished", "failed"]
+        statuses_to_skip = ["finished", "failed", "stopped"]
         while True:
             try:
                 logging.info("Starting a new stream request to watch Condor Jobs")
@@ -422,7 +426,7 @@ class JobMonitorSlurmCERN(JobMonitor):
             banner_timeout=SLURM_SSH_BANNER_TIMEOUT,
             auth_timeout=SLURM_SSH_AUTH_TIMEOUT,
         )
-        statuses_to_skip = ["finished", "failed"]
+        statuses_to_skip = ["finished", "failed", "stopped"]
         while True:
             logging.debug("Starting a new stream request to watch Jobs")
             try:

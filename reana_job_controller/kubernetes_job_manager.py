@@ -172,6 +172,8 @@ class KubernetesJobManager(JobManager):
                         "initContainers": [],
                         "volumes": [],
                         "restartPolicy": "Never",
+                        # No need to wait a long time for jobs to gracefully terminate
+                        "terminationGracePeriodSeconds": 5,
                         "enableServiceLinks": False,
                     },
                 },

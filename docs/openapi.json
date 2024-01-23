@@ -410,6 +410,53 @@
         },
         "summary": "Returns the logs for a given job."
       }
+    },
+    "/shutdown": {
+      "delete": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "All running jobs will be stopped and no more jobs will be scheduled. Kubernetes will call this endpoint before stopping the pod (PreStop hook).",
+        "operationId": "shutdown",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "Request successful. All jobs were stopped.",
+            "examples": {
+              "application/json": {
+                "message": "All jobs stopped."
+              }
+            },
+            "schema": {
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "500": {
+            "description": "Request failed. Something went wrong while stopping the jobs.",
+            "examples": {
+              "application/json": {
+                "message": "Could not stop jobs cdcf48b1-c2f3-4693-8230-b066e088444c"
+              }
+            },
+            "schema": {
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Stop reana-job-controller"
+      }
     }
   },
   "swagger": "2.0"
