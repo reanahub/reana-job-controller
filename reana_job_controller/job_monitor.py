@@ -28,7 +28,7 @@ from reana_job_controller.config import (
     SLURM_SSH_BANNER_TIMEOUT,
     SLURM_SSH_AUTH_TIMEOUT,
 )
-from reana_job_controller.job_db import JOB_DB
+from reana_job_controller.job_db import JOB_DB, store_job_logs, update_job_status
 from reana_job_controller.utils import SSHClient, singleton
 
 
@@ -102,27 +102,6 @@ class JobMonitorKubernetes(JobMonitor):
         :rtype: str
         """
         return job_pod.metadata.labels["job-name"]
-
-    def store_job_logs(self, reana_job_id, logs):
-        """Store logs and update job status.
-
-        :param reana_job_id: Internal REANA job ID.
-        :param logs: Job logs.
-        :type reana_job_id: str
-        :type logs: str
-        """
-        self.job_db[reana_job_id]["log"] = logs
-        store_logs(job_id=reana_job_id, logs=logs)
-
-    def update_job_status(self, reana_job_id, status):
-        """Update job status inside RJC.
-
-        :param reana_job_id: Internal REANA job ID.
-        :param status: One of the possible status for jobs in REANA
-        :type reana_job_id: str
-        :type status: str
-        """
-        self.job_db[reana_job_id]["status"] = status
 
     def should_process_job(self, job_pod) -> bool:
         """Decide whether the job should be processed or not.
@@ -324,9 +303,9 @@ class JobMonitorKubernetes(JobMonitor):
                         reana_job_id = self.get_reana_job_id(backend_job_id)
 
                         logs = self.get_job_logs(job_pod)
-                        self.store_job_logs(reana_job_id, logs)
 
-                        self.update_job_status(reana_job_id, job_status)
+                        store_job_logs(reana_job_id, logs)
+                        update_job_status(reana_job_id, job_status)
 
                         if JobStatus.should_cleanup_job(job_status):
                             self.clean_job(backend_job_id)
@@ -413,21 +392,21 @@ class JobMonitorHTCondorCERN(JobMonitor):
                         if condor_job:
                             msg = "Job was found in history. {}".format(str(condor_job))
                             logging.error(msg)
-                            job_db[job_id]["status"] = "failed"
-                            job_db[job_id]["log"] = msg
+                            update_job_status(job_id, "failed")
+                            store_job_logs(job_id, msg)
                         continue
                     if condor_job["JobStatus"] == condorJobStatus["Completed"]:
                         exit_code = condor_job.get(
                             "ExitCode", condor_job.get("ExitStatus")
                         )
                         if exit_code == 0:
-                            job_db[job_id]["status"] = "finished"
+                            update_job_status(job_id, "finished")
                         else:
                             logging.info(
                                 "Job job_id: {0}, condor_job_id: {1} "
                                 "failed".format(job_id, condor_job["ClusterId"])
                             )
-                            job_db[job_id]["status"] = "failed"
+                            update_job_status(job_id, "failed")
                         app.htcondor_executor.submit(
                             self.job_manager_cls.spool_output,
                             job_dict["backend_job_id"],
@@ -437,8 +416,8 @@ class JobMonitorHTCondorCERN(JobMonitor):
                             job_dict["backend_job_id"],
                             job_db[job_id]["obj"].workflow_workspace,
                         )
-                        job_db[job_id]["log"] = job_logs.result()
-                        store_logs(logs=job_db[job_id]["log"], job_id=job_id)
+                        logs = job_logs.result()
+                        store_job_logs(job_id, logs)
 
                         job_db[job_id]["deleted"] = True
                     elif (
@@ -526,35 +505,25 @@ class JobMonitorSlurmCERN(JobMonitor):
                     job_id = slurm_jobs[slurm_job_id]
                     if slurm_job_status in slurmJobStatus["finished"]:
                         self.job_manager_cls.get_outputs()
-                        job_db[job_id]["status"] = "finished"
+                        update_job_status(job_id, "finished")
                         job_db[job_id]["deleted"] = True
-                        job_db[job_id]["log"] = self.job_manager_cls.get_logs(
+                        logs = self.job_manager_cls.get_logs(
                             backend_job_id=slurm_job_id,
                             workspace=job_db[job_id]["obj"].workflow_workspace,
                         )
-                        store_logs(logs=job_db[job_id]["log"], job_id=job_id)
+                        store_job_logs(job_id, logs)
                     if slurm_job_status in slurmJobStatus["failed"]:
                         self.job_manager_cls.get_outputs()
-                        job_db[job_id]["status"] = "failed"
+                        update_job_status(job_id, "failed")
                         job_db[job_id]["deleted"] = True
-                        job_db[job_id]["log"] = self.job_manager_cls.get_logs(
+                        logs = self.job_manager_cls.get_logs(
                             backend_job_id=slurm_job_id,
                             workspace=job_db[job_id]["obj"].workflow_workspace,
                         )
-                        store_logs(logs=job_db[job_id]["log"], job_id=job_id)
+                        store_job_logs(job_id, logs)
             except Exception as e:
                 logging.error("Unexpected error: {}".format(e), exc_info=True)
                 time.sleep(120)
-
-
-def store_logs(logs, job_id):
-    """Write logs to DB."""
-    try:
-        logging.info("Storing job logs: {}".format(job_id))
-        Session.query(Job).filter_by(id_=job_id).update(dict(logs=logs))
-        Session.commit()
-    except Exception as e:
-        logging.error("Exception while saving logs: {}".format(str(e)), exc_info=True)
 
 
 def format_condor_job_que_query(backend_job_ids):
