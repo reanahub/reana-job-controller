@@ -109,7 +109,7 @@ class JobManager:
         job_db_entry = JobTable(
             backend_job_id=backend_job_id,
             workflow_uuid=self.workflow_uuid,
-            status=JobStatus.created.name,
+            status=JobStatus.created,
             compute_backend=self.compute_backend,
             cvmfs_mounts=self.cvmfs_mounts or "",
             shared_file_system=self.shared_file_system or False,

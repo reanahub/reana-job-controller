@@ -248,6 +248,10 @@ def create_job():  # noqa
         job["backend_job_id"] = backend_jod_id
         job["compute_backend"] = compute_backend
         JOB_DB[str(job["job_id"])] = job
+        # FIXME: we do not detect whether the job has started running or not,
+        # so let's assume the job is running, even though it might be queued in
+        # the backend system
+        update_job_status(job_obj.job_id, JobStatus.running.name)
         job_monitor_cls = current_app.config["JOB_MONITORS"][compute_backend]()
         job_monitor_cls(
             app=current_app._get_current_object(),
