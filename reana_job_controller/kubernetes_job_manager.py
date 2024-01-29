@@ -203,10 +203,10 @@ class KubernetesJobManager(JobManager):
             job_spec["containers"][0]["volumeMounts"].extend(volume_mounts)
             job_spec["volumes"].extend(volumes)
 
-        self.job["spec"]["template"]["spec"][
-            "securityContext"
-        ] = client.V1PodSecurityContext(
-            run_as_group=WORKFLOW_RUNTIME_USER_GID, run_as_user=self.kubernetes_uid
+        self.job["spec"]["template"]["spec"]["securityContext"] = (
+            client.V1PodSecurityContext(
+                run_as_group=WORKFLOW_RUNTIME_USER_GID, run_as_user=self.kubernetes_uid
+            )
         )
 
         if self.kerberos:

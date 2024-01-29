@@ -63,9 +63,9 @@ def retrieve_all_jobs():
             {
                 job_id: {
                     "cmd": job["cmd"] if job.get("cmd") else "",
-                    "cvmfs_mounts": job["cvmfs_mounts"]
-                    if job.get("cvmfs_mounts")
-                    else [],
+                    "cvmfs_mounts": (
+                        job["cvmfs_mounts"] if job.get("cvmfs_mounts") else []
+                    ),
                     "docker_img": job["docker_img"],
                     "job_id": job["job_id"],
                     "max_restart_count": job["max_restart_count"],

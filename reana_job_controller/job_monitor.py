@@ -476,7 +476,7 @@ slurmJobStatus = {
         "RESV_DEL_HOLD",
         "REQUEUED",
         "RESIZING",
-    ]
+    ],
     # 'REVOKED',
     # 'SIGNALING',
     # 'SPECIAL_EXIT',
