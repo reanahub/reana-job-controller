@@ -69,6 +69,62 @@ def initialize_krb5_token(workflow_uuid):
         logging.error(msg, exc_info=True)
 
 
+def motley_cue_auth_strategy_factory(hostname):
+    # Using a factory to avoid a general dependency on libmytoken, paramiko and pyjwt
+    from libmytoken import get_access_token_from_jwt_mytoken
+    from paramiko.auth_strategy import AuthSource
+    from time import time
+    import jwt
+    import requests
+
+    class MotleyCueTokenAuth(AuthSource):
+        def __init__(self):
+            self._access_token = None
+            self._access_token_expires_on = 0
+            self.hostname = hostname
+            self.username = self._get_deployed_username()
+            super().__init__(username=self.username)
+
+        @property
+        def access_token(self):
+            if not (self._access_token and self._is_access_token_valid()):
+                self._refresh_access_token()
+            return self._access_token
+
+        def authenticate(self, transport):
+            return transport.auth_interactive(username=self.username,
+                                              handler=self.motley_cue_auth_handler)
+
+        def _is_access_token_valid(self):
+            return (
+                    self._access_token_expires_on - time() > 100
+            )  # token should be at least valid for 100 s
+
+        def _get_access_token_expiry_date(self):
+            decoded_token = jwt.decode(self._access_token,
+                                       options={"verify_signature": False,
+                                                "verify_aud": False})
+            return decoded_token["exp"]
+
+        def _get_deployed_username(self):
+            headers = {"Authorization": f"Bearer {self.access_token}"}
+            req = requests.get(f"https://{self.hostname}/user/deploy",
+                               headers=headers, verify=True)
+            return req.json()["credentials"]["ssh_user"]
+
+        def motley_cue_auth_handler(self, title, instructions, prompt_list):
+            return [self.access_token if (echo and "Access Token" in prompt) else ""
+                    for
+                    prompt, echo in prompt_list]
+
+        def _refresh_access_token(self):
+            self._access_token = get_access_token_from_jwt_mytoken(
+                os.environ.get("HELMHOLTZ_TOP"))
+            self._access_token_expires_on = self._get_access_token_expiry_date()
+
+    return MotleyCueTokenAuth()
+
+
 @singleton
 class SSHClient:
     """SSH Client."""
@@ -82,6 +138,7 @@ class SSHClient:
         timeout=None,
         banner_timeout=None,
         auth_timeout=None,
+        auth_strategy=None,
     ):
         """Initialize ssh client."""
         if hostname:
@@ -96,6 +153,7 @@ class SSHClient:
         self.timeout = timeout
         self.banner_timeout = banner_timeout
         self.auth_timeout = auth_timeout
+        self.auth_strategy = auth_strategy
         self.ssh_client = self.paramiko.SSHClient()
         self.ssh_client.set_missing_host_key_policy(self.paramiko.AutoAddPolicy())
         self.establish_connection()
@@ -114,6 +172,7 @@ class SSHClient:
             look_for_keys=False,
             port=self.port,
             timeout=self.timeout,
+            auth_strategy=self.auth_strategy,
         )
 
     def exec_command(self, command):
