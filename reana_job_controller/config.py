@@ -30,6 +30,9 @@ COMPUTE_BACKENDS = {
     "slurmcern": lambda: import_string(
         "reana_job_controller.slurmcern_job_manager.SlurmJobManagerCERN"
     ),
+    "compute4punch": lambda: import_string(
+        "reana_job_controller.compute4punch_job_manager.Compute4PUNCHJobManagerCERN"
+    ),
 }
 """Supported job compute backends and corresponding management class."""
 
@@ -42,6 +45,9 @@ JOB_MONITORS = {
     ),
     "slurmcern": lambda: import_string(
         "reana_job_controller.job_monitor.JobMonitorSlurmCERN"
+    ),
+    "compute4punch": lambda: import_string(
+        "reana_job_controller.job_monitor.JobMonitorCompute4PUNCH"
     ),
 }
 """Classes responsible for monitoring specific backend jobs"""
@@ -153,3 +159,18 @@ SLURM_SSH_BANNER_TIMEOUT = float(os.getenv("SLURM_SSH_BANNER_TIMEOUT", "60"))
 
 SLURM_SSH_AUTH_TIMEOUT = float(os.getenv("SLURM_SSH_AUTH_TIMEOUT", "60"))
 """Seconds to wait for SLURM SSH authentication response."""
+
+C4P_LOGIN_NODE_HOSTNAME = os.getenv("C4P_LOGIN_NODE", "c4p-login.gridka.de")
+"""Hostname of C4P login node used for job management via SSH."""
+
+C4P_LOGIN_NODE_PORT = os.getenv("C4P_LOGIN_NODE_PORT", "22")
+"""Port of C4P login node."""
+
+C4P_SSH_TIMEOUT = float(os.getenv("C4P_SSH_TIMEOUT", "60"))
+"""Seconds to wait for C4P SSH TCP connection."""
+
+C4P_SSH_BANNER_TIMEOUT = float(os.getenv("C4P_SSH_BANNER_TIMEOUT", "60"))
+"""Seconds to wait for C4P SSH banner to be presented."""
+
+C4P_SSH_AUTH_TIMEOUT = float(os.getenv("C4P_SSH_AUTH_TIMEOUT", "60"))
+"""Seconds to wait for C4P SSH authentication response."""
