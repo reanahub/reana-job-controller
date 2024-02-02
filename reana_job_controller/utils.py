@@ -8,11 +8,15 @@
 
 """Job controller utils."""
 
+import csv
 import logging
 import os
 import socket
 import subprocess
 import sys
+
+from io import StringIO
+from typing import List, Tuple
 
 from reana_db.database import Session
 from reana_db.models import Workflow
@@ -67,6 +71,48 @@ def initialize_krb5_token(workflow_uuid):
             db_session=Session, workflow_uuid=workflow_uuid, status=None, new_logs=msg
         )
         logging.error(msg, exc_info=True)
+
+
+def csv_parser(
+    input_csv: str,
+    fieldnames: [List, Tuple],
+    delimiter: str = "\t",
+    replacements: dict = None,
+    skip_initial_space: bool = False,
+    skip_trailing_space: bool = False,
+):
+    """
+    Parses CSV formatted input
+
+    :param input_csv: CSV formatted input
+    :type input_csv: str
+    :param fieldnames: corresponding field names
+    :type fieldnames: [List, Tuple]
+    :param delimiter: delimiter between entries
+    :type delimiter: str
+    :param replacements: fields to be replaced
+    :type replacements: dict
+    :param skip_initial_space: ignore whitespace immediately following the delimiter
+    :type skip_initial_space: bool
+    :param skip_trailing_space: ignore whitespace at the end of each csv row
+    :type skip_trailing_space: bool
+    """
+    if skip_trailing_space:
+        input_csv = "\n".join((line.strip() for line in input_csv.splitlines()))
+
+    replacements = replacements or {}
+    with StringIO(input_csv) as csv_input:
+        csv_reader = csv.DictReader(
+            csv_input,
+            fieldnames=fieldnames,
+            delimiter=delimiter,
+            skipinitialspace=skip_initial_space,
+        )
+        for row in csv_reader:
+            yield {
+                key: value if value not in replacements.keys() else replacements[value]
+                for key, value in row.items()
+            }
 
 
 def motley_cue_auth_strategy_factory(hostname):
