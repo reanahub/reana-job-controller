@@ -36,10 +36,12 @@ from reana_job_controller.config import (
 
 from reana_job_controller.job_db import JOB_DB, store_job_logs, update_job_status
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
-from reana_job_controller.utils import (SSHClient,
-                                        singleton,
-                                        csv_parser,
-                                        motley_cue_auth_strategy_factory)
+from reana_job_controller.utils import (
+    SSHClient,
+    singleton,
+    csv_parser,
+    motley_cue_auth_strategy_factory,
+)
 
 
 class JobMonitor:
@@ -481,6 +483,7 @@ class JobMonitorSlurmCERN(JobMonitor):
 @singleton
 class JobMonitorCompute4PUNCH(JobMonitor):
     """HTCondor jobs monitor Compute4PUNCH."""
+
     def __init__(self, **kwargs):
         """Initialize Compute4PUNCH job monitor thread."""
         self.job_manager_cls = COMPUTE_BACKENDS["compute4punch"]()
@@ -588,10 +591,10 @@ def query_c4p_jobs(*backend_job_ids: str, ssh_client: SSHClient):
     c4p_queue = {}
 
     for row in csv_parser(
-            input_csv=c4p_job_status.strip(),
-            fieldnames=attributes,
-            delimiter="\t",
-            replacements=dict(undefined=None),
+        input_csv=c4p_job_status.strip(),
+        fieldnames=attributes,
+        delimiter="\t",
+        replacements=dict(undefined=None),
     ):
         row["JobId"] = f"{row['ClusterId']}.{row['ProcId']}"
         c4p_queue[row["JobId"]] = row
