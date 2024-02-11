@@ -57,13 +57,13 @@ def test_execute_kubernetes_job(
             "reana_commons.k8s.secrets." "current_k8s_corev1_api_client",
             corev1_api_client_with_user_secrets(kerberos_user_secrets),
         ):
-            kubernetes_job_id = job_manager.execute()
+            kubernetes_job_id = job_manager.execute()  # create the job
             created_job = (
                 session.query(Job)
                 .filter_by(backend_job_id=kubernetes_job_id)
                 .one_or_none()
             )
-            assert created_job
+            assert created_job  # testing
             assert created_job.docker_img == expected_image
             assert created_job.cmd == json.dumps(expected_command)
             assert json.dumps(expected_env_var) in created_job.env_vars
