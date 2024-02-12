@@ -603,7 +603,7 @@ def query_c4p_jobs(*backend_job_ids: str, ssh_client: SSHClient):
 
 
 def filter_jobs_to_watch(
-    id, job_db, compute_backend, statuses_to_skip=("finished", "failed")
+    id, job_db, compute_backend, statuses_to_skip=("finished", "failed", "stopped")
 ):
     return job_db[id]["compute_backend"] == compute_backend and not (
         job_db[id]["deleted"] or job_db[id]["status"] in statuses_to_skip
