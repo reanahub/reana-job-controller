@@ -315,8 +315,12 @@ class Compute4PUNCHJobManager(JobManager):
         """
         Collect all input files in the local REANA workspace.
         """
-        return walk(
-            workspace=self.workflow_workspace,
+        skipped_input_files = (".job.ad", ".machine.ad", ".chirp.config")
+        return filter(
+            lambda x: x not in skipped_input_files,
+            walk(
+                workspace=self.workflow_workspace,
+            ),
         )
 
     def _upload_job_inputs(self) -> None:
