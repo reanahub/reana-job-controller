@@ -31,7 +31,7 @@ COMPUTE_BACKENDS = {
         "reana_job_controller.slurmcern_job_manager.SlurmJobManagerCERN"
     ),
     "compute4punch": lambda: import_string(
-        "reana_job_controller.compute4punch_job_manager.Compute4PUNCHJobManagerCERN"
+        "reana_job_controller.compute4punch_job_manager.Compute4PUNCHJobManager"
     ),
 }
 """Supported job compute backends and corresponding management class."""
