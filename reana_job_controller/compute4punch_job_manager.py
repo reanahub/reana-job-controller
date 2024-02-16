@@ -43,6 +43,7 @@ class Compute4PUNCHJobManager(JobManager):
         c4p_cpu_cores=None,
         c4p_memory_limit=None,
         c4p_additional_requirements=None,
+        **kwargs,
     ):
         """
         Compute4PUNCH Job Manager.
