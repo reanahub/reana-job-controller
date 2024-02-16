@@ -209,7 +209,7 @@ class Compute4PUNCHJobManager(JobManager):
         """
         Determine and return the relative Compute4PUNCH workspace path
         """
-        return os.path.join(self.workflow_workspace, self.workflow_uuid)
+        return os.path.join("reana/workflows", self.workflow_uuid)
 
     def _create_c4p_job_description(self) -> None:
         """
