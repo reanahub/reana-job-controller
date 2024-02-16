@@ -246,6 +246,10 @@ class Compute4PUNCHJobManager(JobManager):
         """
         Create job execution script for Compute4PUNCH
         """
+        # The workflow workspace does not exist on Compute4PUNCH,
+        # therefore replace it with CONDOR_JOB_IWD
+        self.cmd = self.cmd.replace(self.workflow_workspace, "$_CONDOR_JOB_IWD")
+        logging.info(f"CMD is {self.cmd}")
         self.cmd = self._encode_cmd(self.cmd)
         job_execution_script_template = ["#!/bin/bash", f"{self.cmd}"]
         job_execution_script = "\n".join(job_execution_script_template)
