@@ -487,9 +487,7 @@ class JobMonitorCompute4PUNCH(JobMonitor):
     def __init__(self, **kwargs):
         """Initialize Compute4PUNCH job monitor thread."""
         self.job_manager_cls = COMPUTE_BACKENDS["compute4punch"]()
-        super(JobMonitorCompute4PUNCH, self).__init__(
-            thread_name="compute4punch_job_monitor"
-        )
+        super(__class__, self).__init__(thread_name="compute4punch_job_monitor")
 
     def watch_jobs(self, job_db, app=None):
         """
