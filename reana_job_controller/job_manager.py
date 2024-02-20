@@ -15,6 +15,8 @@ from reana_db.database import Session, engine as db_engine
 from reana_db.models import Job as JobTable
 from reana_db.models import JobCache, JobStatus, Workflow
 
+from reana_job_controller.config import CACHE_ENABLED
+
 
 class JobManager:
     """Job management interface."""
@@ -61,7 +63,8 @@ class JobManager:
             inst.before_execution()
             backend_job_id = fn(inst, *args, **kwargs)
             inst.create_job_in_db(backend_job_id)
-            inst.cache_job()
+            if CACHE_ENABLED:
+                inst.cache_job()
             db_engine.dispose()
             return backend_job_id
 

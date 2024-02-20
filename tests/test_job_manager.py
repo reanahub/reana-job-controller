@@ -131,6 +131,7 @@ def test_stop_kubernetes_job(
             kubernetes_client.delete_namespaced_job.assert_called_once()
 
 
+@mock.patch("reana_job_controller.job_manager.CACHE_ENABLED", True)
 def test_execution_hooks():
     """Test hook execution order."""
 
