@@ -4,79 +4,29 @@
 #
 #    pip-compile --annotation-style=line --output-file=requirements.txt requirements.in setup.py
 #
-alembic==1.12.1           # via reana-db
-amqp==5.2.0               # via kombu
-apispec[yaml]==3.3.2      # via apispec, apispec-webframeworks, reana-job-controller (setup.py)
-apispec-webframeworks==0.5.2  # via reana-job-controller (setup.py)
-appdirs==1.4.4            # via fs
-attrs==23.1.0             # via jsonschema
-backports-zoneinfo[tzdata]==0.2.1  # via backports-zoneinfo, kombu
-bcrypt==4.1.1             # via paramiko
-bracex==2.4               # via wcmatch
-bravado==10.3.2           # via reana-commons
-bravado-core==6.1.0       # via bravado
-cachetools==5.3.2         # via google-auth
-certifi==2023.11.17       # via kubernetes, requests
-cffi==1.16.0              # via cryptography, pynacl
-charset-normalizer==3.3.2  # via requests
-checksumdir==1.1.9        # via reana-commons
-click==8.1.7              # via flask, reana-commons
-cryptography==41.0.7      # via paramiko, sqlalchemy-utils
-decorator==5.1.1          # via gssapi
-flask==2.1.3              # via reana-job-controller (setup.py)
-fs==2.4.16                # via reana-commons, reana-job-controller (setup.py)
-google-auth==2.24.0       # via kubernetes
-gssapi==1.6.1             # via -r requirements.in, paramiko
-idna==3.6                 # via jsonschema, requests
-importlib-metadata==6.8.0  # via alembic, flask
-importlib-resources==6.1.1  # via alembic
-itsdangerous==2.1.2       # via flask
-jinja2==3.0.3             # via flask, reana-job-controller (setup.py)
-jsonpointer==2.4          # via jsonschema
-jsonref==1.1.0            # via bravado-core
-jsonschema[format]==3.2.0  # via bravado-core, jsonschema, reana-commons, swagger-spec-validator
-kombu==5.3.4              # via reana-commons
-kubernetes==22.6.0        # via reana-commons
-mako==1.3.0               # via alembic
-markupsafe==2.1.3         # via jinja2, mako, werkzeug
-marshmallow==2.20.1       # via reana-job-controller (setup.py)
-mock==3.0.5               # via reana-commons
-monotonic==1.6            # via bravado
-msgpack==1.0.7            # via bravado-core
-msgpack-python==0.5.6     # via bravado
-oauthlib==3.2.2           # via requests-oauthlib
-paramiko[gssapi]==3.0.0   # via -r requirements.in, paramiko
-psycopg2-binary==2.9.9    # via reana-db
-pyasn1==0.5.1             # via paramiko, pyasn1-modules, rsa
-pyasn1-modules==0.3.0     # via google-auth
-pycparser==2.21           # via cffi
-pynacl==1.5.0             # via paramiko
-pyrsistent==0.20.0        # via jsonschema
-python-dateutil==2.8.2    # via bravado, bravado-core, kubernetes
-pytz==2023.3.post1        # via bravado-core
-pyyaml==6.0.1             # via apispec, bravado, bravado-core, kubernetes, reana-commons, swagger-spec-validator
-reana-commons[kubernetes]==0.9.4  # via reana-commons, reana-db, reana-job-controller (setup.py)
-reana-db==0.9.3           # via reana-job-controller (setup.py)
-requests==2.31.0          # via bravado, bravado-core, kubernetes, requests-oauthlib
-requests-oauthlib==1.3.1  # via kubernetes
-retrying==1.3.4           # via reana-job-controller (setup.py)
-rfc3987==1.3.8            # via jsonschema
-rsa==4.9                  # via google-auth
-simplejson==3.19.2        # via bravado, bravado-core
-six==1.16.0               # via bravado, bravado-core, fs, gssapi, jsonschema, kubernetes, mock, python-dateutil, retrying
-sqlalchemy==1.3.24        # via alembic, reana-db, sqlalchemy-utils
-sqlalchemy-utils[encrypted]==0.41.1  # via reana-db, sqlalchemy-utils
-strict-rfc3339==0.7       # via jsonschema
-swagger-spec-validator==3.0.3  # via bravado-core
-typing-extensions==4.8.0  # via alembic, bravado, kombu, swagger-spec-validator
-tzdata==2023.3            # via backports-zoneinfo
-urllib3==2.1.0            # via kubernetes, requests
-vine==5.1.0               # via amqp, kombu
-wcmatch==8.4.1            # via reana-commons
-webcolors==1.13           # via jsonschema
-websocket-client==1.6.4   # via kubernetes
-werkzeug==2.3.8           # via flask, reana-commons, reana-job-controller (setup.py)
-zipp==3.17.0              # via importlib-metadata, importlib-resources
-
-# The following packages are considered to be unsafe in a requirements file:
-# setuptools
+bcrypt==4.1.1
+    # via paramiko
+cffi==1.16.0
+    # via
+    #   cryptography
+    #   pynacl
+cryptography==42.0.4
+    # via paramiko
+decorator==5.1.1
+    # via gssapi
+gssapi==1.6.1
+    # via
+    #   -r requirements.in
+    #   paramiko
+paramiko[gssapi]==3.0.0
+    # via
+    #   -r requirements.in
+    #   paramiko
+pyasn1==0.5.1
+    # via paramiko
+pycparser==2.21
+    # via cffi
+pynacl==1.5.0
+    # via paramiko
+six==1.16.0
+    # via gssapi
