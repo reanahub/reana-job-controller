@@ -317,7 +317,6 @@ class Compute4PUNCHJobManager(JobManager):
             if S_ISDIR(item.st_mode):
                 cls._download_output_directory(sftp_client, remote_path, local_path)
             else:
-                print(f"Download {remote_path} to {local_path}")
                 sftp_client.get(remote_path, local_path)
 
     @staticmethod
