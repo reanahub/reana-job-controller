@@ -159,16 +159,15 @@ class Compute4PUNCHJobManager(JobManager):
             logging.error(msg, exc_info=True)
             return msg
 
-    def get_outputs(self) -> None:
+    @classmethod
+    def get_outputs(cls, c4p_connection, src, dest) -> None:
         """
         Transfer job outputs from Compute4PUNCH to local REANA workspace.
         """
-        sftp_client = self.c4p_connection.ssh_client.open_sftp()
-        sftp_client.chdir(self.c4p_abs_workspace_path)
+        sftp_client = c4p_connection.ssh_client.open_sftp()
+        sftp_client.chdir(src)
         try:
-            self._download_output_directory(
-                sftp_client, self.c4p_abs_workspace_path, self.workflow_workspace
-            )
+            cls._download_output_directory(sftp_client, src, dest)
         finally:
             sftp_client.close()
 
@@ -190,7 +189,12 @@ class Compute4PUNCHJobManager(JobManager):
         Determine and return the Compute4PUNCH home directory on Compute4PUNCH
         """
         if not self.C4P_HOME_PATH:
-            self.C4P_HOME_PATH = self.c4p_connection.exec_command("pwd").strip()
+            # Since the JobMonitor entirely rely on class variables to get corresponding
+            # paths on Compute4PUNCH, the class variable C4P_HOME_PATH needs to be
+            # modified here.
+            Compute4PUNCHJobManager.C4P_HOME_PATH = self.c4p_connection.exec_command(
+                "pwd"
+            ).strip()
         return self.C4P_HOME_PATH
 
     @property
@@ -199,7 +203,10 @@ class Compute4PUNCHJobManager(JobManager):
         Determine and return the absolute Compute4PUNCH workspace path
         """
         if not self.C4P_WORKSPACE_PATH:
-            self.C4P_WORKSPACE_PATH = os.path.join(
+            # Since the JobMonitor entirely rely on class variables to get corresponding
+            # paths on Compute4PUNCH, the class variable C4P_WORKSPACE_PATH needs to be
+            # modified here.
+            Compute4PUNCHJobManager.C4P_WORKSPACE_PATH = os.path.join(
                 self.c4p_home_path, self.c4p_rel_workspace_path
             )
         return self.C4P_WORKSPACE_PATH
@@ -270,8 +277,9 @@ class Compute4PUNCHJobManager(JobManager):
             )
         )
 
+    @classmethod
     def _download_output_directory(
-        self, sftp_client: SFTPClient, remote_dir: str, local_dir: str
+        cls, sftp_client: SFTPClient, remote_dir: str, local_dir: str
     ) -> None:
         """
         Download output directory and content to a local directory.
@@ -300,7 +308,7 @@ class Compute4PUNCHJobManager(JobManager):
             remote_path = os.path.join(remote_dir, item.filename)
             local_path = os.path.join(local_dir, item.filename)
             if S_ISDIR(item.st_mode):
-                self._download_output_directory(sftp_client, remote_path, local_path)
+                cls._download_output_directory(sftp_client, remote_path, local_path)
             else:
                 print(f"Download {remote_path} to {local_path}")
                 sftp_client.get(remote_path, local_path)

@@ -521,11 +521,12 @@ class JobMonitorCompute4PUNCH(JobMonitor):
                 c4p_job_statuses = query_c4p_jobs(
                     *c4p_job_mapping.keys(), ssh_client=c4p_connection
                 )
-
+                logging.debug(f"Compute4PUNCH JobStatuses: {c4p_job_statuses}")
                 for c4p_job_id, reana_job_id in c4p_job_mapping.items():
                     job_status = None
                     try:
                         c4p_job_status = c4p_job_statuses[c4p_job_id]["JobStatus"]
+                        logging.debug(f"JobStatus of {c4p_job_id} is {c4p_job_status}")
                     except KeyError:
                         msg = f"Job {c4p_job_id} was not found on "
                         msg += f"{C4P_LOGIN_NODE_HOSTNAME}. Assuming it has failed."
@@ -533,18 +534,18 @@ class JobMonitorCompute4PUNCH(JobMonitor):
                         job_status = "failed"
                         update_job_status(reana_job_id, job_status)
                         job_db[reana_job_id]["deleted"] = True
-                        job_db[reana_job_id]["log"] = msg
+                        store_job_logs(logs=msg, job_id=reana_job_id)
                     else:
-                        if c4p_job_status == condorJobStatus["Completed"]:
+                        if c4p_job_status == str(condorJobStatus["Completed"]):
                             if c4p_job_statuses[c4p_job_id]["ExitCode"] == "0":
                                 job_status = "finished"
                             else:
                                 job_status = "failed"
-                        elif c4p_job_status == condorJobStatus["Held"]:
+                        elif c4p_job_status == str(condorJobStatus["Held"]):
                             if c4p_job_statuses[c4p_job_id]["HoldReasonCode"] == "16":
                                 # HoldReasonCode 16 means input files are being spooled.
                                 continue
-                            logging.info(
+                            logging.debug(
                                 f"Job {c4p_job_id} was held, will delete and set as failed"
                             )
                             self.job_manager_cls.stop(c4p_job_id)
@@ -552,19 +553,22 @@ class JobMonitorCompute4PUNCH(JobMonitor):
                         else:
                             continue
                         if job_status in ("failed", "finished"):
-                            self.job_manager_cls.get_outputs()
+                            workflow_workspace = job_db[reana_job_id][
+                                "obj"
+                            ].workflow_workspace
+                            self.job_manager_cls.get_outputs(
+                                c4p_connection=c4p_connection,
+                                src=self.job_manager_cls.C4P_WORKSPACE_PATH,
+                                dest=workflow_workspace,
+                            )
                             update_job_status(reana_job_id, job_status)
                             job_db[reana_job_id]["deleted"] = True
-                            job_db[reana_job_id]["log"] = self.job_manager_cls.get_logs(
-                                backend_job_id=c4p_job_id,
-                                workspace=job_db[reana_job_id][
-                                    "obj"
-                                ].workflow_workspace,
-                            )
-                    finally:
-                        if job_status in ("failed", "finished"):
                             store_job_logs(
-                                logs=job_db[reana_job_id]["log"], job_id=reana_job_id
+                                logs=self.job_manager_cls.get_logs(
+                                    backend_job_id=c4p_job_id,
+                                    workspace=workflow_workspace,
+                                ),
+                                job_id=reana_job_id,
                             )
             except Exception as ex:
                 logging.error("Unexpected error: {}".format(ex), exc_info=True)
