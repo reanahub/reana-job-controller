@@ -237,6 +237,7 @@ class Compute4PUNCHJobManager(JobManager):
             "log = cluster.log",
             "ShouldTransferFiles = YES",
             "WhenToTransferOutput = ON_SUCCESS",
+            "preserve_relative_paths = TRUE",
             f"transfer_input_files = {job_inputs}" if job_inputs else "",
             f"transfer_output_files = {job_outputs}",
             f"request_cpus = {self.c4p_cpu_cores}",
