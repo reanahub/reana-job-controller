@@ -14,14 +14,34 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import Flask
 from reana_commons.config import REANA_LOG_FORMAT, REANA_LOG_LEVEL
 from reana_db.database import Session, engine as db_engine
+from sqlalchemy import event
 
 from reana_job_controller import config
 from reana_job_controller.spec import build_openapi_spec
 
 
+@event.listens_for(db_engine, "checkin")
+def receive_checkin(dbapi_connection, connection_record):
+    """Close all the connections before returning them to the connection pool."""
+    # Given the current architecture of REANA, job-controller needs to connect to the
+    # database in order to, among other things, update the details of jobs. However,
+    # it can happen that for long periods of time job-controller does not need to access
+    # the database, for example when waiting for long-lasting jobs to finish. For this
+    # reason, each connection is closed before being returned to the connection pool, so
+    # that job-controller does not unnecessarily use one or more of the available
+    # connection slots of PostgreSQL. Keeping one connection open for the whole
+    # duration of the workflow is not possible, as that would limit the number of
+    # workflows that can be run in parallel.
+    #
+    # To improve scalability, we should consider refactoring job-controller to avoid
+    # accessing the database, or at least consider using external connection pooling
+    # mechanisms such as pgBouncer.
+    connection_record.close()
+
+
 def shutdown_session(response_or_exc):
-    """Close session and remove all DB connections."""
-    db_engine.dispose()
+    """Close session at the end of each request."""
+    Session.close()
 
 
 def create_app(config_mapping=None):
@@ -43,9 +63,6 @@ def create_app(config_mapping=None):
     app.register_blueprint(blueprint, url_prefix="/")
 
     # Close session after each request
-    app.teardown_request(shutdown_session)
-
-    # Close session on app teardown
     app.teardown_appcontext(shutdown_session)
 
     return app

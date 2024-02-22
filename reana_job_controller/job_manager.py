@@ -11,9 +11,8 @@
 import json
 
 from reana_commons.utils import calculate_file_access_time
-from reana_db.database import Session, engine as db_engine
-from reana_db.models import Job as JobTable
-from reana_db.models import JobCache, JobStatus, Workflow
+from reana_db.database import Session
+from reana_db.models import Job as JobTable, JobCache, JobStatus, Workflow
 
 from reana_job_controller.config import CACHE_ENABLED
 
@@ -65,7 +64,6 @@ class JobManager:
             inst.create_job_in_db(backend_job_id)
             if CACHE_ENABLED:
                 inst.cache_job()
-            db_engine.dispose()
             return backend_job_id
 
         return wrapper
