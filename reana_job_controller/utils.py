@@ -138,34 +138,39 @@ def motley_cue_auth_strategy_factory(hostname):
             return self._access_token
 
         def authenticate(self, transport):
-            return transport.auth_interactive(username=self.username,
-                                              handler=self.motley_cue_auth_handler)
+            return transport.auth_interactive(
+                username=self.username, handler=self.motley_cue_auth_handler
+            )
 
         def _is_access_token_valid(self):
             return (
-                    self._access_token_expires_on - time() > 100
+                self._access_token_expires_on - time() > 100
             )  # token should be at least valid for 100 s
 
         def _get_access_token_expiry_date(self):
-            decoded_token = jwt.decode(self._access_token,
-                                       options={"verify_signature": False,
-                                                "verify_aud": False})
+            decoded_token = jwt.decode(
+                self._access_token,
+                options={"verify_signature": False, "verify_aud": False},
+            )
             return decoded_token["exp"]
 
         def _get_deployed_username(self):
             headers = {"Authorization": f"Bearer {self.access_token}"}
-            req = requests.get(f"https://{self.hostname}/user/deploy",
-                               headers=headers, verify=True)
+            req = requests.get(
+                f"https://{self.hostname}/user/deploy", headers=headers, verify=True
+            )
             return req.json()["credentials"]["ssh_user"]
 
         def motley_cue_auth_handler(self, title, instructions, prompt_list):
-            return [self.access_token if (echo and "Access Token" in prompt) else ""
-                    for
-                    prompt, echo in prompt_list]
+            return [
+                self.access_token if (echo and "Access Token" in prompt) else ""
+                for prompt, echo in prompt_list
+            ]
 
         def _refresh_access_token(self):
             self._access_token = get_access_token_from_jwt_mytoken(
-                os.environ.get("HELMHOLTZ_TOP"))
+                os.environ.get("HELMHOLTZ_TOP")
+            )
             self._access_token_expires_on = self._get_access_token_expiry_date()
 
     return MotleyCueTokenAuth()
