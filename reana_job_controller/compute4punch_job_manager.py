@@ -265,7 +265,7 @@ class Compute4PUNCHJobManager(JobManager):
         self.cmd = self.cmd.replace(self.workflow_workspace, "$_CONDOR_JOB_IWD")
         logging.info(f"CMD is {self.cmd}")
         self.cmd = self._encode_cmd(self.cmd)
-        job_execution_script_template = ["#!/bin/bash", f"{self.cmd}"]
+        job_execution_script_template = ["#!/bin/bash", self.cmd]
         job_execution_script = "\n".join(job_execution_script_template)
 
         self.c4p_connection.exec_command(
@@ -277,9 +277,7 @@ class Compute4PUNCHJobManager(JobManager):
         """Create workspace environment for REANA @ Compute4PUNCH."""
         self.c4p_connection.exec_command(f"mkdir -p {self.c4p_abs_workspace_path}")
         self.c4p_connection.exec_command(
-            os.path.join(
-                f"mkdir -p {os.path.join(self.c4p_abs_workspace_path, 'logs')}"
-            )
+            f"mkdir -p {os.path.join(self.c4p_abs_workspace_path, 'logs')}"
         )
 
     @classmethod

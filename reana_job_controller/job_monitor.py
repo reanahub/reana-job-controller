@@ -521,7 +521,7 @@ class JobMonitorCompute4PUNCH(JobMonitor):
                 c4p_job_statuses = query_c4p_jobs(
                     *c4p_job_mapping.keys(), ssh_client=c4p_connection
                 )
-                logging.debug(f"Compute4PUNCH JobStatuses: {c4p_job_statuses}")
+                logging.info(f"Compute4PUNCH JobStatuses: {c4p_job_statuses}")
                 for c4p_job_id, reana_job_id in c4p_job_mapping.items():
                     job_status = None
                     try:
