@@ -24,6 +24,10 @@ from reana_job_controller.config import (
     C4P_SSH_TIMEOUT,
     C4P_SSH_BANNER_TIMEOUT,
     C4P_SSH_AUTH_TIMEOUT,
+    C4P_CPU_CORES,
+    C4P_MEMORY_LIMIT,
+    C4P_ADDITIONAL_REQUIREMENTS,
+    C4P_REANA_REL_WORKFLOW_PATH,
 )
 
 
@@ -48,9 +52,9 @@ class Compute4PUNCHJobManager(JobManager):
         cvmfs_mounts="false",
         shared_file_system=False,
         job_name=None,
-        c4p_cpu_cores=None,
-        c4p_memory_limit=None,
-        c4p_additional_requirements=None,
+        c4p_cpu_cores=C4P_CPU_CORES,
+        c4p_memory_limit=C4P_MEMORY_LIMIT,
+        c4p_additional_requirements=C4P_ADDITIONAL_REQUIREMENTS,
         **kwargs,
     ):
         """
@@ -110,11 +114,9 @@ class Compute4PUNCHJobManager(JobManager):
             self.c4p_abs_workspace_path, "submit.jdl"
         )
 
-        self.c4p_cpu_cores = c4p_cpu_cores or 8
-        self.c4p_memory_limit = c4p_memory_limit or 20000
+        self.c4p_cpu_cores = c4p_cpu_cores
+        self.c4p_memory_limit = c4p_memory_limit
         self.c4p_additional_requirements = c4p_additional_requirements
-
-        self._workflow = None
 
     @JobManager.execution_hook
     def execute(self) -> str:
@@ -226,7 +228,7 @@ class Compute4PUNCHJobManager(JobManager):
     @property
     def c4p_rel_workspace_path(self) -> str:
         """Determine and return the relative Compute4PUNCH workspace path."""
-        return os.path.join("reana/workflows", self.workflow_uuid)
+        return os.path.join(C4P_REANA_REL_WORKFLOW_PATH, self.workflow_uuid)
 
     def _create_c4p_job_description(self) -> None:
         """Create job description for Compute4PUNCH."""
