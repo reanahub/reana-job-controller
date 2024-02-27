@@ -82,7 +82,7 @@ def csv_parser(
     skip_trailing_space: bool = False,
 ):
     """
-    Parses CSV formatted input
+    Parse CSV formatted input.
 
     :param input_csv: CSV formatted input
     :type input_csv: str
@@ -116,6 +116,15 @@ def csv_parser(
 
 
 def motley_cue_auth_strategy_factory(hostname):
+    """
+    Paramiko auth strategy factory that provides oauth based ssh token authentication.
+
+    This auth strategy has been developed against the motley cue implementation of
+    oauth based ssh token authentication on the server side.
+
+    :param hostname: hostname of the ssh node
+    :type hostname: str
+    """
     # Using a factory to avoid a general dependency on libmytoken, paramiko and pyjwt
     from libmytoken import get_access_token_from_jwt_mytoken
     from paramiko.auth_strategy import AuthSource

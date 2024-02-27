@@ -576,6 +576,13 @@ class JobMonitorCompute4PUNCH(JobMonitor):
 
 
 def query_c4p_jobs(*backend_job_ids: str, ssh_client: SSHClient):
+    """
+    Query status information of backend jobs on Compute4PUNCH.
+
+    :param backend_job_ids: List of job ids to query on Compute4PUNCH
+    :type backend_job_ids: str
+    :param ssh_client: SSH client used to communicate with Compute4PUNCH
+    """
     attributes = ("JobStatus", "ClusterId", "ProcId", "ExitCode", "HoldReasonCode")
     attributes_string = " ".join(attributes)
 
@@ -607,6 +614,18 @@ def query_c4p_jobs(*backend_job_ids: str, ssh_client: SSHClient):
 def filter_jobs_to_watch(
     id, job_db, compute_backend, statuses_to_skip=("finished", "failed", "stopped")
 ):
+    """
+    Filter jobs to watch for job completion.
+
+    :param id: REANA job id
+    :type id: str
+    :param job_db: REANA job database
+    :type job_db: JOB_DB
+    :param compute_backend: REANA compute backend used
+    :type compute_backend: str
+    :param statuses_to_skip: REANA job statuses to skip
+    :type statuses_to_skip: tuple[str]
+    """
     return job_db[id]["compute_backend"] == compute_backend and not (
         job_db[id]["deleted"] or job_db[id]["status"] in statuses_to_skip
     )

@@ -4,6 +4,8 @@
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
 
+"""Compute4PUNCH Job Manager."""
+
 import base64
 import logging
 import os
@@ -26,7 +28,7 @@ from reana_job_controller.config import (
 
 
 class Compute4PUNCHJobManager(JobManager):
-    """Compute4PUNCH Job Manager"""
+    """Compute4PUNCH Job Manager."""
 
     C4P_WORKSPACE_PATH = ""
     """Absolute path on the Compute4PUNCH head node used for submission"""
@@ -64,6 +66,7 @@ class Compute4PUNCHJobManager(JobManager):
         :type env_vars: dict
         :param workflow_uuid: Unique workflow id.
         :type workflow_uuid: str
+        :param workflow_workspace: Path to REANA workspace
         :type workflow_workspace: str
         :param cvmfs_mounts: list of CVMFS mounts as a string.
         :type cvmfs_mounts: str
@@ -169,6 +172,13 @@ class Compute4PUNCHJobManager(JobManager):
     def get_outputs(cls, c4p_connection, src, dest) -> None:
         """
         Transfer job outputs from Compute4PUNCH to local REANA workspace.
+
+        :param c4p_connection: SSH connection to Compute4PUNCH
+        :type c4p_connection: SSHClient
+        :param src: Source directory
+        :type src: str
+        :param dest: Destination directory
+        :type dest: str
         """
         sftp_client = c4p_connection.ssh_client.open_sftp()
         sftp_client.chdir(src)
@@ -191,9 +201,7 @@ class Compute4PUNCHJobManager(JobManager):
 
     @property
     def c4p_home_path(self) -> str:
-        """
-        Determine and return the Compute4PUNCH home directory on Compute4PUNCH
-        """
+        """Determine and return the Compute4PUNCH home directory on Compute4PUNCH."""
         if not self.C4P_HOME_PATH:
             # Since the JobMonitor entirely rely on class variables to get corresponding
             # paths on Compute4PUNCH, the class variable C4P_HOME_PATH needs to be
@@ -205,9 +213,7 @@ class Compute4PUNCHJobManager(JobManager):
 
     @property
     def c4p_abs_workspace_path(self) -> str:
-        """
-        Determine and return the absolute Compute4PUNCH workspace path
-        """
+        """Determine and return the absolute Compute4PUNCH workspace path."""
         if not self.C4P_WORKSPACE_PATH:
             # Since the JobMonitor entirely rely on class variables to get corresponding
             # paths on Compute4PUNCH, the class variable C4P_WORKSPACE_PATH needs to be
@@ -219,15 +225,11 @@ class Compute4PUNCHJobManager(JobManager):
 
     @property
     def c4p_rel_workspace_path(self) -> str:
-        """
-        Determine and return the relative Compute4PUNCH workspace path
-        """
+        """Determine and return the relative Compute4PUNCH workspace path."""
         return os.path.join("reana/workflows", self.workflow_uuid)
 
     def _create_c4p_job_description(self) -> None:
-        """
-        Create job description for Compute4PUNCH
-        """
+        """Create job description for Compute4PUNCH."""
         job_inputs = ",".join(self._get_inputs())
         job_outputs = "."  # download everything from remote job
         job_description_template = [
@@ -257,9 +259,7 @@ class Compute4PUNCHJobManager(JobManager):
         )
 
     def _create_c4p_job_execution_script(self) -> None:
-        """
-        Create job execution script for Compute4PUNCH
-        """
+        """Create job execution script for Compute4PUNCH."""
         # The workflow workspace does not exist on Compute4PUNCH,
         # therefore replace it with CONDOR_JOB_IWD
         self.cmd = self.cmd.replace(self.workflow_workspace, "$_CONDOR_JOB_IWD")
@@ -274,9 +274,7 @@ class Compute4PUNCHJobManager(JobManager):
         )
 
     def _create_c4p_workspace_environment(self) -> None:
-        """
-        Create workspace environment for REANA @ Compute4PUNCH
-        """
+        """Create workspace environment for REANA @ Compute4PUNCH."""
         self.c4p_connection.exec_command(f"mkdir -p {self.c4p_abs_workspace_path}")
         self.c4p_connection.exec_command(
             os.path.join(
@@ -331,9 +329,7 @@ class Compute4PUNCHJobManager(JobManager):
         return f"echo {encoded_cmd} | base64 -d | bash"
 
     def _get_inputs(self) -> Iterable:
-        """
-        Collect all input files in the local REANA workspace.
-        """
+        """Collect all input files in the local REANA workspace."""
         skipped_input_files = (".job.ad", ".machine.ad", ".chirp.config")
         return filter(
             lambda x: x not in skipped_input_files,
@@ -343,9 +339,7 @@ class Compute4PUNCHJobManager(JobManager):
         )
 
     def _upload_job_inputs(self) -> None:
-        """
-        Upload job inputs to Compute4PUNCH
-        """
+        """Upload job inputs to Compute4PUNCH."""
         sftp_client = self.c4p_connection.ssh_client.open_sftp()
         sftp_client.chdir(self.c4p_rel_workspace_path)
 
