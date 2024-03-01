@@ -127,8 +127,9 @@ class Compute4PUNCHJobManager(JobManager):
         """
         self._create_c4p_workspace_environment()
         self._create_c4p_job_execution_script()
-        self._create_c4p_job_description()
-        self._upload_job_inputs()
+        job_inputs = self._get_job_inputs()
+        self._create_c4p_job_description(job_inputs=job_inputs)
+        self._upload_job_inputs(job_inputs=job_inputs)
 
         submit_cmd_list = [
             f"cd {self.c4p_abs_workspace_path}",
@@ -230,9 +231,9 @@ class Compute4PUNCHJobManager(JobManager):
         """Determine and return the relative Compute4PUNCH workspace path."""
         return os.path.join(C4P_REANA_REL_WORKFLOW_PATH, self.workflow_uuid)
 
-    def _create_c4p_job_description(self) -> None:
+    def _create_c4p_job_description(self, job_inputs: Iterable) -> None:
         """Create job description for Compute4PUNCH."""
-        job_inputs = ",".join(self._get_inputs())
+        job_inputs = ",".join(job_inputs)
         job_outputs = "."  # download everything from remote job
         job_description_template = [
             f"executable = {os.path.basename(self.job_execution_script_path)}",
@@ -338,13 +339,13 @@ class Compute4PUNCHJobManager(JobManager):
             ),
         )
 
-    def _upload_job_inputs(self) -> None:
+    def _upload_job_inputs(self, job_inputs: Iterable) -> None:
         """Upload job inputs to Compute4PUNCH."""
         sftp_client = self.c4p_connection.ssh_client.open_sftp()
         sftp_client.chdir(self.c4p_rel_workspace_path)
 
         try:
-            for job_input in self._get_inputs():
+            for job_input in job_inputs:
                 if is_directory(self.workflow_workspace, job_input):
                     try:  # check if directory already exists
                         sftp_client.stat(job_input)
