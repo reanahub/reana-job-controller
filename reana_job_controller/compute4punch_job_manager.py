@@ -79,9 +79,9 @@ class Compute4PUNCHJobManager(JobManager):
         :param job_name: Name of the job
         :type job_name: str
         :param c4p_cpu_cores: number of CPU cores to use on C4P
-        :type c4p_cpu_cores: int, str
+        :type c4p_cpu_cores: str
         :param c4p_memory_limit: maximum memory to be used on C4P
-        :type c4p_memory_limit: int, str
+        :type c4p_memory_limit: str
         :param c4p_additional_requirements: additional HTCondor requirements for the job
         :type c4p_additional_requirements: str
         """
