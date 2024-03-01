@@ -40,7 +40,11 @@ extras_require = {
         "htcondor==9.0.17",
     ],
     "tests": tests_require,
-    "ssh": ["paramiko[gssapi]>=3.0.0"],
+    "ssh": ["paramiko[gssapi]>=3.2.0"],
+    "mytoken": [
+        "pyjwt>=2.8.0",
+        "libmytoken>=0.1.0",
+    ],
 }
 
 # Python tests need SSH dependencies for imports

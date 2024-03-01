@@ -27,10 +27,21 @@ from reana_job_controller.config import (
     SLURM_SSH_TIMEOUT,
     SLURM_SSH_BANNER_TIMEOUT,
     SLURM_SSH_AUTH_TIMEOUT,
+    C4P_LOGIN_NODE_HOSTNAME,
+    C4P_LOGIN_NODE_PORT,
+    C4P_SSH_TIMEOUT,
+    C4P_SSH_BANNER_TIMEOUT,
+    C4P_SSH_AUTH_TIMEOUT,
 )
+
 from reana_job_controller.job_db import JOB_DB, store_job_logs, update_job_status
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
-from reana_job_controller.utils import SSHClient, singleton
+from reana_job_controller.utils import (
+    SSHClient,
+    singleton,
+    csv_parser,
+    motley_cue_auth_strategy_factory,
+)
 
 
 class JobMonitor:
@@ -467,6 +478,157 @@ class JobMonitorSlurmCERN(JobMonitor):
             except Exception as e:
                 logging.error("Unexpected error: {}".format(e), exc_info=True)
                 time.sleep(120)
+
+
+@singleton
+class JobMonitorCompute4PUNCH(JobMonitor):
+    """HTCondor jobs monitor Compute4PUNCH."""
+
+    def __init__(self, **kwargs):
+        """Initialize Compute4PUNCH job monitor thread."""
+        self.job_manager_cls = COMPUTE_BACKENDS["compute4punch"]()
+        super(__class__, self).__init__(thread_name="compute4punch_job_monitor")
+
+    def watch_jobs(self, job_db, app=None):
+        """
+        Use SSH connection to Compute4PUNCH login node to monitor jobs.
+
+        :param job_db: Dictionary which contains all running jobs.
+        """
+        c4p_connection = SSHClient(
+            hostname=C4P_LOGIN_NODE_HOSTNAME,
+            port=C4P_LOGIN_NODE_PORT,
+            timeout=C4P_SSH_TIMEOUT,
+            banner_timeout=C4P_SSH_BANNER_TIMEOUT,
+            auth_timeout=C4P_SSH_AUTH_TIMEOUT,
+            auth_strategy=motley_cue_auth_strategy_factory(
+                hostname=C4P_LOGIN_NODE_HOSTNAME
+            ),
+        )
+
+        while True:
+            logging.debug(
+                "Starting a new stream request to watch Jobs on Compute4PUNCH"
+            )
+            try:
+                c4p_job_mapping = {
+                    job_dict["backend_job_id"]: reana_job_id
+                    for reana_job_id, job_dict in job_db.items()
+                    if filter_jobs_to_watch(
+                        reana_job_id, job_db, compute_backend="compute4punch"
+                    )
+                }
+                c4p_job_statuses = query_c4p_jobs(
+                    *c4p_job_mapping.keys(), ssh_client=c4p_connection
+                )
+                logging.info(f"Compute4PUNCH JobStatuses: {c4p_job_statuses}")
+                for c4p_job_id, reana_job_id in c4p_job_mapping.items():
+                    job_status = None
+                    try:
+                        c4p_job_status = c4p_job_statuses[c4p_job_id]["JobStatus"]
+                        logging.debug(f"JobStatus of {c4p_job_id} is {c4p_job_status}")
+                    except KeyError:
+                        msg = f"Job {c4p_job_id} was not found on "
+                        msg += f"{C4P_LOGIN_NODE_HOSTNAME}. Assuming it has failed."
+                        logging.warning(msg)
+                        job_status = "failed"
+                        update_job_status(reana_job_id, job_status)
+                        job_db[reana_job_id]["deleted"] = True
+                        store_job_logs(logs=msg, job_id=reana_job_id)
+                    else:
+                        if c4p_job_status == str(condorJobStatus["Completed"]):
+                            if c4p_job_statuses[c4p_job_id]["ExitCode"] == "0":
+                                job_status = "finished"
+                            else:
+                                job_status = "failed"
+                        elif c4p_job_status == str(condorJobStatus["Held"]):
+                            if c4p_job_statuses[c4p_job_id]["HoldReasonCode"] == "16":
+                                # HoldReasonCode 16 means input files are being spooled.
+                                continue
+                            logging.debug(
+                                f"Job {c4p_job_id} was held, will delete and set as failed"
+                            )
+                            self.job_manager_cls.stop(c4p_job_id)
+                            job_status = "failed"
+                        else:
+                            continue
+                        if job_status in ("failed", "finished"):
+                            workflow_workspace = job_db[reana_job_id][
+                                "obj"
+                            ].workflow_workspace
+                            self.job_manager_cls.get_outputs(
+                                c4p_connection=c4p_connection,
+                                src=self.job_manager_cls.C4P_WORKSPACE_PATH,
+                                dest=workflow_workspace,
+                            )
+                            update_job_status(reana_job_id, job_status)
+                            job_db[reana_job_id]["deleted"] = True
+                            store_job_logs(
+                                logs=self.job_manager_cls.get_logs(
+                                    backend_job_id=c4p_job_id,
+                                    workspace=workflow_workspace,
+                                ),
+                                job_id=reana_job_id,
+                            )
+            except Exception as ex:
+                logging.error("Unexpected error: {}".format(ex), exc_info=True)
+            time.sleep(120)
+
+
+def query_c4p_jobs(*backend_job_ids: str, ssh_client: SSHClient):
+    """
+    Query status information of backend jobs on Compute4PUNCH.
+
+    :param backend_job_ids: List of job ids to query on Compute4PUNCH
+    :type backend_job_ids: str
+    :param ssh_client: SSH client used to communicate with Compute4PUNCH
+    """
+    attributes = ("JobStatus", "ClusterId", "ProcId", "ExitCode", "HoldReasonCode")
+    attributes_string = " ".join(attributes)
+
+    formatted_backend_job_ids = " ".join(backend_job_ids)
+
+    condor_q_command = f"condor_q {formatted_backend_job_ids} -af:t {attributes_string}"
+    condor_history_command = (
+        f"condor_history {formatted_backend_job_ids} -af:t {attributes_string}"
+    )
+
+    c4p_job_status = ssh_client.exec_command(
+        f"{condor_q_command} && {condor_history_command}"
+    )
+
+    c4p_queue = {}
+
+    for row in csv_parser(
+        input_csv=c4p_job_status.strip(),
+        fieldnames=attributes,
+        delimiter="\t",
+        replacements=dict(undefined=None),
+    ):
+        row["JobId"] = f"{row['ClusterId']}.{row['ProcId']}"
+        c4p_queue[row["JobId"]] = row
+
+    return c4p_queue
+
+
+def filter_jobs_to_watch(
+    id, job_db, compute_backend, statuses_to_skip=("finished", "failed", "stopped")
+):
+    """
+    Filter jobs to watch for job completion.
+
+    :param id: REANA job id
+    :type id: str
+    :param job_db: REANA job database
+    :type job_db: JOB_DB
+    :param compute_backend: REANA compute backend used
+    :type compute_backend: str
+    :param statuses_to_skip: REANA job statuses to skip
+    :type statuses_to_skip: tuple[str]
+    """
+    return job_db[id]["compute_backend"] == compute_backend and not (
+        job_db[id]["deleted"] or job_db[id]["status"] in statuses_to_skip
+    )
 
 
 def format_condor_job_que_query(backend_job_ids):
