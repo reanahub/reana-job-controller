@@ -235,11 +235,13 @@ class Compute4PUNCHJobManager(JobManager):
         """Create job description for Compute4PUNCH."""
         job_inputs = ",".join(job_inputs)
         job_outputs = "."  # download everything from remote job
+        job_environment = (f"{key}={value}" for key, value in self.env_vars.items())
         job_description_template = [
             f"executable = {os.path.basename(self.job_execution_script_path)}",
             "output = logs/$(cluster).$(process).out",
             "error = logs/$(cluster).$(process).err",
             "log = cluster.log",
+            f'environment = "{' '.join(job_environment)}"',
             "ShouldTransferFiles = YES",
             "WhenToTransferOutput = ON_SUCCESS",
             "preserve_relative_paths = TRUE",
