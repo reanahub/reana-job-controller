@@ -1,5 +1,59 @@
 # Changelog
 
+## [0.9.3](https://github.com/reanahub/reana-job-controller/compare/0.9.2...0.9.3) (2024-03-04)
+
+
+### Build
+
+* **certificates:** update expired CERN Grid CA certificate ([#440](https://github.com/reanahub/reana-job-controller/issues/440)) ([8d6539a](https://github.com/reanahub/reana-job-controller/commit/8d6539a94af035aca1191c9a6a7ff43791a3c930)), closes [#439](https://github.com/reanahub/reana-job-controller/issues/439)
+* **docker:** non-editable submodules in "latest" mode ([#416](https://github.com/reanahub/reana-job-controller/issues/416)) ([3bdda63](https://github.com/reanahub/reana-job-controller/commit/3bdda6367d9a4682028a2a7df7268e4c9b42ef6c))
+* **python:** bump all required packages as of 2024-03-04 ([#442](https://github.com/reanahub/reana-job-controller/issues/442)) ([de119eb](https://github.com/reanahub/reana-job-controller/commit/de119eb8f663dcfe1a126747a7c404e39ece47c0))
+* **python:** bump shared REANA packages as of 2024-03-04 ([#442](https://github.com/reanahub/reana-job-controller/issues/442)) ([fc77628](https://github.com/reanahub/reana-job-controller/commit/fc776284abe15030581d5adf4aa575f4f3a1c756))
+
+
+### Features
+
+* **shutdown:** stop all running jobs before stopping workflow ([#423](https://github.com/reanahub/reana-job-controller/issues/423)) ([866675b](https://github.com/reanahub/reana-job-controller/commit/866675b7288e840130cfee851f4a248a9ae2617d))
+
+
+### Bug fixes
+
+* **database:** limit the number of open database connections ([#437](https://github.com/reanahub/reana-job-controller/issues/437)) ([980f749](https://github.com/reanahub/reana-job-controller/commit/980f74982b75176c5958f09bc581e941cdf44310))
+
+
+### Performance improvements
+
+* **cache:** avoid caching jobs when the cache is disabled ([#435](https://github.com/reanahub/reana-job-controller/issues/435)) ([553468f](https://github.com/reanahub/reana-job-controller/commit/553468f55f6b63cebba45ccd460593131e5dcfea)), closes [#422](https://github.com/reanahub/reana-job-controller/issues/422)
+
+
+### Code refactoring
+
+* **db:** set job status also in the main database ([#423](https://github.com/reanahub/reana-job-controller/issues/423)) ([9d6fc99](https://github.com/reanahub/reana-job-controller/commit/9d6fc99063deb468fe9d45d9ad626c745c7bd827))
+* **docs:** move from reST to Markdown ([#428](https://github.com/reanahub/reana-job-controller/issues/428)) ([4732884](https://github.com/reanahub/reana-job-controller/commit/4732884a3da52694fb86d72873eceef3ad2deb27))
+* **monitor:** centralise logs and status updates ([#423](https://github.com/reanahub/reana-job-controller/issues/423)) ([3685b01](https://github.com/reanahub/reana-job-controller/commit/3685b01a57e1d0b1bd363534ff331b988e04719e))
+* **monitor:** move fetching of logs to job-manager ([#423](https://github.com/reanahub/reana-job-controller/issues/423)) ([1fc117e](https://github.com/reanahub/reana-job-controller/commit/1fc117ebb3dd908a01ee3fd539fa24a07cdb4d16))
+
+
+### Code style
+
+* **black:** format with black v24 ([#426](https://github.com/reanahub/reana-job-controller/issues/426)) ([8a2757e](https://github.com/reanahub/reana-job-controller/commit/8a2757ee8bf52d1d5189f1dd1d690cb8922599cb))
+
+
+### Continuous integration
+
+* **commitlint:** addition of commit message linter ([#417](https://github.com/reanahub/reana-job-controller/issues/417)) ([f547d3b](https://github.com/reanahub/reana-job-controller/commit/f547d3bc25f438203252ea149cf6c6e5d2428189))
+* **commitlint:** allow release commit style ([#443](https://github.com/reanahub/reana-job-controller/issues/443)) ([0fc9794](https://github.com/reanahub/reana-job-controller/commit/0fc9794bfbe2799bb9666ec5b2ff1dd15def8c34))
+* **commitlint:** check for the presence of concrete PR number ([#425](https://github.com/reanahub/reana-job-controller/issues/425)) ([35bc1c5](https://github.com/reanahub/reana-job-controller/commit/35bc1c5acb1aa8ff51689142a007da66e49d8d2b))
+* **pytest:** move to PostgreSQL 14.10 ([#429](https://github.com/reanahub/reana-job-controller/issues/429)) ([42622fa](https://github.com/reanahub/reana-job-controller/commit/42622fa1597e49fae36c625941188be5a093eda9))
+* **release-please:** initial configuration ([#417](https://github.com/reanahub/reana-job-controller/issues/417)) ([fca6f74](https://github.com/reanahub/reana-job-controller/commit/fca6f74aa0d0e55e41d96b0e79c66a5cb3517189))
+* **release-please:** update version in Dockerfile/OpenAPI specs ([#421](https://github.com/reanahub/reana-job-controller/issues/421)) ([e6742f2](https://github.com/reanahub/reana-job-controller/commit/e6742f2911df46dfbef3b7e9104330d58e2b4211))
+* **shellcheck:** fix exit code propagation ([#425](https://github.com/reanahub/reana-job-controller/issues/425)) ([8e74a85](https://github.com/reanahub/reana-job-controller/commit/8e74a85c90df00c8734a6cdd81597f583d11d566))
+
+
+### Documentation
+
+* **authors:** complete list of contributors ([#434](https://github.com/reanahub/reana-job-controller/issues/434)) ([b9f8364](https://github.com/reanahub/reana-job-controller/commit/b9f83647fa8fc337140da5c3f2814ea24a15c5d5))
+
 ## 0.9.2 (2023-12-12)
 
 - Adds metadata labels to Dockerfile.
@@ -158,4 +212,3 @@
 ## 0.1.0 (2018-01-30)
 
 - Initial public release.
-
