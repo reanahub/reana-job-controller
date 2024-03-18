@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.95.0](https://github.com/reanahub/reana-job-controller/compare/0.9.3...0.95.0) (2024-03-18)
+
+
+### Continuous integration
+
+* **actions:** update GitHub actions due to Node 16 deprecation ([#447](https://github.com/reanahub/reana-job-controller/issues/447)) ([f4f955c](https://github.com/reanahub/reana-job-controller/commit/f4f955c3c7eb02f3f75081fb9882931cc5165a05))
+
+
+### Chores
+
+* **master:** release 0.95.0-alpha.1 ([74a32d8](https://github.com/reanahub/reana-job-controller/commit/74a32d80158c8629e0505a7650e16507f01331a5))
+
 ## [0.9.3](https://github.com/reanahub/reana-job-controller/compare/0.9.2...0.9.3) (2024-03-04)
 
 
