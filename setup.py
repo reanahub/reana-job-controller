@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2023 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -40,7 +40,10 @@ extras_require = {
         "htcondor==9.0.17",
     ],
     "tests": tests_require,
-    "ssh": ["paramiko[gssapi]>=3.0.0"],
+    "ssh": [
+        "paramiko[gssapi]>=3.0.0",
+        "gssapi==1.6.1",  # matches version in Dockerfile
+    ],
 }
 
 # Python tests need SSH dependencies for imports
