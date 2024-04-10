@@ -145,7 +145,7 @@ class KubernetesJobManager(JobManager):
             "metadata": {
                 "name": backend_job_id,
                 "namespace": REANA_RUNTIME_KUBERNETES_NAMESPACE,
-                "labels": {"kueue.x-k8s.io/queue-name": "local-queue-job"},
+                "labels": {"kueue.x-k8s.io/queue-name": "local-queue-job"},     # Submit Workflow Task Job with Kueue
             },
             "spec": {
                 "backoffLimit": KubernetesJobManager.MAX_NUM_JOB_RESTARTS,
