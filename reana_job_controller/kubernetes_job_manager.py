@@ -138,6 +138,8 @@ class KubernetesJobManager(JobManager):
     @JobManager.execution_hook
     def execute(self):
         """Execute a job in Kubernetes."""
+        
+        KUEUE_DEPLOYED = True
         backend_job_id = build_unique_component_name("run-job")
         self.job = {
             "kind": "Job",
@@ -145,7 +147,11 @@ class KubernetesJobManager(JobManager):
             "metadata": {
                 "name": backend_job_id,
                 "namespace": REANA_RUNTIME_KUBERNETES_NAMESPACE,
-                "labels": {"kueue.x-k8s.io/queue-name": "local-queue-job"},     # Submit Workflow Task Job with Kueue
+                "labels": (
+                    {"kueue.x-k8s.io/queue-name": "local-queue-job"}
+                    if KUEUE_DEPLOYED
+                    else {}
+                ),
             },
             "spec": {
                 "backoffLimit": KubernetesJobManager.MAX_NUM_JOB_RESTARTS,
