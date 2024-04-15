@@ -13,7 +13,7 @@ import traceback
 from typing import Optional
 
 from flask import current_app
-from kubernetes import client
+from kubernetes import client, config
 from kubernetes.client.models.v1_delete_options import V1DeleteOptions
 from kubernetes.client.rest import ApiException
 from reana_commons.config import (
@@ -48,6 +48,7 @@ from retrying import retry
 from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_MEMORY_LIMIT,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT,
+    USE_KUEUE,
 )
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
@@ -139,7 +140,6 @@ class KubernetesJobManager(JobManager):
     def execute(self):
         """Execute a job in Kubernetes."""
         
-        KUEUE_DEPLOYED = True
         backend_job_id = build_unique_component_name("run-job")
         self.job = {
             "kind": "Job",
@@ -149,7 +149,7 @@ class KubernetesJobManager(JobManager):
                 "namespace": REANA_RUNTIME_KUBERNETES_NAMESPACE,
                 "labels": (
                     {"kueue.x-k8s.io/queue-name": "local-queue-job"}
-                    if KUEUE_DEPLOYED
+                    if USE_KUEUE
                     else {}
                 ),
             },
