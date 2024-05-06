@@ -21,7 +21,7 @@ from reana_commons.errors import (
 )
 
 from reana_db.models import JobStatus
-
+from reana_commons.k8s.secrets import UserSecrets, UserSecretsStore
 
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_db import (
@@ -44,6 +44,18 @@ blueprint = Blueprint("jobs", __name__)
 
 job_request_schema = JobRequest()
 job_schema = Job()
+
+
+_SECRETS_CACHE = None
+"""Cache for user secrets."""
+
+
+def get_cached_user_secrets() -> UserSecrets:
+    """Return cached user secrets."""
+    global _SECRETS_CACHE
+    if _SECRETS_CACHE is None:
+        _SECRETS_CACHE = UserSecretsStore.fetch(config.REANA_USER_ID)
+    return _SECRETS_CACHE
 
 
 class JobCreationCondition:
@@ -269,15 +281,20 @@ def create_job():  # noqa
         logging.error(msg, exc_info=True)
         update_workflow_logs(job_request["workflow_uuid"], msg)
         return jsonify({"job": msg}), 500
+
     with current_app.app_context():
         job_manager_cls = current_app.config["COMPUTE_BACKENDS"][compute_backend]()
         try:
-            job_obj = job_manager_cls(**job_request)
+            job_obj = job_manager_cls(
+                **job_request,
+                # we pass the secrets from the local cache in order to avoid many calls
+                # to the k8s API when many jobs are executed at the same time
+                secrets=get_cached_user_secrets(),
+            )
         except REANAKubernetesMemoryLimitExceeded as e:
             return jsonify({"message": e.message}), 403
         except REANAKubernetesWrongMemoryFormat as e:
             return jsonify({"message": e.message}), 400
-
     if not job_creation_condition.start_creation():
         return jsonify({"message": "Cannot create new jobs, shutting down"}), 400
 

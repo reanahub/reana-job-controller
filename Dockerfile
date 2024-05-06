@@ -23,6 +23,7 @@ COPY requirements.txt /code/
 # hadolint ignore=DL3008,DL3013
 RUN apt-get update -y && \
     apt-get install --no-install-recommends -y \
+      git \
       gcc \
       krb5-config \
       krb5-user \

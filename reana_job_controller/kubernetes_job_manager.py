@@ -39,7 +39,7 @@ from reana_commons.k8s.api_client import (
     current_k8s_corev1_api_client,
 )
 from reana_commons.k8s.kerberos import get_kerberos_k8s_config
-from reana_commons.k8s.secrets import REANAUserSecretsStore
+from reana_commons.k8s.secrets import UserSecretsStore, UserSecrets
 from reana_commons.k8s.volumes import (
     get_k8s_cvmfs_volumes,
     get_reana_shared_volume,
@@ -51,6 +51,7 @@ from retrying import retry
 from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_MEMORY_LIMIT,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT,
+    REANA_USER_ID,
 )
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
@@ -81,6 +82,7 @@ class KubernetesJobManager(JobManager):
         voms_proxy=False,
         rucio=False,
         kubernetes_job_timeout: Optional[int] = None,
+        secrets: Optional[UserSecrets] = None,
         **kwargs,
     ):
         """Instantiate kubernetes job manager.
@@ -117,6 +119,8 @@ class KubernetesJobManager(JobManager):
         :param rucio: Decides if a rucio environment should be provided
             for job.
         :type rucio: bool
+        :param secrets: User secrets, if none they will be fetched from k8s.
+        :type secrets: Optional[UserSecrets]
         """
         super(KubernetesJobManager, self).__init__(
             docker_img=docker_img,
@@ -127,6 +131,7 @@ class KubernetesJobManager(JobManager):
             workflow_workspace=workflow_workspace,
             job_name=job_name,
         )
+
         self.compute_backend = "Kubernetes"
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
@@ -137,6 +142,14 @@ class KubernetesJobManager(JobManager):
         self.set_memory_limit(kubernetes_memory_limit)
         self.workflow_uuid = workflow_uuid
         self.kubernetes_job_timeout = kubernetes_job_timeout
+        self._secrets: Optional[UserSecrets] = secrets
+
+    @property
+    def secrets(self):
+        """Get cached secrets if present, otherwise fetch them from k8s."""
+        if self._secrets is None:
+            self._secrets = UserSecretsStore.fetch(REANA_USER_ID)
+        return self._secrets
 
     @JobManager.execution_hook
     def execute(self):
@@ -179,15 +192,13 @@ class KubernetesJobManager(JobManager):
                 },
             },
         }
-        user_id = os.getenv("REANA_USER_ID")
-        secrets_store = REANAUserSecretsStore(user_id)
 
-        secret_env_vars = secrets_store.get_env_secrets_as_k8s_spec()
+        secret_env_vars = self.secrets.get_env_secrets_as_k8s_spec()
         job_spec = self.job["spec"]["template"]["spec"]
         job_spec["containers"][0]["env"].extend(secret_env_vars)
-        job_spec["volumes"].append(secrets_store.get_file_secrets_volume_as_k8s_specs())
+        job_spec["volumes"].append(self.secrets.get_file_secrets_volume_as_k8s_specs())
 
-        secrets_volume_mount = secrets_store.get_secrets_volume_mount_as_k8s_spec()
+        secrets_volume_mount = self.secrets.get_secrets_volume_mount_as_k8s_spec()
         job_spec["containers"][0]["volumeMounts"].append(secrets_volume_mount)
 
         if self.env_vars:
@@ -215,7 +226,7 @@ class KubernetesJobManager(JobManager):
         )
 
         if self.kerberos:
-            self._add_krb5_containers(secrets_store)
+            self._add_krb5_containers(self.secrets)
 
         if self.voms_proxy:
             self._add_voms_proxy_init_container(secrets_volume_mount, secret_env_vars)
@@ -444,10 +455,10 @@ class KubernetesJobManager(JobManager):
             ].append(volume_mount)
             self.job["spec"]["template"]["spec"]["volumes"].append(volume)
 
-    def _add_krb5_containers(self, secrets_store):
+    def _add_krb5_containers(self, secrets):
         """Add krb5 init and renew containers for a job."""
         krb5_config = get_kerberos_k8s_config(
-            secrets_store,
+            secrets,
             kubernetes_uid=self.kubernetes_uid,
         )
 

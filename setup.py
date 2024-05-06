@@ -63,7 +63,7 @@ install_requires = [
     "jinja2<3.1.0",
     "fs>=2.0",
     "marshmallow>2.13.0,<3.0.0",  # same upper pin as reana-server
-    "reana-commons[kubernetes]>=0.95.0a3,<0.96.0",
+    "reana-commons[kubernetes] @ git+https://github.com/reanahub/reana-commons.git@0.95.0a4",
     "reana-db>=0.95.0a2,<0.96.0",
     "retrying>=1.3.3",
 ]

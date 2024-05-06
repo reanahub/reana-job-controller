@@ -153,3 +153,6 @@ SLURM_SSH_BANNER_TIMEOUT = float(os.getenv("SLURM_SSH_BANNER_TIMEOUT", "60"))
 
 SLURM_SSH_AUTH_TIMEOUT = float(os.getenv("SLURM_SSH_AUTH_TIMEOUT", "60"))
 """Seconds to wait for SLURM SSH authentication response."""
+
+REANA_USER_ID = os.getenv("REANA_USER_ID")
+"""User UUID of the owner of the workflow."""
