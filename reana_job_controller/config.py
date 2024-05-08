@@ -11,7 +11,7 @@
 import os
 
 from reana_commons.config import REANA_COMPONENT_PREFIX
-
+from distutils.util import strtobool
 from werkzeug.utils import import_string
 
 SHARED_VOLUME_PATH_ROOT = os.getenv("SHARED_VOLUME_PATH_ROOT", "/var/reana")
@@ -151,4 +151,4 @@ SLURM_SSH_BANNER_TIMEOUT = float(os.getenv("SLURM_SSH_BANNER_TIMEOUT", "60"))
 SLURM_SSH_AUTH_TIMEOUT = float(os.getenv("SLURM_SSH_AUTH_TIMEOUT", "60"))
 """Seconds to wait for SLURM SSH authentication response."""
 
-USE_KUEUE = bool(os.getenv("USE_KUEUE", "False"))
+USE_KUEUE = bool(strtobool(os.getenv("USE_KUEUE", "False")))
