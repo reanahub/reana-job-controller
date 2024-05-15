@@ -40,31 +40,6 @@ def test_initialisation(app):
 
 
 @pytest.mark.parametrize(
-    "k8s_phase,k8s_container_state,k8s_logs,pod_logs",
-    [
-        ("Pending", "ErrImagePull", "pull access denied", None),
-        ("Pending", "InvalidImageName", "couldn't parse image", None),
-        ("Succeeded", "Completed", None, "job finished"),
-        ("Failed", "Error", None, "job failed"),
-    ],
-)
-def test_kubernetes_get_job_logs(
-    k8s_phase, k8s_container_state, k8s_logs, pod_logs, app, kubernetes_job_pod
-):
-    """Test retrieval of job logs."""
-    k8s_corev1_api_client = mock.MagicMock()
-    k8s_corev1_api_client.read_namespaced_pod_log = lambda **kwargs: pod_logs
-    with mock.patch.multiple(
-        "reana_job_controller.job_monitor",
-        current_k8s_corev1_api_client=k8s_corev1_api_client,
-        threading=mock.DEFAULT,
-    ):
-        job_monitor_k8s = JobMonitorKubernetes(app=app)
-        job_pod = kubernetes_job_pod(k8s_phase, k8s_container_state)
-        assert (k8s_logs or pod_logs) in job_monitor_k8s.get_job_logs(job_pod)
-
-
-@pytest.mark.parametrize(
     "k8s_phase,k8s_container_state,expected_reana_status",
     [
         ("Pending", "ErrImagePull", "failed"),

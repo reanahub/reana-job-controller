@@ -107,9 +107,21 @@ RUN if [ "${DEBUG}" -gt 0 ]; then \
     fi
 
 # Are we building with locally-checked-out shared modules?
-# hadolint ignore=SC2102
-RUN if test -e modules/reana-commons; then pip install --no-cache-dir -e modules/reana-commons[kubernetes] --upgrade; fi
-RUN if test -e modules/reana-db; then pip install --no-cache-dir -e modules/reana-db --upgrade; fi
+# hadolint ignore=DL3013
+RUN if test -e modules/reana-commons; then \
+      if [ "${DEBUG}" -gt 0 ]; then \
+        pip install --no-cache-dir -e "modules/reana-commons[kubernetes]" --upgrade; \
+      else \
+        pip install --no-cache-dir "modules/reana-commons[kubernetes]" --upgrade; \
+      fi \
+    fi; \
+    if test -e modules/reana-db; then \
+      if [ "${DEBUG}" -gt 0 ]; then \
+        pip install --no-cache-dir -e "modules/reana-db" --upgrade; \
+      else \
+        pip install --no-cache-dir "modules/reana-db" --upgrade; \
+      fi \
+    fi
 
 # Check for any broken Python dependencies
 RUN pip check
@@ -127,7 +139,7 @@ CMD ["flask", "run", "-h", "0.0.0.0"]
 
 # Set image labels
 LABEL org.opencontainers.image.authors="team@reanahub.io"
-LABEL org.opencontainers.image.created="2023-12-12"
+LABEL org.opencontainers.image.created="2024-03-04"
 LABEL org.opencontainers.image.description="REANA reproducible analysis platform - job controller component"
 LABEL org.opencontainers.image.documentation="https://reana-job-controller.readthedocs.io/"
 LABEL org.opencontainers.image.licenses="MIT"
@@ -135,4 +147,6 @@ LABEL org.opencontainers.image.source="https://github.com/reanahub/reana-job-con
 LABEL org.opencontainers.image.title="reana-job-controller"
 LABEL org.opencontainers.image.url="https://github.com/reanahub/reana-job-controller"
 LABEL org.opencontainers.image.vendor="reanahub"
-LABEL org.opencontainers.image.version="0.9.2"
+# x-release-please-start-version
+LABEL org.opencontainers.image.version="0.95.0-alpha.1"
+# x-release-please-end

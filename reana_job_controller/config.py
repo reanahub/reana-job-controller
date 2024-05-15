@@ -14,6 +14,9 @@ from reana_commons.config import REANA_COMPONENT_PREFIX
 from distutils.util import strtobool
 from werkzeug.utils import import_string
 
+CACHE_ENABLED = False
+"""Determines if jobs caching is enabled."""
+
 SHARED_VOLUME_PATH_ROOT = os.getenv("SHARED_VOLUME_PATH_ROOT", "/var/reana")
 """Root path of the shared volume ."""
 

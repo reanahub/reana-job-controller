@@ -294,8 +294,19 @@ class HTCondorJobManagerCERN(JobManager):
         logging.info("Spooling jobs {} output.".format(backend_job_id))
         schedd.retrieve("ClusterId == {}".format(backend_job_id))
 
-    def get_logs(backend_job_id, workspace):
-        """Return job logs if log files are present."""
+    @classmethod
+    def get_logs(cls, backend_job_id, **kwargs):
+        """Return job logs if log files are present.
+
+        :param backend_job_id: ID of the job in the backend.
+        :param kwargs: Additional parameters needed to fetch logs.
+            In the case of HTCondor, the ``workspace`` parameter is needed.
+        :return: String containing the job logs.
+        """
+        if "workspace" not in kwargs:
+            raise ValueError("Missing 'workspace' parameter")
+        workspace = kwargs["workspace"]
+
         stderr_file = os.path.join(
             workspace, "reana_job." + str(backend_job_id) + ".0.err"
         )

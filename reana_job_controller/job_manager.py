@@ -11,9 +11,10 @@
 import json
 
 from reana_commons.utils import calculate_file_access_time
-from reana_db.database import Session, engine as db_engine
-from reana_db.models import Job as JobTable
-from reana_db.models import JobCache, JobStatus, Workflow
+from reana_db.database import Session
+from reana_db.models import Job as JobTable, JobCache, JobStatus, Workflow
+
+from reana_job_controller.config import CACHE_ENABLED
 
 
 class JobManager:
@@ -61,8 +62,8 @@ class JobManager:
             inst.before_execution()
             backend_job_id = fn(inst, *args, **kwargs)
             inst.create_job_in_db(backend_job_id)
-            inst.cache_job()
-            db_engine.dispose()
+            if CACHE_ENABLED:
+                inst.cache_job()
             return backend_job_id
 
         return wrapper
@@ -92,11 +93,14 @@ class JobManager:
         """
         raise NotImplementedError
 
-    def get_logs(self):
-        """Get job log.
+    @classmethod
+    def get_logs(cls, backend_job_id, **kwargs):
+        """Return job logs if log files are present.
 
-        :returns: stderr, stdout of a job.
-        :rtype: dict
+        :param backend_job_id: ID of the job in the backend.
+        :param kwargs: Additional parameters needed to fetch logs.
+            These depend on the chosen compute backend.
+        :return: String containing the job logs.
         """
         raise NotImplementedError
 
@@ -109,7 +113,7 @@ class JobManager:
         job_db_entry = JobTable(
             backend_job_id=backend_job_id,
             workflow_uuid=self.workflow_uuid,
-            status=JobStatus.created.name,
+            status=JobStatus.created,
             compute_backend=self.compute_backend,
             cvmfs_mounts=self.cvmfs_mounts or "",
             shared_file_system=self.shared_file_system or False,

@@ -34,7 +34,10 @@ from reana_commons.job_utils import (
     validate_kubernetes_memory,
     kubernetes_memory_to_bytes,
 )
-from reana_commons.k8s.api_client import current_k8s_batchv1_api_client
+from reana_commons.k8s.api_client import (
+    current_k8s_batchv1_api_client,
+    current_k8s_corev1_api_client,
+)
 from reana_commons.k8s.kerberos import get_kerberos_k8s_config
 from reana_commons.k8s.secrets import REANAUserSecretsStore
 from reana_commons.k8s.volumes import (
@@ -176,6 +179,8 @@ class KubernetesJobManager(JobManager):
                         "initContainers": [],
                         "volumes": [],
                         "restartPolicy": "Never",
+                        # No need to wait a long time for jobs to gracefully terminate
+                        "terminationGracePeriodSeconds": 5,
                         "enableServiceLinks": False,
                     },
                 },
@@ -249,6 +254,99 @@ class KubernetesJobManager(JobManager):
         except Exception:
             logging.exception("Unexpected error while submitting a job")
             raise
+
+    @classmethod
+    def _get_containers_logs(cls, job_pod) -> Optional[str]:
+        """Fetch the logs from all the containers in the given pod.
+
+        :param job_pod: Pod resource coming from Kubernetes.
+        """
+        try:
+            pod_logs = ""
+            container_statuses = (job_pod.status.container_statuses or []) + (
+                job_pod.status.init_container_statuses or []
+            )
+
+            logging.info(f"Grabbing pod {job_pod.metadata.name} logs ...")
+            for container in container_statuses:
+                # If we are here, it means that either all the containers have finished
+                # running or there has been some sort of failure. For this reason we get
+                # the logs of all containers, even if they are still running, as the job
+                # will not continue running after this anyway.
+                if container.state.terminated or container.state.running:
+                    container_log = (
+                        current_k8s_corev1_api_client.read_namespaced_pod_log(
+                            namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
+                            name=job_pod.metadata.name,
+                            container=container.name,
+                        )
+                    )
+                    pod_logs += "{}: :\n {}\n".format(container.name, container_log)
+                    if hasattr(container.state.terminated, "reason"):
+                        pod_logs += "\n{}\n".format(container.state.terminated.reason)
+                elif container.state.waiting:
+                    # No need to fetch logs, as the container has not started yet.
+                    pod_logs += "Container {} failed, error: {}".format(
+                        container.name, container.state.waiting.message
+                    )
+
+            return pod_logs
+        except client.rest.ApiException as e:
+            logging.error(f"Error from Kubernetes API while getting job logs: {e}")
+            return None
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            logging.error("Unexpected error: {}".format(e))
+            return None
+
+    @classmethod
+    def get_logs(cls, backend_job_id, **kwargs):
+        """Return job logs.
+
+        :param backend_job_id: ID of the job in the backend.
+        :param kwargs: Additional parameters needed to fetch logs.
+            In the case of Kubernetes, the ``job_pod`` parameter can be specified
+            to avoid fetching the pod specification from Kubernetes.
+        :return: String containing the job logs.
+        """
+        if "job_pod" in kwargs:
+            job_pod = kwargs["job_pod"]
+            assert (
+                job_pod.metadata.labels["job-name"] == backend_job_id
+            ), "Pod does not refer to correct job."
+        else:
+            job_pods = current_k8s_corev1_api_client.list_namespaced_pod(
+                namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
+                label_selector=f"job-name={backend_job_id}",
+            )
+            if not job_pods.items:
+                logging.error(f"Could not find any pod for job {backend_job_id}")
+                return None
+            job_pod = job_pods.items[0]
+
+        logs = cls._get_containers_logs(job_pod)
+
+        if job_pod.status.reason == "DeadlineExceeded":
+            if not logs:
+                logs = ""
+
+            message = f"\n{job_pod.status.reason}\nThe job was killed due to exceeding timeout"
+
+            try:
+                specified_timeout = job_pod.spec.active_deadline_seconds
+                message += f" of {specified_timeout} seconds."
+            except AttributeError:
+                message += "."
+                logging.error(
+                    f"Kubernetes job id: {backend_job_id}. Could not get job timeout from Job spec."
+                )
+
+            logs += message
+            logging.info(
+                f"Kubernetes job id: {backend_job_id} was killed due to timeout."
+            )
+
+        return logs
 
     def stop(backend_job_id, asynchronous=True):
         """Stop Kubernetes job execution.

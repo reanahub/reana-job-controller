@@ -28,7 +28,8 @@ from reana_job_controller.config import (
     SLURM_SSH_BANNER_TIMEOUT,
     SLURM_SSH_AUTH_TIMEOUT,
 )
-from reana_job_controller.job_db import JOB_DB
+from reana_job_controller.job_db import JOB_DB, store_job_logs, update_job_status
+from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 from reana_job_controller.utils import SSHClient, singleton
 
 
@@ -103,27 +104,6 @@ class JobMonitorKubernetes(JobMonitor):
         """
         return job_pod.metadata.labels["job-name"]
 
-    def store_job_logs(self, reana_job_id, logs):
-        """Store logs and update job status.
-
-        :param reana_job_id: Internal REANA job ID.
-        :param logs: Job logs.
-        :type reana_job_id: str
-        :type logs: str
-        """
-        self.job_db[reana_job_id]["log"] = logs
-        store_logs(job_id=reana_job_id, logs=logs)
-
-    def update_job_status(self, reana_job_id, status):
-        """Update job status inside RJC.
-
-        :param reana_job_id: Internal REANA job ID.
-        :param status: One of the possible status for jobs in REANA
-        :type reana_job_id: str
-        :type status: str
-        """
-        self.job_db[reana_job_id]["status"] = status
-
     def should_process_job(self, job_pod) -> bool:
         """Decide whether the job should be processed or not.
 
@@ -133,7 +113,11 @@ class JobMonitorKubernetes(JobMonitor):
             https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1Pod.md)
         """
         remaining_jobs = self._get_remaining_jobs(
-            statuses_to_skip=[JobStatus.finished.name, JobStatus.failed.name]
+            statuses_to_skip=[
+                JobStatus.finished.name,
+                JobStatus.failed.name,
+                JobStatus.stopped.name,
+            ]
         )
         backend_job_id = self.get_backend_job_id(job_pod)
         is_job_in_remaining_jobs = backend_job_id in remaining_jobs
@@ -235,70 +219,6 @@ class JobMonitorKubernetes(JobMonitor):
 
         return status
 
-    def _get_containers_logs(self, job_pod) -> Optional[str]:
-        try:
-            pod_logs = ""
-            container_statuses = self._get_job_container_statuses(job_pod)
-
-            logging.info(f"Grabbing pod {job_pod.metadata.name} logs ...")
-            for container in container_statuses:
-                # If we are here, it means that either all the containers have finished
-                # running or there has been some sort of failure. For this reason we get
-                # the logs of all containers, even if they are still running, as the job
-                # will not continue running after this anyway.
-                if container.state.terminated or container.state.running:
-                    container_log = (
-                        current_k8s_corev1_api_client.read_namespaced_pod_log(
-                            namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
-                            name=job_pod.metadata.name,
-                            container=container.name,
-                        )
-                    )
-                    pod_logs += "{}: :\n {}\n".format(container.name, container_log)
-                    if hasattr(container.state.terminated, "reason"):
-                        pod_logs += "\n{}\n".format(container.state.terminated.reason)
-                elif container.state.waiting:
-                    # No need to fetch logs, as the container has not started yet.
-                    pod_logs += "Container {} failed, error: {}".format(
-                        container.name, container.state.waiting.message
-                    )
-
-            return pod_logs
-        except client.rest.ApiException as e:
-            logging.error(f"Error from Kubernetes API while getting job logs: {e}")
-            return None
-        except Exception as e:
-            logging.error(traceback.format_exc())
-            logging.error("Unexpected error: {}".format(e))
-            return None
-
-    def get_job_logs(self, job_pod) -> Optional[str]:
-        """Get job logs."""
-        logs = self._get_containers_logs(job_pod)
-
-        if job_pod.status.reason == "DeadlineExceeded":
-            if not logs:
-                logs = ""
-
-            backend_job_id = self.get_backend_job_id(job_pod)
-            message = f"\n{job_pod.status.reason}\nThe job was killed due to exceeding timeout"
-
-            try:
-                specified_timeout = job_pod.spec.active_deadline_seconds
-                message += f" of {specified_timeout} seconds."
-            except AttributeError:
-                message += "."
-                logging.error(
-                    f"Kubernetes job id: {backend_job_id}. Could not get job timeout from Job spec."
-                )
-
-            logs += message
-            logging.info(
-                f"Kubernetes job id: {backend_job_id} was killed due to timeout."
-            )
-
-        return logs
-
     def watch_jobs(self, job_db, app=None):
         """Open stream connection to k8s apiserver to watch all jobs status.
 
@@ -323,15 +243,17 @@ class JobMonitorKubernetes(JobMonitor):
                         backend_job_id = self.get_backend_job_id(job_pod)
                         reana_job_id = self.get_reana_job_id(backend_job_id)
 
-                        logs = self.get_job_logs(job_pod)
-                        self.store_job_logs(reana_job_id, logs)
+                        logs = self.job_manager_cls.get_logs(
+                            backend_job_id, job_pod=job_pod
+                        )
 
-                        self.update_job_status(reana_job_id, job_status)
+                        store_job_logs(reana_job_id, logs)
+                        update_job_status(reana_job_id, job_status)
 
                         if JobStatus.should_cleanup_job(job_status):
                             self.clean_job(backend_job_id)
             except client.rest.ApiException as e:
-                logging.error(
+                logging.exception(
                     f"Error from Kubernetes API while watching jobs pods: {e}"
                 )
             except Exception as e:
@@ -373,7 +295,7 @@ class JobMonitorHTCondorCERN(JobMonitor):
         :param job_db: Dictionary which contains all current jobs.
         """
         ignore_hold_codes = [35, 16]
-        statuses_to_skip = ["finished", "failed"]
+        statuses_to_skip = ["finished", "failed", "stopped"]
         while True:
             try:
                 logging.info("Starting a new stream request to watch Condor Jobs")
@@ -413,21 +335,21 @@ class JobMonitorHTCondorCERN(JobMonitor):
                         if condor_job:
                             msg = "Job was found in history. {}".format(str(condor_job))
                             logging.error(msg)
-                            job_db[job_id]["status"] = "failed"
-                            job_db[job_id]["log"] = msg
+                            update_job_status(job_id, "failed")
+                            store_job_logs(job_id, msg)
                         continue
                     if condor_job["JobStatus"] == condorJobStatus["Completed"]:
                         exit_code = condor_job.get(
                             "ExitCode", condor_job.get("ExitStatus")
                         )
                         if exit_code == 0:
-                            job_db[job_id]["status"] = "finished"
+                            update_job_status(job_id, "finished")
                         else:
                             logging.info(
                                 "Job job_id: {0}, condor_job_id: {1} "
                                 "failed".format(job_id, condor_job["ClusterId"])
                             )
-                            job_db[job_id]["status"] = "failed"
+                            update_job_status(job_id, "failed")
                         app.htcondor_executor.submit(
                             self.job_manager_cls.spool_output,
                             job_dict["backend_job_id"],
@@ -435,10 +357,10 @@ class JobMonitorHTCondorCERN(JobMonitor):
                         job_logs = app.htcondor_executor.submit(
                             self.job_manager_cls.get_logs,
                             job_dict["backend_job_id"],
-                            job_db[job_id]["obj"].workflow_workspace,
+                            workspace=job_db[job_id]["obj"].workflow_workspace,
                         )
-                        job_db[job_id]["log"] = job_logs.result()
-                        store_logs(logs=job_db[job_id]["log"], job_id=job_id)
+                        logs = job_logs.result()
+                        store_job_logs(job_id, logs)
 
                         job_db[job_id]["deleted"] = True
                     elif (
@@ -476,7 +398,7 @@ slurmJobStatus = {
         "RESV_DEL_HOLD",
         "REQUEUED",
         "RESIZING",
-    ]
+    ],
     # 'REVOKED',
     # 'SIGNALING',
     # 'SPECIAL_EXIT',
@@ -504,7 +426,7 @@ class JobMonitorSlurmCERN(JobMonitor):
             banner_timeout=SLURM_SSH_BANNER_TIMEOUT,
             auth_timeout=SLURM_SSH_AUTH_TIMEOUT,
         )
-        statuses_to_skip = ["finished", "failed"]
+        statuses_to_skip = ["finished", "failed", "stopped"]
         while True:
             logging.debug("Starting a new stream request to watch Jobs")
             try:
@@ -526,35 +448,25 @@ class JobMonitorSlurmCERN(JobMonitor):
                     job_id = slurm_jobs[slurm_job_id]
                     if slurm_job_status in slurmJobStatus["finished"]:
                         self.job_manager_cls.get_outputs()
-                        job_db[job_id]["status"] = "finished"
+                        update_job_status(job_id, "finished")
                         job_db[job_id]["deleted"] = True
-                        job_db[job_id]["log"] = self.job_manager_cls.get_logs(
+                        logs = self.job_manager_cls.get_logs(
                             backend_job_id=slurm_job_id,
                             workspace=job_db[job_id]["obj"].workflow_workspace,
                         )
-                        store_logs(logs=job_db[job_id]["log"], job_id=job_id)
+                        store_job_logs(job_id, logs)
                     if slurm_job_status in slurmJobStatus["failed"]:
                         self.job_manager_cls.get_outputs()
-                        job_db[job_id]["status"] = "failed"
+                        update_job_status(job_id, "failed")
                         job_db[job_id]["deleted"] = True
-                        job_db[job_id]["log"] = self.job_manager_cls.get_logs(
+                        logs = self.job_manager_cls.get_logs(
                             backend_job_id=slurm_job_id,
                             workspace=job_db[job_id]["obj"].workflow_workspace,
                         )
-                        store_logs(logs=job_db[job_id]["log"], job_id=job_id)
+                        store_job_logs(job_id, logs)
             except Exception as e:
                 logging.error("Unexpected error: {}".format(e), exc_info=True)
                 time.sleep(120)
-
-
-def store_logs(logs, job_id):
-    """Write logs to DB."""
-    try:
-        logging.info("Storing job logs: {}".format(job_id))
-        Session.query(Job).filter_by(id_=job_id).update(dict(logs=logs))
-        Session.commit()
-    except Exception as e:
-        logging.error("Exception while saving logs: {}".format(str(e)), exc_info=True)
 
 
 def format_condor_job_que_query(backend_job_ids):
