@@ -48,7 +48,6 @@ def create_app(config_mapping=None):
     """Create REANA-Job-Controller application."""
     logging.basicConfig(level=REANA_LOG_LEVEL, format=REANA_LOG_FORMAT)
     app = Flask(__name__)
-    app.secret_key = "mega secret key"
     app.session = Session
     app.config.from_object(config)
     if config_mapping:

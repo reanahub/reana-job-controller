@@ -9,10 +9,19 @@
 """Flask application configuration."""
 
 import os
+import secrets
 
 from reana_commons.config import REANA_COMPONENT_PREFIX
 
 from werkzeug.utils import import_string
+
+
+SECRET_KEY = os.getenv("REANA_SECRET_KEY", secrets.token_hex())
+"""Secret key used for the application user sessions.
+
+A new random key is generated on every start of job-controller, but this is not an
+issues as job-controller is never restarted (and thus the secret never changes)
+during the execution of a single workflow."""
 
 CACHE_ENABLED = False
 """Determines if jobs caching is enabled."""
