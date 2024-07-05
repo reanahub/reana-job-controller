@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.4](https://github.com/reanahub/reana-job-controller/compare/0.9.3...0.9.4) (2024-07-05)
+
+
+### Features
+
+* **backends:** add new Compute4PUNCH backend ([#430](https://github.com/reanahub/reana-job-controller/issues/430)) ([4243252](https://github.com/reanahub/reana-job-controller/commit/42432522c8d9dd5e4ee908a16b1be87046908e08))
+
+
+### Bug fixes
+
+* **config:** update reana-auth-vomsproxy to 1.2.1 to fix WLCG IAM ([#457](https://github.com/reanahub/reana-job-controller/issues/457)) ([132868f](https://github.com/reanahub/reana-job-controller/commit/132868f4824a0f4049febf17c90bea0df838e724))
+
 ## [0.9.3](https://github.com/reanahub/reana-job-controller/compare/0.9.2...0.9.3) (2024-03-04)
 
 
