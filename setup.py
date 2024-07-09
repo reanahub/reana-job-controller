@@ -34,7 +34,7 @@ extras_require = {
         "sphinxcontrib-redoc>=1.5.1",
     ],
     "htcondor": [
-        "htcondor==9.0.17",
+        "htcondor>=9.0.17",
     ],
     "tests": [
         "pytest-reana>=0.95.0a2,<0.96.0",
@@ -55,12 +55,12 @@ install_requires = [
     # apispec>=4.0 drops support for marshmallow<3
     "apispec[yaml]>=3.0,<4.0",
     "apispec-webframeworks",
-    "Flask>=2.1.1,<2.2.0",
+    "Flask>=2.1.1,<2.3.0",  # same upper pin as invenio-base/reana-server
+    "Werkzeug>=2.1.0,<2.3.0",  # same upper pin as invenio-base
     "jinja2<3.1.0",
-    "Werkzeug>=2.1.0,<3.0",
     "fs>=2.0",
-    "marshmallow>2.13.0,<=2.20.1",
-    "reana-commons[kubernetes]>=0.95.0a2,<0.96.0",
+    "marshmallow>2.13.0,<3.0.0",  # same upper pin as reana-server
+    "reana-commons[kubernetes]>=0.95.0a3,<0.96.0",
     "reana-db>=0.95.0a2,<0.96.0",
     "retrying>=1.3.3",
 ]
@@ -102,7 +102,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python",
         "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
