@@ -36,7 +36,7 @@ RUN apt-get update -y && \
       python3.8 \
       python3.8-dev \
       vim-tiny && \
-    pip install --no-cache-dir --upgrade pip setuptools && \
+    pip install --no-cache-dir --upgrade pip 'setuptools<71' && \
     pip install --no-cache-dir -r /code/requirements.txt && \
     apt-get remove -y \
       gcc && \
