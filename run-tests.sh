@@ -112,7 +112,7 @@ check_pytest () {
     clean_old_db_container
     start_db_container
     trap clean_old_db_container SIGINT SIGTERM SIGSEGV ERR
-    python setup.py test
+    pytest
     stop_db_container
 }
 
@@ -153,7 +153,7 @@ check_all_darwin () {
     pip install check-manifest &&
     export REANA_SQLALCHEMY_DATABASE_URI=$REANA_SQLALCHEMY_DATABASE_URI &&
     ./run-tests.sh --check-all &&
-    python setup.py test"
+    pytest"
     docker run -v "$(pwd)"/..:/code -ti $DOCKER_IMAGE_NAME bash -c "eval $RUN_TESTS_INSIDE_DOCKER"
     stop_db_container
 }
