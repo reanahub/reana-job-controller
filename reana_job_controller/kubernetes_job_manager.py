@@ -155,7 +155,7 @@ class KubernetesJobManager(JobManager):
                 "template": {
                     "metadata": {
                         "name": backend_job_id,
-                        "labels": {"reana-run-job-workflow-uuid": self.workflow_uuid},
+                        "labels": {"reana-run-job-workflow-uuid": self.workflow_uuid, "test":"test"},
                     },
                     "spec": {
                         "automountServiceAccountToken": False,
@@ -167,6 +167,11 @@ class KubernetesJobManager(JobManager):
                                 "name": "job",
                                 "env": [],
                                 "volumeMounts": [],
+                                "securityContext": [
+                                    {
+                                        "allowPrivilegeEscalation": "false"
+                                    }
+                                ],
                             }
                         ],
                         "initContainers": [],
