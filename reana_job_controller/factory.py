@@ -36,7 +36,8 @@ def receive_checkin(dbapi_connection, connection_record):
     # To improve scalability, we should consider refactoring job-controller to avoid
     # accessing the database, or at least consider using external connection pooling
     # mechanisms such as pgBouncer.
-    connection_record.close()
+    if config.REANA_DB_CLOSE_POOL_CONNECTIONS:
+        connection_record.close()
 
 
 def shutdown_session(response_or_exc):
