@@ -8,11 +8,17 @@
 
 """Flask application configuration."""
 
+from distutils.util import strtobool
 import os
 
 from reana_commons.config import REANA_COMPONENT_PREFIX
 
 from werkzeug.utils import import_string
+
+REANA_DB_CLOSE_POOL_CONNECTIONS = bool(
+    strtobool(os.getenv("REANA_DB_CLOSE_POOL_CONNECTIONS", "false"))
+)
+"""Determine whether to close each database connection when it is returned to the pool."""
 
 CACHE_ENABLED = False
 """Determines if jobs caching is enabled."""

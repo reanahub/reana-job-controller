@@ -26,17 +26,26 @@ def receive_checkin(dbapi_connection, connection_record):
     # Given the current architecture of REANA, job-controller needs to connect to the
     # database in order to, among other things, update the details of jobs. However,
     # it can happen that for long periods of time job-controller does not need to access
-    # the database, for example when waiting for long-lasting jobs to finish. For this
-    # reason, each connection is closed before being returned to the connection pool, so
-    # that job-controller does not unnecessarily use one or more of the available
-    # connection slots of PostgreSQL. Keeping one connection open for the whole
-    # duration of the workflow is not possible, as that would limit the number of
-    # workflows that can be run in parallel.
+    # the database, for example when waiting for long-lasting jobs to finish. During this
+    # time, connections that are kept in the pool still consume the available connection
+    # slots of PostgreSQL, even though they are not being used. This effectively limits
+    # the number of workflows that can run in parallel.
     #
-    # To improve scalability, we should consider refactoring job-controller to avoid
-    # accessing the database, or at least consider using external connection pooling
-    # mechanisms such as pgBouncer.
-    connection_record.close()
+    # There are a few options to avoid this:
+    #  - enable external connection pooling with PgBouncer in the Helm chart, so that
+    #    many more connections can be opened at the same time
+    #  - increase the number of connection slots of PostgreSQL, but this increases the
+    #    memory/cpu needed by the database
+    #  - close each connection as soon as it is returned to the pool
+    #
+    # Note that closing connections every time they are returned to the pool means that
+    # every new transaction will need to open a connection to the database. This
+    # impacts how fast jobs can be spawned, as opening a connection takes quite some time
+    # (tens of millisecond). For this reason, connections are not closed by default when
+    # they are returned to the pool, but this behaviour can be customised with env
+    # variables.
+    if config.REANA_DB_CLOSE_POOL_CONNECTIONS:
+        connection_record.close()
 
 
 def shutdown_session(response_or_exc):
