@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.95.0](https://github.com/reanahub/reana-job-controller/compare/0.9.3...0.95.0) (2024-08-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **python:** drop support for Python 3.6 and 3.7
+
+### Build
+
+* **docker:** pin setuptools to v70 ([#459](https://github.com/reanahub/reana-job-controller/issues/459)) ([1288088](https://github.com/reanahub/reana-job-controller/commit/12880887c8f48f1085fcc8bab6d0896e16e97e53))
+* **docker:** upgrade to Ubuntu 24.04 and Python 3.12 ([#458](https://github.com/reanahub/reana-job-controller/issues/458)) ([f65641a](https://github.com/reanahub/reana-job-controller/commit/f65641ab1e4d0e7c215a480bcacfa8539c1c4182))
+* **python:** add minimal `pyproject.toml` ([#459](https://github.com/reanahub/reana-job-controller/issues/459)) ([c84ceaf](https://github.com/reanahub/reana-job-controller/commit/c84ceaf21c3e3b5b079765d9ce60da0746d9e506))
+* **python:** drop support for Python 3.6 and 3.7 ([#455](https://github.com/reanahub/reana-job-controller/issues/455)) ([20899e7](https://github.com/reanahub/reana-job-controller/commit/20899e79389becfea92ac761c211076b21f82080))
+* **python:** remove deprecated `pytest-runner` ([#459](https://github.com/reanahub/reana-job-controller/issues/459)) ([e5fef3f](https://github.com/reanahub/reana-job-controller/commit/e5fef3fa66ef5255ec2ff02477bbc3d63f096b31))
+* **python:** use optional deps instead of `tests_require` ([#459](https://github.com/reanahub/reana-job-controller/issues/459)) ([6a3acdf](https://github.com/reanahub/reana-job-controller/commit/6a3acdf0dd800770a14ec8992674419c92b47001))
+
+
+### Continuous integration
+
+* **actions:** update GitHub actions due to Node 16 deprecation ([#447](https://github.com/reanahub/reana-job-controller/issues/447)) ([f4f955c](https://github.com/reanahub/reana-job-controller/commit/f4f955c3c7eb02f3f75081fb9882931cc5165a05))
+* **commitlint:** improve checking of merge commits ([#458](https://github.com/reanahub/reana-job-controller/issues/458)) ([f646fbe](https://github.com/reanahub/reana-job-controller/commit/f646fbe31a990939af44318b87c0e27ac1f4bc94))
+* **pytest:** invoke `pytest` directly instead of `setup.py test` ([#459](https://github.com/reanahub/reana-job-controller/issues/459)) ([637aaf1](https://github.com/reanahub/reana-job-controller/commit/637aaf197dc18e21bb412b7517c43e2d7b6f78d1))
+
+
+### Chores
+
+* **master:** release 0.95.0-alpha.1 ([74a32d8](https://github.com/reanahub/reana-job-controller/commit/74a32d80158c8629e0505a7650e16507f01331a5))
+
 ## [0.9.3](https://github.com/reanahub/reana-job-controller/compare/0.9.2...0.9.3) (2024-03-04)
 
 
