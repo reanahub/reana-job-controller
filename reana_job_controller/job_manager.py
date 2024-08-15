@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2019, 2020, 2021 CERN.
+# Copyright (C) 2019, 2020, 2021, 2024 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -14,7 +14,7 @@ from reana_commons.utils import calculate_file_access_time
 from reana_db.database import Session
 from reana_db.models import Job as JobTable, JobCache, JobStatus, Workflow
 
-from reana_job_controller.config import CACHE_ENABLED
+from reana_job_controller.config import CACHE_ENABLED, DASK_SCHEDULER_URI
 
 
 class JobManager:
@@ -149,4 +149,5 @@ class JobManager:
         prefix = "REANA"
         env_vars[prefix + "_WORKSPACE"] = self.workflow_workspace
         env_vars[prefix + "_WORKFLOW_UUID"] = str(self.workflow_uuid)
+        env_vars["DASK_SCHEDULER_URI"] = DASK_SCHEDULER_URI
         return env_vars
