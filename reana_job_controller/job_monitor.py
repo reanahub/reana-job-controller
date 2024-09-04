@@ -171,7 +171,7 @@ class JobMonitorKubernetes(JobMonitor):
                         f"Kubernetes job {backend_job_id}, assuming successful."
                     )
                 elif reason != "Completed":
-                    logging.info(
+                    logging.warn(
                         f"Kubernetes job id: {backend_job_id} failed, phase 'Succeeded' but "
                         f"container '{container.name}' was terminated because of '{reason}'."
                     )
@@ -199,19 +199,19 @@ class JobMonitorKubernetes(JobMonitor):
                     continue
 
                 if "ErrImagePull" in reason:
-                    logging.info(
+                    logging.warn(
                         f"Container {container.name} in Kubernetes job {backend_job_id} "
                         "failed to fetch image."
                     )
                     status = JobStatus.failed.name
                 elif "InvalidImageName" in reason:
-                    logging.info(
+                    logging.warn(
                         f"Container {container.name} in Kubernetes job {backend_job_id} "
                         "failed due to invalid image name."
                     )
                     status = JobStatus.failed.name
                 elif "CreateContainerConfigError" in reason:
-                    logging.info(
+                    logging.warn(
                         f"Container {container.name} in Kubernetes job {backend_job_id} "
                         f"failed due to container configuration error: {message}"
                     )
@@ -247,6 +247,11 @@ class JobMonitorKubernetes(JobMonitor):
                             backend_job_id, job_pod=job_pod
                         )
 
+                        if job_status == JobStatus.failed.name:
+                            self.log_disruption(
+                                event["object"].status.conditions, backend_job_id
+                            )
+
                         store_job_logs(reana_job_id, logs)
                         update_job_status(reana_job_id, job_status)
 
@@ -259,6 +264,23 @@ class JobMonitorKubernetes(JobMonitor):
             except Exception as e:
                 logging.error(traceback.format_exc())
                 logging.error("Unexpected error: {}".format(e))
+
+    def log_disruption(self, conditions, backend_job_id):
+        """Log disruption message from Kubernetes event conditions.
+
+        Usually it is pod eviction but can be any of https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#pod-disruption-conditions.
+
+        :param conditions: List of Kubernetes event conditions.
+        :param backend_job_id: Backend job ID.
+        """
+        disruption_target = next(
+            (item for item in conditions if item.type == "DisruptionTarget"),
+            None,
+        )
+        if disruption_target:
+            logging.warn(
+                f"{disruption_target.reason}: Job {backend_job_id} was disrupted: {disruption_target.message}"
+            )
 
 
 condorJobStatus = {

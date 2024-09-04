@@ -12,6 +12,7 @@ import uuid
 
 import mock
 import pytest
+from kubernetes.client.models import V1PodCondition
 
 from reana_job_controller.job_monitor import (
     JobMonitorHTCondorCERN,
@@ -107,3 +108,61 @@ def test_kubernetes_should_process_job(
         )
 
         assert bool(job_monitor_k8s.should_process_job(job_pod_event)) == should_process
+
+
+@pytest.mark.parametrize(
+    "conditions,is_call_expected,expected_message",
+    [
+        (
+            [
+                V1PodCondition(
+                    type="PodScheduled",
+                    status="True",
+                ),
+                V1PodCondition(
+                    type="DisruptionTarget",
+                    status="True",
+                    reason="EvictionByEvictionAPI",
+                    message="Eviction API: evicting",
+                ),
+                V1PodCondition(
+                    type="Initialized",
+                    status="True",
+                ),
+            ],
+            True,
+            "EvictionByEvictionAPI: Job backend_job_id was disrupted: Eviction API: evicting",
+        ),
+        (
+            [
+                V1PodCondition(
+                    type="PodScheduled",
+                    status="True",
+                ),
+                V1PodCondition(
+                    type="Initialized",
+                    status="True",
+                ),
+            ],
+            False,
+            "",
+        ),
+        (
+            [],
+            False,
+            "",
+        ),
+    ],
+)
+def test_log_disruption_evicted(conditions, is_call_expected, expected_message):
+    """Test logging of disruption target condition."""
+    with (
+        mock.patch("reana_job_controller.job_monitor.threading"),
+        mock.patch("reana_job_controller.job_monitor.logging.warn") as log_mock,
+    ):
+        job_monitor_k8s = JobMonitorKubernetes(app=None)
+        job_monitor_k8s.log_disruption(conditions, "backend_job_id")
+        if is_call_expected:
+            log_mock.assert_called_with(expected_message)
+        else:
+            log_mock.assert_not_called()
