@@ -18,6 +18,7 @@ from sqlalchemy import event
 
 from reana_job_controller import config
 from reana_job_controller.spec import build_openapi_spec
+from reana_job_controller.utils import MultilineFormatter
 
 
 @event.listens_for(db_engine, "checkin")
@@ -55,7 +56,12 @@ def shutdown_session(response_or_exc):
 
 def create_app(config_mapping=None):
     """Create REANA-Job-Controller application."""
-    logging.basicConfig(level=REANA_LOG_LEVEL, format=REANA_LOG_FORMAT)
+    handler = logging.StreamHandler()
+    handler.setFormatter(MultilineFormatter(REANA_LOG_FORMAT))
+    logging.basicConfig(
+        level=REANA_LOG_LEVEL, format=REANA_LOG_FORMAT, handlers=[handler]
+    )
+
     app = Flask(__name__)
     app.secret_key = "mega secret key"
     app.session = Session
