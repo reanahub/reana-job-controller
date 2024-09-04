@@ -287,12 +287,21 @@ class KubernetesJobManager(JobManager):
                     )
                     pod_logs += "{}: :\n {}\n".format(container.name, container_log)
                     if hasattr(container.state.terminated, "reason"):
+                        if container.state.terminated.reason != "Completed":
+                            message = "Job pod {} was terminated, reason: {}, message: {}".format(
+                                job_pod.metadata.name,
+                                container.state.terminated.reason,
+                                container.state.terminated.message,
+                            )
+                            logging.warn(message)
                         pod_logs += "\n{}\n".format(container.state.terminated.reason)
                 elif container.state.waiting:
                     # No need to fetch logs, as the container has not started yet.
-                    pod_logs += "Container {} failed, error: {}".format(
+                    message = "Container {} failed, error: {}".format(
                         container.name, container.state.waiting.message
                     )
+                    logging.warn(message)
+                    pod_logs += message
 
             return pod_logs
         except client.rest.ApiException as e:
@@ -334,7 +343,9 @@ class KubernetesJobManager(JobManager):
             if not logs:
                 logs = ""
 
-            message = f"\n{job_pod.status.reason}\nThe job was killed due to exceeding timeout"
+            message = (
+                f"{job_pod.status.reason}: The job was killed due to exceeding timeout"
+            )
 
             try:
                 specified_timeout = job_pod.spec.active_deadline_seconds
@@ -345,8 +356,9 @@ class KubernetesJobManager(JobManager):
                     f"Kubernetes job id: {backend_job_id}. Could not get job timeout from Job spec."
                 )
 
-            logs += message
-            logging.info(
+            logs += "\n{message}\n"
+            logging.warn(message)
+            logging.warn(
                 f"Kubernetes job id: {backend_job_id} was killed due to timeout."
             )
 
