@@ -21,7 +21,7 @@ cffi==1.16.0              # via cryptography, pynacl
 charset-normalizer==3.3.2  # via requests
 checksumdir==1.1.9        # via reana-commons
 click==8.1.7              # via flask, reana-commons
-cryptography==43.0.0      # via paramiko, sqlalchemy-utils
+cryptography==43.0.1      # via paramiko, sqlalchemy-utils
 decorator==5.1.1          # via gssapi
 flask==2.2.5              # via reana-job-controller (setup.py)
 fqdn==1.5.1               # via jsonschema
