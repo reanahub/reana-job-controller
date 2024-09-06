@@ -81,15 +81,15 @@ def test_execute_kubernetes_job(
                 assert len(containers) == 2  # main job + sidecar
                 assert len(init_containers) == 1
                 assert init_containers[0]["name"] == KRB5_INIT_CONTAINER_NAME
-                assert len(env_vars) == 6  # KRB5CCNAME is added
+                assert len(env_vars) == 7  # KRB5CCNAME is added
                 assert "trap" in command[0] and expected_command in command[0]
                 assert "kinit -R" in containers[1]["args"][0]
                 assert containers[1]["name"] == KRB5_RENEW_CONTAINER_NAME
             else:
                 assert len(containers) == 1
                 assert len(init_containers) == 0
-                # custom env + REANA_WORKSPACE + REANA_WORKFLOW_UUID + two secrets
-                assert len(env_vars) == 5
+                # custom env + REANA_WORKSPACE + REANA_WORKFLOW_UUID + DASK_SCHEDULER_URI + two secrets
+                assert len(env_vars) == 6
                 assert command == [expected_command]
 
 
