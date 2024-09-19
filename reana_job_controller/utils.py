@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020, 2022, 2023 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2022, 2023, 2024 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -13,9 +13,35 @@ import os
 import socket
 import subprocess
 import sys
+from logging import Formatter, LogRecord
 
 from reana_db.database import Session
 from reana_db.models import Workflow
+
+
+class MultilineFormatter(Formatter):
+    """Logging formatter for multiline logs."""
+
+    def format(self, record: LogRecord):
+        """Format multiline log message.
+
+        :param record: LogRecord object.
+        :type record: logging.LogRecord
+
+        :return: Formatted log message.
+        :rtype: str
+        """
+        save_msg = str(record.msg)
+        output = ""
+        lines = save_msg.splitlines()
+        for line in lines:
+            record.msg = line
+            output += super().format(record) + "\n"
+        output = output.strip()
+        record.msg = save_msg
+        record.message = output
+
+        return output
 
 
 def singleton(cls):
