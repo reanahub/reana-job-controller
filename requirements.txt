@@ -26,6 +26,7 @@ decorator==5.1.1          # via gssapi
 flask==2.2.5              # via reana-job-controller (setup.py)
 fqdn==1.5.1               # via jsonschema
 fs==2.4.16                # via reana-commons, reana-job-controller (setup.py)
+gherkin-official==29.0.0  # via reana-commons
 google-auth==2.32.0       # via kubernetes
 greenlet==3.0.3           # via sqlalchemy
 gssapi==1.8.2             # via paramiko, reana-job-controller (setup.py)
@@ -48,7 +49,8 @@ monotonic==1.6            # via bravado
 msgpack==1.0.8            # via bravado-core
 msgpack-python==0.5.6     # via bravado
 oauthlib==3.2.2           # via requests-oauthlib
-paramiko[gssapi]==3.0.0   # via reana-job-controller (setup.py)
+paramiko[gssapi]==3.5.0   # via reana-job-controller (setup.py)
+parse==1.20.2             # via reana-commons
 psycopg2-binary==2.9.9    # via reana-db
 pyasn1==0.6.0             # via paramiko, pyasn1-modules, rsa
 pyasn1-modules==0.4.0     # via google-auth
@@ -57,8 +59,8 @@ pynacl==1.5.0             # via paramiko
 python-dateutil==2.9.0.post0  # via arrow, bravado, bravado-core, kubernetes
 pytz==2024.1              # via bravado-core
 pyyaml==6.0.1             # via apispec, bravado, bravado-core, kubernetes, reana-commons, swagger-spec-validator
-reana-commons[kubernetes]==0.95.0a3  # via reana-db, reana-job-controller (setup.py)
-reana-db==0.95.0a3        # via reana-job-controller (setup.py)
+reana-commons[kubernetes]==0.95.0a5  # via reana-db, reana-job-controller (setup.py)
+reana-db==0.95.0a4        # via reana-job-controller (setup.py)
 referencing==0.35.1       # via jsonschema, jsonschema-specifications
 requests==2.32.3          # via bravado, bravado-core, kubernetes, requests-oauthlib
 requests-oauthlib==2.0.0  # via kubernetes
