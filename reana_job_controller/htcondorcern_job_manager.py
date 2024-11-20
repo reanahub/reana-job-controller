@@ -9,6 +9,7 @@
 import base64
 import logging
 import os
+import shlex
 import threading
 from shutil import copyfile
 
@@ -235,9 +236,10 @@ class HTCondorJobManagerCERN(JobManager):
                     "--bind $PWD:/srv "
                     "--bind /cvmfs "
                     "--bind /eos "
-                    "{DOCKER_IMG} {CMD}".format(
+                    "{DOCKER_IMG} "
+                    "bash -c {CMD}".format(
                         DOCKER_IMG=self.docker_img,
-                        CMD=self._format_arguments() + " | bash",
+                        CMD=shlex.quote(self._format_arguments() + " | bash"),
                     )
                 )
                 f = open("job_singularity_wrapper.sh", "w")
