@@ -164,7 +164,7 @@ class HTCondorJobManagerCERN(JobManager):
             # Take only the user's command, removes the change directory to workflow workspace
             # added by RWE-Serial/Snakemake since HTCondor implementation does not need it.
             # E.g. "cd /path/to/workspace ; user-command" -> "user-command"
-            base_cmd = " ".join(self.cmd.split()[3:])
+            base_cmd = self.cmd.split(maxsplit=3)[3]
             if self.workflow.type_ == "snakemake":
                 # For Snakemake workflows, also remove the workspace path from
                 # `jobfinished` and `jobfailed` touch commands.
