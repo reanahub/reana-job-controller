@@ -180,7 +180,8 @@ class KubernetesJobManager(JobManager):
                                 "name": "job",
                                 "env": [],
                                 "volumeMounts": [],
-                            }
+                                "securityContext": {"allowPrivilegeEscalation": False},
+                            },
                         ],
                         "initContainers": [],
                         "volumes": [],
