@@ -82,7 +82,7 @@ vine==5.1.0               # via amqp, kombu
 wcmatch==8.4.1            # via reana-commons
 webcolors==24.6.0         # via jsonschema
 websocket-client==1.8.0   # via kubernetes
-werkzeug==2.2.3           # via flask, reana-commons, reana-job-controller (setup.py)
+werkzeug==3.0.6           # via flask, reana-commons, reana-job-controller (setup.py)
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
