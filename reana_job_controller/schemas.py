@@ -56,6 +56,9 @@ class JobRequest(Schema):
     htcondor_accounting_group = fields.Str(required=False)
     slurm_partition = fields.Str(required=False)
     slurm_time = fields.Str(required=False)
+    c4p_cpu_cores = fields.Str(required=False)
+    c4p_memory_limit = fields.Str(required=False)
+    c4p_additional_requirements = fields.Str(required=False)
 
     @pre_load
     def set_kubernetes_job_timeout(self, in_data, **kwargs):

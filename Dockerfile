@@ -90,12 +90,16 @@ ARG DEBUG=0
 RUN if [ "${DEBUG}" -gt 0 ]; then \
       if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
         pip install --no-cache-dir -e ".[debug,htcondor]"; \
+      elif echo "$COMPUTE_BACKENDS" | grep -q "compute4punch"; then \
+        pip install --no-cache-dir ".[debug,mytoken,ssh]"; \
       else \
         pip install --no-cache-dir -e ".[debug]"; \
       fi \
     else \
       if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
         pip install --no-cache-dir ".[htcondor]"; \
+      elif echo "$COMPUTE_BACKENDS" | grep -q "compute4punch"; then \
+        pip install --no-cache-dir ".[mytoken,ssh]"; \
       else \
         pip install --no-cache-dir .; \
       fi \
@@ -138,7 +142,7 @@ CMD ["flask", "run", "-h", "0.0.0.0"]
 
 # Set image labels
 LABEL org.opencontainers.image.authors="team@reanahub.io"
-LABEL org.opencontainers.image.created="2024-03-04"
+LABEL org.opencontainers.image.created="2024-11-29"
 LABEL org.opencontainers.image.description="REANA reproducible analysis platform - job controller component"
 LABEL org.opencontainers.image.documentation="https://reana-job-controller.readthedocs.io/"
 LABEL org.opencontainers.image.licenses="MIT"

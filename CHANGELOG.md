@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.9.4](https://github.com/reanahub/reana-job-controller/compare/0.9.3...0.9.4) (2024-11-29)
+
+
+### Build
+
+* **deps:** update reana-auth-vomsproxy to 1.3.0 ([#466](https://github.com/reanahub/reana-job-controller/issues/466)) ([72e9ea1](https://github.com/reanahub/reana-job-controller/commit/72e9ea1442d2b6cf7d466d0701e269fda1e15b22))
+* **docker:** pin setuptools 70 ([#465](https://github.com/reanahub/reana-job-controller/issues/465)) ([c593d9b](https://github.com/reanahub/reana-job-controller/commit/c593d9bc84763f142573396be48c762eefa8f6ec))
+* **python:** bump shared REANA packages as of 2024-11-28 ([#477](https://github.com/reanahub/reana-job-controller/issues/477)) ([9cdd06c](https://github.com/reanahub/reana-job-controller/commit/9cdd06c72faa5ded628b2766113ab37ac06f5868))
+
+
+### Features
+
+* **backends:** add new Compute4PUNCH backend ([#430](https://github.com/reanahub/reana-job-controller/issues/430)) ([4243252](https://github.com/reanahub/reana-job-controller/commit/42432522c8d9dd5e4ee908a16b1be87046908e08))
+
+
+### Bug fixes
+
+* **config:** read secret key from env ([#476](https://github.com/reanahub/reana-job-controller/issues/476)) ([1b5aa98](https://github.com/reanahub/reana-job-controller/commit/1b5aa98b0ed76ea614dac1209ba23b366d417d9f))
+* **config:** update reana-auth-vomsproxy to 1.2.1 to fix WLCG IAM ([#457](https://github.com/reanahub/reana-job-controller/issues/457)) ([132868f](https://github.com/reanahub/reana-job-controller/commit/132868f4824a0f4049febf17c90bea0df838e724))
+* **htcondorcern:** run provided command in unpacked image ([#474](https://github.com/reanahub/reana-job-controller/issues/474)) ([9cda591](https://github.com/reanahub/reana-job-controller/commit/9cda591affaa1f821409961ec4e379e1bf5fa248)), closes [#471](https://github.com/reanahub/reana-job-controller/issues/471)
+* **htcondorcern:** support multiline commands ([#474](https://github.com/reanahub/reana-job-controller/issues/474)) ([eb07aa9](https://github.com/reanahub/reana-job-controller/commit/eb07aa9b7b03d38dd47cd004ff8b48440ad45c2a)), closes [#470](https://github.com/reanahub/reana-job-controller/issues/470)
+* **kubernetes:** avoid privilege escalation in Kubernetes jobs ([#476](https://github.com/reanahub/reana-job-controller/issues/476)) ([389f0ea](https://github.com/reanahub/reana-job-controller/commit/389f0ea9606d4ac5fa24458b7cef39e8ab430c64))
+
 ## [0.9.3](https://github.com/reanahub/reana-job-controller/compare/0.9.2...0.9.3) (2024-03-04)
 
 

@@ -63,7 +63,6 @@ def create_app(config_mapping=None):
     )
 
     app = Flask(__name__)
-    app.secret_key = "mega secret key"
     app.session = Session
     app.config.from_object(config)
     if config_mapping:

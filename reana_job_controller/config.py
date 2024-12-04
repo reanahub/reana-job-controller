@@ -10,6 +10,7 @@
 
 from distutils.util import strtobool
 import os
+import secrets
 
 from reana_commons.config import REANA_COMPONENT_PREFIX
 
@@ -19,6 +20,13 @@ REANA_DB_CLOSE_POOL_CONNECTIONS = bool(
     strtobool(os.getenv("REANA_DB_CLOSE_POOL_CONNECTIONS", "false"))
 )
 """Determine whether to close each database connection when it is returned to the pool."""
+
+SECRET_KEY = os.getenv("REANA_SECRET_KEY", secrets.token_hex())
+"""Secret key used for the application user sessions.
+
+A new random key is generated on every start of job-controller, but this is not an
+issues as job-controller is never restarted (and thus the secret never changes)
+during the execution of a single workflow."""
 
 CACHE_ENABLED = False
 """Determines if jobs caching is enabled."""
@@ -39,6 +47,9 @@ COMPUTE_BACKENDS = {
     "slurmcern": lambda: import_string(
         "reana_job_controller.slurmcern_job_manager.SlurmJobManagerCERN"
     ),
+    "compute4punch": lambda: import_string(
+        "reana_job_controller.compute4punch_job_manager.Compute4PUNCHJobManager"
+    ),
 }
 """Supported job compute backends and corresponding management class."""
 
@@ -51,6 +62,9 @@ JOB_MONITORS = {
     ),
     "slurmcern": lambda: import_string(
         "reana_job_controller.job_monitor.JobMonitorSlurmCERN"
+    ),
+    "compute4punch": lambda: import_string(
+        "reana_job_controller.job_monitor.JobMonitorCompute4PUNCH"
     ),
 }
 """Classes responsible for monitoring specific backend jobs"""
@@ -66,7 +80,7 @@ SUPPORTED_COMPUTE_BACKENDS = os.getenv(
 
 
 VOMSPROXY_CONTAINER_IMAGE = os.getenv(
-    "VOMSPROXY_CONTAINER_IMAGE", "docker.io/reanahub/reana-auth-vomsproxy:1.2.0"
+    "VOMSPROXY_CONTAINER_IMAGE", "docker.io/reanahub/reana-auth-vomsproxy:1.3.0"
 )
 """Default docker image of VOMSPROXY sidecar container."""
 
@@ -165,3 +179,32 @@ SLURM_SSH_AUTH_TIMEOUT = float(os.getenv("SLURM_SSH_AUTH_TIMEOUT", "60"))
 
 REANA_USER_ID = os.getenv("REANA_USER_ID")
 """User UUID of the owner of the workflow."""
+
+C4P_LOGIN_NODE_HOSTNAME = os.getenv("C4P_LOGIN_NODE", "c4p-login.gridka.de")
+"""Hostname of C4P login node used for job management via SSH."""
+
+C4P_LOGIN_NODE_PORT = os.getenv("C4P_LOGIN_NODE_PORT", "22")
+"""Port of C4P login node."""
+
+C4P_SSH_TIMEOUT = float(os.getenv("C4P_SSH_TIMEOUT", "60"))
+"""Seconds to wait for C4P SSH TCP connection."""
+
+C4P_SSH_BANNER_TIMEOUT = float(os.getenv("C4P_SSH_BANNER_TIMEOUT", "60"))
+"""Seconds to wait for C4P SSH banner to be presented."""
+
+C4P_SSH_AUTH_TIMEOUT = float(os.getenv("C4P_SSH_AUTH_TIMEOUT", "60"))
+"""Seconds to wait for C4P SSH authentication response."""
+
+C4P_CPU_CORES = os.getenv("C4P_CPU_CORES", "8")
+"""Number of CPU cores used to run the REANA jobs."""
+
+C4P_MEMORY_LIMIT = os.getenv("C4P_MEMORY_LIMIT", "20000")
+"""Maximum amount memory used by the REANA jobs."""
+
+C4P_ADDITIONAL_REQUIREMENTS = os.getenv("C4P_ADDITIONAL_REQUIREMENTS", "")
+"""Additional requirements to run the REANA jobs on C4P nodes."""
+
+C4P_REANA_REL_WORKFLOW_PATH = os.getenv(
+    "C4P_REANA_REL_WORKFLOW_PATH", "reana/workflows"
+)
+"""Path relative to the uses home directory of the REANA workflow space on the C4P login node."""
