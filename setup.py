@@ -39,9 +39,10 @@ extras_require = {
     "tests": [
         "pytest-reana>=0.95.0a4,<0.96.0",
     ],
-    "ssh": [
-        "paramiko[gssapi]>=3.0.0",
-        "gssapi==1.8.2",  # matches version in Dockerfile
+    "ssh": ["paramiko[gssapi]>=3.2.0"],
+    "mytoken": [
+        "pyjwt>=2.8.0",
+        "libmytoken>=0.1.0",
     ],
 }
 

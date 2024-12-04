@@ -39,6 +39,15 @@
     },
     "JobRequest": {
       "properties": {
+        "c4p_additional_requirements": {
+          "type": "string"
+        },
+        "c4p_cpu_cores": {
+          "type": "string"
+        },
+        "c4p_memory_limit": {
+          "type": "string"
+        },
         "cmd": {
           "default": "",
           "type": "string"

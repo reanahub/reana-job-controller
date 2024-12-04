@@ -9,6 +9,7 @@
 import base64
 import logging
 import os
+import shlex
 import threading
 from shutil import copyfile
 
@@ -163,7 +164,7 @@ class HTCondorJobManagerCERN(JobManager):
             # Take only the user's command, removes the change directory to workflow workspace
             # added by RWE-Serial/Snakemake since HTCondor implementation does not need it.
             # E.g. "cd /path/to/workspace ; user-command" -> "user-command"
-            base_cmd = " ".join(self.cmd.split()[3:])
+            base_cmd = self.cmd.split(maxsplit=3)[3]
             if self.workflow.type_ == "snakemake":
                 # For Snakemake workflows, also remove the workspace path from
                 # `jobfinished` and `jobfailed` touch commands.
@@ -235,9 +236,10 @@ class HTCondorJobManagerCERN(JobManager):
                     "--bind $PWD:/srv "
                     "--bind /cvmfs "
                     "--bind /eos "
-                    "{DOCKER_IMG} {CMD}".format(
+                    "{DOCKER_IMG} "
+                    "bash -c {CMD}".format(
                         DOCKER_IMG=self.docker_img,
-                        CMD=self._format_arguments() + " | bash",
+                        CMD=shlex.quote(self._format_arguments() + " | bash"),
                     )
                 )
                 f = open("job_singularity_wrapper.sh", "w")
