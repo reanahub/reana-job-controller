@@ -61,7 +61,7 @@ install_requires = [
     "apispec-webframeworks",
     "Flask>=2.1.1,<2.3.0",  # same upper pin as invenio-base/reana-server
     "Werkzeug>=2.1.0,<2.3.0",  # same upper pin as invenio-base
-    "jinja2<3.1.0",
+    "jinja2<3.2.0",
     "fs>=2.0",
     "marshmallow>2.13.0,<3.0.0",  # same upper pin as reana-server
     "reana-commons[kubernetes]>=0.95.0a7,<0.96.0",
