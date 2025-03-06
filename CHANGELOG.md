@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.5](https://github.com/reanahub/reana-job-controller/compare/0.9.4...0.9.5) (2025-03-06)
+
+
+### Bug fixes
+
+* **config:** update reana-auth-vomsproxy to 1.3.1 to fix WLCG IAM ([#481](https://github.com/reanahub/reana-job-controller/issues/481)) ([48c362f](https://github.com/reanahub/reana-job-controller/commit/48c362fc975d9ee0e18af2f4fcd5ede6ed923134))
+
 ## [0.9.4](https://github.com/reanahub/reana-job-controller/compare/0.9.3...0.9.4) (2024-11-29)
 
 
