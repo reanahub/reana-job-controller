@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2019, 2020, 2021, 2022, 2023 CERN.
+# Copyright (C) 2019, 2020, 2021, 2022, 2023, 2025 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -15,7 +15,12 @@ import mock
 import pytest
 from reana_db.models import Job, JobStatus
 from reana_commons.config import KRB5_INIT_CONTAINER_NAME, KRB5_RENEW_CONTAINER_NAME
-
+from reana_commons.errors import (
+    REANAKubernetesCPULimitExceeded,
+    REANAKubernetesWrongCPUFormat,
+    REANAKubernetesMemoryLimitExceeded,
+    REANAKubernetesWrongMemoryFormat,
+)
 from reana_job_controller.job_manager import JobManager
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 
@@ -180,3 +185,150 @@ def test_kubernetes_get_job_logs(
         assert (k8s_logs or pod_logs) in KubernetesJobManager.get_logs(
             job_pod.metadata.labels["job-name"], job_pod=job_pod
         )
+
+
+@pytest.mark.parametrize(
+    "cpu_request,max_cpu_request,should_raise,expected_value",
+    [
+        ("100m", "200m", False, "100m"),  # Valid request
+        ("0.1", "0.2", False, "0.1"),  # Valid decimal format
+        ("invalid", None, True, None),  # Invalid format
+        ("300m", "200m", True, None),  # Exceeds limit
+        (None, None, False, None),  # No request specified
+    ],
+)
+def test_set_cpu_request(
+    app, monkeypatch, cpu_request, max_cpu_request, should_raise, expected_value
+):
+    """Test CPU request validation and setting."""
+    if max_cpu_request:
+
+        monkeypatch.setattr(
+            "reana_job_controller.kubernetes_job_manager.REANA_KUBERNETES_JOBS_MAX_USER_CPU_REQUEST",
+            max_cpu_request,
+        )
+
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+    )
+
+    if should_raise:
+        with pytest.raises(
+            (REANAKubernetesWrongCPUFormat, REANAKubernetesCPULimitExceeded)
+        ):
+            job_manager.set_cpu_request(cpu_request)
+    else:
+        job_manager.set_cpu_request(cpu_request)
+        assert job_manager.kubernetes_cpu_request == expected_value
+
+
+@pytest.mark.parametrize(
+    "cpu_limit,max_cpu_limit,should_raise,expected_value",
+    [
+        ("100m", "200m", False, "100m"),  # Valid limit
+        ("0.1", "0.2", False, "0.1"),  # Valid decimal format
+        ("invalid", None, True, None),  # Invalid format
+        ("300m", "200m", True, None),  # Exceeds limit
+        (None, None, False, None),  # No limit specified
+    ],
+)
+def test_set_cpu_limit(
+    app, monkeypatch, cpu_limit, max_cpu_limit, should_raise, expected_value
+):
+    """Test CPU limit validation and setting."""
+    if max_cpu_limit:
+
+        monkeypatch.setattr(
+            "reana_job_controller.kubernetes_job_manager.REANA_KUBERNETES_JOBS_MAX_USER_CPU_LIMIT",
+            max_cpu_limit,
+        )
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+    )
+
+    if should_raise:
+        with pytest.raises(
+            (REANAKubernetesWrongCPUFormat, REANAKubernetesCPULimitExceeded)
+        ):
+            job_manager.set_cpu_limit(cpu_limit)
+    else:
+        job_manager.set_cpu_limit(cpu_limit)
+        assert job_manager.kubernetes_cpu_limit == expected_value
+
+
+@pytest.mark.parametrize(
+    "memory_request,max_memory_request,should_raise,expected_value",
+    [
+        ("100Mi", "200Mi", False, "100Mi"),  # Valid request
+        ("1Gi", "2Gi", False, "1Gi"),  # Valid gigabyte format
+        ("invalid", None, True, None),  # Invalid format
+        ("300Mi", "200Mi", True, None),  # Exceeds limit
+        (None, None, False, None),  # No request specified
+    ],
+)
+def test_set_memory_request(
+    app, monkeypatch, memory_request, max_memory_request, should_raise, expected_value
+):
+    """Test memory request validation and setting."""
+    if max_memory_request:
+
+        monkeypatch.setattr(
+            "reana_job_controller.kubernetes_job_manager.REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_REQUEST",
+            max_memory_request,
+        )
+
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+    )
+
+    if should_raise:
+        with pytest.raises(
+            (REANAKubernetesWrongMemoryFormat, REANAKubernetesMemoryLimitExceeded)
+        ):
+            job_manager.set_memory_request(memory_request)
+    else:
+        job_manager.set_memory_request(memory_request)
+        assert job_manager.kubernetes_memory_request == expected_value
+
+
+@pytest.mark.parametrize(
+    "memory_limit,max_memory_limit,should_raise,expected_value",
+    [
+        ("100Mi", "200Mi", False, "100Mi"),  # Valid limit
+        ("1Gi", "2Gi", False, "1Gi"),  # Valid gigabyte format
+        ("invalid", None, True, None),  # Invalid format
+        ("300Mi", "200Mi", True, None),  # Exceeds limit
+        (None, None, False, None),  # No limit specified
+    ],
+)
+def test_set_memory_limit(
+    app, monkeypatch, memory_limit, max_memory_limit, should_raise, expected_value
+):
+    """Test memory limit validation and setting."""
+    if max_memory_limit:
+
+        monkeypatch.setattr(
+            "reana_job_controller.kubernetes_job_manager.REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT",
+            max_memory_limit,
+        )
+
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+    )
+
+    if should_raise:
+        with pytest.raises(
+            (REANAKubernetesWrongMemoryFormat, REANAKubernetesMemoryLimitExceeded)
+        ):
+            job_manager.set_memory_limit(memory_limit)
+    else:
+        job_manager.set_memory_limit(memory_limit)
+        assert job_manager.kubernetes_memory_limit == expected_value

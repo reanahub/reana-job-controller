@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -109,8 +109,59 @@ RUCIO_CERN_BUNDLE_CACHE_FILENAME = "CERN-bundle.pem"
 IMAGE_PULL_SECRETS = os.getenv("IMAGE_PULL_SECRETS", "").split(",")
 """Docker image pull secrets which allow the usage of private images."""
 
+REANA_KUBERNETES_JOBS_CPU_REQUEST = os.getenv("REANA_KUBERNETES_JOBS_CPU_REQUEST")
+"""Default cpu request for user job containers.
+
+Please see the following URL for possible values
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-cpu.
+"""
+
+REANA_KUBERNETES_JOBS_CPU_LIMIT = os.getenv("REANA_KUBERNETES_JOBS_CPU_LIMIT")
+"""Default cpu limit for user job containers. Exceeding this limit will terminate the container.
+
+Please see the following URL for possible values
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-cpu.
+"""
+
+REANA_KUBERNETES_JOBS_MEMORY_REQUEST = os.getenv("REANA_KUBERNETES_JOBS_MEMORY_REQUEST")
+"""Default memory request for user job containers.
+
+Please see the following URL for possible values
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory.
+"""
+
 REANA_KUBERNETES_JOBS_MEMORY_LIMIT = os.getenv("REANA_KUBERNETES_JOBS_MEMORY_LIMIT")
-"""Maximum default memory limit for user job containers. Exceeding this limit will terminate the container.
+"""Default memory limit for user job containers. Exceeding this limit will terminate the container.
+
+Please see the following URL for possible values
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory.
+"""
+
+REANA_KUBERNETES_JOBS_MAX_USER_CPU_REQUEST = os.getenv(
+    "REANA_KUBERNETES_JOBS_MAX_USER_CPU_REQUEST"
+)
+"""Maximum custom CPU request that users can assign to their job containers via
+``kubernetes_cpu_request`` in reana.yaml.
+
+Please see the following URL for possible values
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-cpu.
+"""
+
+REANA_KUBERNETES_JOBS_MAX_USER_CPU_LIMIT = os.getenv(
+    "REANA_KUBERNETES_JOBS_MAX_USER_CPU_LIMIT"
+)
+"""Maximum custom CPU limit that users can assign to their job containers via
+``kubernetes_cpu_limit`` in reana.yaml. Exceeding this limit will terminate the container.
+
+Please see the following URL for possible values
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-cpu.
+"""
+
+REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_REQUEST = os.getenv(
+    "REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_REQUEST"
+)
+"""Maximum custom memory request that users can assign to their job containers via
+``kubernetes_memory_request`` in reana.yaml.
 
 Please see the following URL for possible values
 https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory.

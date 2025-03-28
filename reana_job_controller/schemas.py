@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2025 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -49,6 +49,9 @@ class JobRequest(Schema):
     voms_proxy = fields.Bool(required=False)
     rucio = fields.Bool(required=False)
     kubernetes_uid = fields.Int(required=False)
+    kubernetes_cpu_request = fields.Str(required=False)
+    kubernetes_cpu_limit = fields.Str(required=False)
+    kubernetes_memory_request = fields.Str(required=False)
     kubernetes_memory_limit = fields.Str(required=False)
     kubernetes_job_timeout = fields.Int(required=False)
     unpacked_img = fields.Bool(required=False)
