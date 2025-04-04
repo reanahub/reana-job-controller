@@ -18,6 +18,8 @@ from sqlalchemy.exc import OperationalError
 from reana_commons.errors import (
     REANAKubernetesMemoryLimitExceeded,
     REANAKubernetesWrongMemoryFormat,
+    REANAKubernetesCPULimitExceeded,
+    REANAKubernetesWrongCPUFormat,
 )
 
 from reana_db.models import JobStatus
@@ -273,6 +275,10 @@ def create_job():  # noqa
         job_manager_cls = current_app.config["COMPUTE_BACKENDS"][compute_backend]()
         try:
             job_obj = job_manager_cls(**job_request)
+        except REANAKubernetesCPULimitExceeded as e:
+            return jsonify({"message": e.message}), 403
+        except REANAKubernetesWrongCPUFormat as e:
+            return jsonify({"message": e.message}), 400
         except REANAKubernetesMemoryLimitExceeded as e:
             return jsonify({"message": e.message}), 403
         except REANAKubernetesWrongMemoryFormat as e:
