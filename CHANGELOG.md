@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.9.5](https://github.com/reanahub/reana-job-controller/compare/0.9.4...0.9.5) (2025-04-25)
+
+
+### Build
+
+* **deps:** update reana-auth-vomsproxy to 1.3.1 ([#486](https://github.com/reanahub/reana-job-controller/issues/486)) ([dacbfa0](https://github.com/reanahub/reana-job-controller/commit/dacbfa03490d0374701664e77dbaf70a8a00e3fc))
+
+
+### Features
+
+* **kubernetes:** add resource settings in Kubernetes jobs ([#484](https://github.com/reanahub/reana-job-controller/issues/484)) ([4753ce2](https://github.com/reanahub/reana-job-controller/commit/4753ce227efa2bd5b48046d0e650569a0c91abf4))
+
+
+### Continuous integration
+
+* **runners:** upgrade CI runners to Ubuntu 22.04 ([#486](https://github.com/reanahub/reana-job-controller/issues/486)) ([bfbbd7c](https://github.com/reanahub/reana-job-controller/commit/bfbbd7c63e12ca3f56cc13fd356c3db389af7bf7))
+
 ## [0.9.4](https://github.com/reanahub/reana-job-controller/compare/0.9.3...0.9.4) (2024-11-29)
 
 
