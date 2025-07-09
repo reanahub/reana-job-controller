@@ -129,6 +129,10 @@ check_pytest () {
     stop_db_container
 }
 
+check_yamllint() {
+    yamllint .
+}
+
 check_dockerfile () {
     docker run -i --rm docker.io/hadolint/hadolint:v2.12.0 < Dockerfile
 }
@@ -146,6 +150,7 @@ check_all () {
     check_openapi_spec
     check_manifest
     check_sphinx
+    check_yamllint
 }
 
 check_all_darwin () {
@@ -195,6 +200,7 @@ case $arg in
     --check-manifest) check_manifest;;
     --check-sphinx) check_sphinx;;
     --check-pytest) check_pytest;;
+    --check-yamllint) check_yamllint;;
     --check-all) check_all;;
     --check-dockerfile) check_dockerfile;;
     --check-docker-build) check_docker_build;;

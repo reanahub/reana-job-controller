@@ -7,6 +7,7 @@ The list of contributors in alphabetical order:
 - [Alp Tuna](https://orcid.org/0009-0001-1915-3993)
 - [Anton Khodak](https://orcid.org/0000-0003-3263-4553)
 - [Audrius Mecionis](https://orcid.org/0000-0002-3759-1663)
+- [Cameron McClymont](https://orcid.org/0009-0002-0176-5251)
 - [Chris Hollowell](https://orcid.org/0000-0003-1239-111X)
 - [Cody Kankel](https://github.com/CodyKank)
 - [Diego Rodriguez](https://orcid.org/0000-0003-0649-2002)
