@@ -119,6 +119,10 @@ check_sphinx() {
     sphinx-build -qnN docs docs/_build/html
 }
 
+check_jsonlint() {
+    find . -name "*.json" -exec jsonlint -q {} \+
+}
+
 check_shfmt() {
     shfmt -d .
 }
@@ -154,6 +158,7 @@ check_all() {
     check_sphinx
     check_yamllint
     check_shfmt
+    check_jsonlint
 }
 
 check_all_darwin() {
@@ -202,6 +207,7 @@ case $arg in
 --check-openapi-spec) check_openapi_spec ;;
 --check-manifest) check_manifest ;;
 --check-sphinx) check_sphinx ;;
+--check-jsonlint) check_jsonlint ;;
 --check-pytest) check_pytest ;;
 --check-shfmt) check_shfmt ;;
 --check-yamllint) check_yamllint ;;
