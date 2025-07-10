@@ -1,3 +1,6 @@
+<!-- markdownlint-disable MD041 -->
+<!-- markdownlint-disable MD033 -->
+
 ```{include} ../README.md
 :end-before: "## About"
 ```
@@ -49,6 +52,7 @@ argument `COMPUTE_BACKENDS=kubernetes,htcondorcern`.
 $ reana-dev docker-build -c reana-job-controller \
   -b COMPUTE_BACKENDS=kubernetes,htcondorcern
 ```
+
 :::
 
 ### Slurm
@@ -66,6 +70,7 @@ argument `COMPUTE_BACKENDS=kubernetes,slurmcern`.
 $ reana-dev docker-build -c reana-job-controller \
   -b COMPUTE_BACKENDS=kubernetes,slurmcern
 ```
+
 :::
 
 :::{note}
@@ -75,7 +80,8 @@ Please note that CERN Slurm cluster access is not granted by
 
 ## REST API
 
-The REANA Job Controller API offers different endpoints to create, manage and monitor jobs.
+The REANA Job Controller API offers different endpoints to create, manage and
+monitor jobs.
 Detailed REST API documentation can be found <a href="_static/api.html">here</a>.
 
 ```{eval-rst}
