@@ -13,7 +13,7 @@ echo "command to execute:"
 # shellcheck disable=SC2068,SC2294
 eval $@
 
-echo "$@" "|bash" > "$tmpjob"
+echo "$@" "|bash" >"$tmpjob"
 bash "$tmpjob"
 res=$?
 rm "$tmpjob"
