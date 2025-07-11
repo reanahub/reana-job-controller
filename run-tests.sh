@@ -131,6 +131,10 @@ check_markdownlint() {
     markdownlint-cli2 "**/*.md" -i "node_modules/**"
 }
 
+check_prettier() {
+    prettier -c .
+}
+
 check_pytest() {
     clean_old_db_container
     start_db_container
@@ -164,6 +168,7 @@ check_all() {
     check_shfmt
     check_jsonlint
     check_markdownlint
+    check_prettier
 }
 
 check_all_darwin() {
@@ -215,6 +220,7 @@ case $arg in
 --check-jsonlint) check_jsonlint ;;
 --check-pytest) check_pytest ;;
 --check-shfmt) check_shfmt ;;
+--check-prettier) check_prettier ;;
 --check-markdownlint) check_markdownlint ;;
 --check-yamllint) check_yamllint ;;
 --check-all) check_all ;;

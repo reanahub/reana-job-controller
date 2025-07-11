@@ -23,6 +23,7 @@ compute backends.
 ```
 
 ```{image} /_static/reana-job-manager.png
+
 ```
 
 ### Kubernetes
@@ -32,10 +33,8 @@ compute backends.
    :members:
 ```
 
-:::{note}
-REANA-Job-Controller supports the Kubernetes job manager by default, no need
-to pass any build argument.
-:::
+Note that REANA-Job-Controller supports the Kubernetes job manager by default,
+no need to pass any build argument.
 
 ### HTCondor
 
@@ -44,16 +43,14 @@ to pass any build argument.
    :members:
 ```
 
-:::{note}
-To build REANA-Job-Controller Docker image with HTCondor dependencies use build
-argument `COMPUTE_BACKENDS=kubernetes,htcondorcern`.
+Note that in order to build REANA-Job-Controller Docker image with HTCondor
+dependencies, you need to use a build argument
+`COMPUTE_BACKENDS=kubernetes,htcondorcern`:
 
 ```console
 $ reana-dev docker-build -c reana-job-controller \
   -b COMPUTE_BACKENDS=kubernetes,htcondorcern
 ```
-
-:::
 
 ### Slurm
 
@@ -62,27 +59,20 @@ $ reana-dev docker-build -c reana-job-controller \
    :members:
 ```
 
-:::{note}
-To build REANA-Job-Controller Docker image with Slum dependencies use build
-argument `COMPUTE_BACKENDS=kubernetes,slurmcern`.
+Note that in order to build REANA-Job-Controller Docker image with Slurm
+dependencies, you need to use a build argument
+`COMPUTE_BACKENDS=kubernetes,slurmcern`:
 
 ```console
 $ reana-dev docker-build -c reana-job-controller \
   -b COMPUTE_BACKENDS=kubernetes,slurmcern
 ```
 
-:::
-
-:::{note}
-Please note that CERN Slurm cluster access is not granted by
-[default](https://batchdocs.web.cern.ch/linuxhpc/access.html).
-:::
-
 ## REST API
 
 The REANA Job Controller API offers different endpoints to create, manage and
-monitor jobs.
-Detailed REST API documentation can be found <a href="_static/api.html">here</a>.
+monitor jobs. Detailed REST API documentation can be found
+<a href="_static/api.html">here</a>.
 
 ```{eval-rst}
 .. automodule:: reana_job_controller.rest

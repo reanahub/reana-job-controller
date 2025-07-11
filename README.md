@@ -10,8 +10,8 @@
 ## About
 
 REANA-Job-Controller is a component of the [REANA](http://www.reana.io/)
-reusable and reproducible research data analysis platform. It takes care
-of executing and managing jobs on compute clouds.
+reusable and reproducible research data analysis platform. It takes care of
+executing and managing jobs on compute clouds.
 
 ## Features
 

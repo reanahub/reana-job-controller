@@ -34,3 +34,5 @@ recursive-include etc *.yaml
 recursive-include etc *.sh
 include etc/ngbauth-submit
 include krb5/Dockerfile
+exclude .editorconfig
+exclude .prettierignore
