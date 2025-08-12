@@ -177,6 +177,12 @@ SLURM_SSH_BANNER_TIMEOUT = float(os.getenv("SLURM_SSH_BANNER_TIMEOUT", "60"))
 SLURM_SSH_AUTH_TIMEOUT = float(os.getenv("SLURM_SSH_AUTH_TIMEOUT", "60"))
 """Seconds to wait for SLURM SSH authentication response."""
 
+USE_KUEUE = bool(strtobool(os.getenv("USE_KUEUE", "False")))
+"""Whether to use Kueue to manage job execution."""
+
+KUEUE_LOCAL_QUEUE_NAME = "local-queue-job"
+"""Name of the local queue to be used by Kueue."""
+
 REANA_USER_ID = os.getenv("REANA_USER_ID")
 """User UUID of the owner of the workflow."""
 
