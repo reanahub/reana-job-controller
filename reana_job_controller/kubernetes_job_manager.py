@@ -52,6 +52,8 @@ from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_MEMORY_LIMIT,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT,
     REANA_USER_ID,
+    USE_KUEUE,
+    KUEUE_LOCAL_QUEUE_NAME,
 )
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
@@ -155,12 +157,18 @@ class KubernetesJobManager(JobManager):
     def execute(self):
         """Execute a job in Kubernetes."""
         backend_job_id = build_unique_component_name("run-job")
+
         self.job = {
             "kind": "Job",
             "apiVersion": "batch/v1",
             "metadata": {
                 "name": backend_job_id,
                 "namespace": REANA_RUNTIME_KUBERNETES_NAMESPACE,
+                "labels": (
+                    {"kueue.x-k8s.io/queue-name": KUEUE_LOCAL_QUEUE_NAME}
+                    if USE_KUEUE
+                    else {}
+                ),
             },
             "spec": {
                 "backoffLimit": KubernetesJobManager.MAX_NUM_JOB_RESTARTS,

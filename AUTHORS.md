@@ -25,3 +25,4 @@ The list of contributors in alphabetical order:
 - [Sinclert Perez](https://www.linkedin.com/in/sinclert)
 - [Tibor Simko](https://orcid.org/0000-0001-7202-5803)
 - [Vladyslav Moisieienkov](https://orcid.org/0000-0001-9717-0775)
+- [Xavier Tintin](https://orcid.org/0000-0002-3150-9112)
