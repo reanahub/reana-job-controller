@@ -13,9 +13,8 @@ import uuid
 
 import mock
 import pytest
-from reana_db.models import Job, JobStatus
 from reana_commons.config import KRB5_INIT_CONTAINER_NAME, KRB5_RENEW_CONTAINER_NAME
-
+from reana_db.models import Job, JobStatus
 from reana_job_controller.job_manager import JobManager
 from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 
