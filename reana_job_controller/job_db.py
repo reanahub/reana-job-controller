@@ -115,10 +115,10 @@ def retrieve_job_logs(job_id):
 
 
 def store_job_logs(job_id, logs):
-    """Store job logs.
+    """Store job logs in the database.
 
     :param job_id: Internal REANA job ID.
-    :param logs: Job logs.
+    :param logs: Job logs to store.
     :type job_id: str
     :type logs: str
     """

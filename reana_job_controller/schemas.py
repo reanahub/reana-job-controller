@@ -50,6 +50,7 @@ class JobRequest(Schema):
     rucio = fields.Bool(required=False)
     kubernetes_uid = fields.Int(required=False)
     kubernetes_memory_limit = fields.Str(required=False)
+    kubernetes_queue = fields.Str(required=False)
     kubernetes_job_timeout = fields.Int(required=False)
     unpacked_img = fields.Bool(required=False)
     htcondor_max_runtime = fields.Str(required=False)

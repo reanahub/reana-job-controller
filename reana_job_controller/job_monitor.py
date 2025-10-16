@@ -17,8 +17,7 @@ from typing import Optional, Dict
 from kubernetes import client, watch
 from reana_commons.config import REANA_RUNTIME_KUBERNETES_NAMESPACE
 from reana_commons.k8s.api_client import current_k8s_corev1_api_client
-from reana_db.database import Session
-from reana_db.models import Job, JobStatus
+from reana_db.models import JobStatus
 
 from reana_job_controller.config import (
     COMPUTE_BACKENDS,
@@ -32,10 +31,11 @@ from reana_job_controller.config import (
     C4P_SSH_TIMEOUT,
     C4P_SSH_BANNER_TIMEOUT,
     C4P_SSH_AUTH_TIMEOUT,
+    KUEUE_ENABLED,
+    KUEUE_DEFAULT_QUEUE,
 )
 
 from reana_job_controller.job_db import JOB_DB, store_job_logs, update_job_status
-from reana_job_controller.kubernetes_job_manager import KubernetesJobManager
 from reana_job_controller.utils import (
     SSHClient,
     singleton,
@@ -104,7 +104,8 @@ class JobMonitorKubernetes(JobMonitor):
         remaining_jobs = self._get_remaining_jobs()
         return remaining_jobs[backend_job_id]
 
-    def get_backend_job_id(self, job_pod):
+    @staticmethod
+    def get_backend_job_id(job_pod):
         """Get the backend job id for the backend object.
 
         :param job_pod: Compute backend job object (Kubernetes V1Pod
@@ -115,7 +116,7 @@ class JobMonitorKubernetes(JobMonitor):
         """
         return job_pod.metadata.labels["job-name"]
 
-    def should_process_job(self, job_pod) -> bool:
+    def should_process_job_pod(self, job_pod) -> bool:
         """Decide whether the job should be processed or not.
 
         Each job is processed only once, when it reaches a final state (either `failed` or `finished`).
@@ -138,6 +139,29 @@ class JobMonitorKubernetes(JobMonitor):
             JobStatus.finished.name,
             JobStatus.failed.name,
         ]
+
+        return is_job_in_remaining_jobs and is_job_completed
+
+    def should_process_job(self, job) -> bool:
+        """Decide whether the job should be processed or not.
+
+        Each job is processed only once, when it reaches a final state (either `failed` or `finished`).
+
+        :param job: Compute backend job object (Kubernetes V1Job
+            https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1Job.md)
+        """
+        remaining_jobs = self._get_remaining_jobs(
+            statuses_to_skip=[
+                JobStatus.finished.name,
+                JobStatus.failed.name,
+                JobStatus.stopped.name,
+            ]
+        )
+
+        is_job_in_remaining_jobs = job.metadata.name in remaining_jobs
+        is_job_completed = not job.status.active and (
+            job.status.succeeded or job.status.failed
+        )
 
         return is_job_in_remaining_jobs and is_job_completed
 
@@ -230,13 +254,77 @@ class JobMonitorKubernetes(JobMonitor):
 
         return status
 
-    def watch_jobs(self, job_db, app=None):
-        """Open stream connection to k8s apiserver to watch all jobs status.
+    def watch_job_event_stream(self):
+        """
+        Watch job events from the Kubernetes API.
 
-        :param job_db: Dictionary which contains all current jobs.
+        This method is used when MultiKueue is enabled, since in that case we can't
+        directly monitor the worker pods as they are remote.
         """
         while True:
             logging.info("Starting a new stream request to watch Jobs")
+
+            try:
+                w = watch.Watch()
+                for event in w.stream(
+                    client.BatchV1Api().list_namespaced_job,
+                    namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
+                    label_selector=f"reana-run-job-workflow-uuid={self.workflow_uuid}",
+                ):
+                    logging.info(f"New Job event received: {event["type"]}")
+
+                    job = event["object"]
+                    job_id = job.metadata.name
+                    job_finished = (
+                        job.status.succeeded
+                        and not job.status.active
+                        and not job.status.failed
+                    )
+                    job_status = (
+                        JobStatus.finished.name
+                        if job_finished
+                        else (
+                            JobStatus.failed.name
+                            if job.status.failed
+                            else JobStatus.running.name
+                        )
+                    )
+
+                    if self.should_process_job(job):
+                        reana_job_id = self.get_reana_job_id(job_id)
+
+                        if job_status == JobStatus.failed.name:
+                            self.log_disruption(
+                                event["object"].status.conditions, job_id
+                            )
+
+                        # TODO: Fetch logs from the remote job pod on the remote worker when MultiKueue supports this
+                        logs = self.job_manager_cls.get_logs(job_id)
+                        if logs is not None:
+                            store_job_logs(reana_job_id, logs)
+
+                        update_job_status(
+                            reana_job_id,
+                            job_status,
+                        )
+
+                        if JobStatus.should_cleanup_job(job_status):
+                            self.clean_job(job_id)
+
+            except client.rest.ApiException as e:
+                logging.exception(f"Error from Kubernetes API while watching jobs: {e}")
+            except Exception as e:
+                logging.error(traceback.format_exc())
+                logging.error("Unexpected error: {}".format(e))
+
+    def watch_pod_event_stream(self):
+        """
+        Watch pod events from the Kubernetes API.
+
+        This method is used when MultiKueue is not enabled, since in that case we can
+        directly monitor the worker pods as they are running on the local cluster.
+        """
+        while True:
             try:
                 w = watch.Watch()
                 for event in w.stream(
@@ -249,7 +337,7 @@ class JobMonitorKubernetes(JobMonitor):
 
                     # Each job is processed once, when reaching a final state
                     # (either successfully or not)
-                    if self.should_process_job(job_pod):
+                    if self.should_process_job_pod(job_pod):
                         job_status = self.get_job_status(job_pod)
                         backend_job_id = self.get_backend_job_id(job_pod)
                         reana_job_id = self.get_reana_job_id(backend_job_id)
@@ -276,7 +364,20 @@ class JobMonitorKubernetes(JobMonitor):
                 logging.error(traceback.format_exc())
                 logging.error("Unexpected error: {}".format(e))
 
-    def log_disruption(self, conditions, backend_job_id):
+    def watch_jobs(self, job_db, app=None):
+        """Open stream connection to k8s apiserver to watch all jobs status.
+
+        :param job_db: Dictionary which contains all current jobs.
+        """
+        # If using MultiKueue, watch jobs instead of pods since worker pods could be
+        # running on a remote cluster that we can't directly monitor
+        if KUEUE_ENABLED:
+            self.watch_job_event_stream()
+        else:
+            self.watch_pod_event_stream()
+
+    @staticmethod
+    def log_disruption(conditions, backend_job_id):
         """Log disruption message from Kubernetes event conditions.
 
         Usually it is pod eviction but can be any of https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#pod-disruption-conditions.

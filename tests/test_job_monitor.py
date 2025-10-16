@@ -107,7 +107,10 @@ def test_kubernetes_should_process_job(
             "Succeeded", "Completed", job_id=backend_job_id
         )
 
-        assert bool(job_monitor_k8s.should_process_job(job_pod_event)) == should_process
+        assert (
+            bool(job_monitor_k8s.should_process_job_pod(job_pod_event))
+            == should_process
+        )
 
 
 @pytest.mark.parametrize(
@@ -166,3 +169,52 @@ def test_log_disruption_evicted(conditions, is_call_expected, expected_message):
             log_mock.assert_called_with(expected_message)
         else:
             log_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "job_succeeded,job_failed,job_active,compute_backend,deleted,should_process",
+    [
+        # Successful job - should be processed
+        (1, None, None, "kubernetes", False, True),
+        # Failed job - should be processed
+        (None, 1, None, "kubernetes", False, True),
+        # Active job (still running) - should not be processed
+        (None, None, 1, "kubernetes", False, False),
+        # Successful but still active - should not be processed
+        (1, None, 1, "kubernetes", False, False),
+        # Failed but still active - should not be processed
+        (None, 1, 1, "kubernetes", False, False),
+        # Successful job but already deleted - should not be processed
+        (1, None, None, "kubernetes", True, False),
+        # Failed job but already deleted - should not be processed
+        (None, 1, None, "kubernetes", True, False),
+        # Successful job but wrong backend - should not be processed
+        (1, None, None, "slurm", False, False),
+        # Failed job but wrong backend - should not be processed
+        (None, 1, None, "htcondor", False, False),
+    ],
+)
+def test_kubernetes_should_process_job_with_kueue(
+    app, job_succeeded, job_failed, job_active, compute_backend, deleted, should_process
+):
+    """Test should_process_job method for Kubernetes Job objects (used when KUEUE_ENABLED)."""
+    with mock.patch("reana_job_controller.job_monitor.threading"):
+        job_monitor_k8s = JobMonitorKubernetes(app=app)
+        job_id = str(uuid.uuid4())
+        backend_job_id = str(uuid.uuid4())
+        job_metadata = {
+            "deleted": deleted,
+            "compute_backend": compute_backend,
+            "status": "running",
+            "backend_job_id": backend_job_id,
+        }
+        job_monitor_k8s.job_db = {job_id: job_metadata}
+
+        # Create a mock Kubernetes Job object
+        job = mock.MagicMock()
+        job.metadata.name = backend_job_id
+        job.status.succeeded = job_succeeded
+        job.status.failed = job_failed
+        job.status.active = job_active
+
+        assert bool(job_monitor_k8s.should_process_job(job)) == should_process

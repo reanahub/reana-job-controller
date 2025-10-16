@@ -52,8 +52,8 @@ from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_MEMORY_LIMIT,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT,
     REANA_USER_ID,
-    USE_KUEUE,
-    KUEUE_LOCAL_QUEUE_NAME,
+    KUEUE_ENABLED,
+    KUEUE_DEFAULT_QUEUE,
 )
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
@@ -66,6 +66,13 @@ class KubernetesJobManager(JobManager):
     """Maximum number of job submission/creation tries """
     MAX_NUM_JOB_RESTARTS = 0
     """Maximum number of job restarts in case of internal failures."""
+
+    @property
+    def secrets(self):
+        """Get cached secrets if present, otherwise fetch them from k8s."""
+        if self._secrets is None:
+            self._secrets = UserSecretsStore.fetch(REANA_USER_ID)
+        return self._secrets
 
     def __init__(
         self,
@@ -81,6 +88,7 @@ class KubernetesJobManager(JobManager):
         kerberos=False,
         kubernetes_uid=None,
         kubernetes_memory_limit=None,
+        kubernetes_queue=None,
         voms_proxy=False,
         rucio=False,
         kubernetes_job_timeout: Optional[int] = None,
@@ -113,6 +121,8 @@ class KubernetesJobManager(JobManager):
         :type kubernetes_uid: int
         :param kubernetes_memory_limit: Memory limit for job container.
         :type kubernetes_memory_limit: str
+        :param kubernetes_queue: If Kueue is enabled of the MultiKueue LocalQueue to send jobs to.
+        :type kubernetes_queue: str
         :param kubernetes_job_timeout: Job timeout in seconds.
         :type kubernetes_job_timeout: int
         :param voms_proxy: Decides if a voms-proxy certificate should be
@@ -142,21 +152,30 @@ class KubernetesJobManager(JobManager):
         self.rucio = rucio
         self.set_user_id(kubernetes_uid)
         self.set_memory_limit(kubernetes_memory_limit)
+        self.kubernetes_queue = kubernetes_queue
         self.workflow_uuid = workflow_uuid
         self.kubernetes_job_timeout = kubernetes_job_timeout
         self._secrets: Optional[UserSecrets] = secrets
-
-    @property
-    def secrets(self):
-        """Get cached secrets if present, otherwise fetch them from k8s."""
-        if self._secrets is None:
-            self._secrets = UserSecretsStore.fetch(REANA_USER_ID)
-        return self._secrets
 
     @JobManager.execution_hook
     def execute(self):
         """Execute a job in Kubernetes."""
         backend_job_id = build_unique_component_name("run-job")
+
+        if KUEUE_ENABLED and not (self.kubernetes_queue or KUEUE_DEFAULT_QUEUE):
+            logging.error(
+                "Kueue is enabled but no queue name was provided. Please set a KUEUE_DEFAULT_QUEUE or ensure that all jobs set a value for kubernetes_queue in their spec."
+            )
+            raise
+
+        labels = {
+            "reana-run-job-workflow-uuid": self.workflow_uuid,
+        }
+
+        if KUEUE_ENABLED:
+            labels["kueue.x-k8s.io/queue-name"] = (
+                f"{self.kubernetes_queue or KUEUE_DEFAULT_QUEUE}-job-queue"
+            )
 
         self.job = {
             "kind": "Job",
@@ -164,11 +183,7 @@ class KubernetesJobManager(JobManager):
             "metadata": {
                 "name": backend_job_id,
                 "namespace": REANA_RUNTIME_KUBERNETES_NAMESPACE,
-                "labels": (
-                    {"kueue.x-k8s.io/queue-name": KUEUE_LOCAL_QUEUE_NAME}
-                    if USE_KUEUE
-                    else {}
-                ),
+                "labels": labels,
             },
             "spec": {
                 "backoffLimit": KubernetesJobManager.MAX_NUM_JOB_RESTARTS,
@@ -176,7 +191,7 @@ class KubernetesJobManager(JobManager):
                 "template": {
                     "metadata": {
                         "name": backend_job_id,
-                        "labels": {"reana-run-job-workflow-uuid": self.workflow_uuid},
+                        "labels": labels,
                     },
                     "spec": {
                         "automountServiceAccountToken": False,

@@ -12,8 +12,6 @@ from distutils.util import strtobool
 import os
 import secrets
 
-from reana_commons.config import REANA_COMPONENT_PREFIX
-
 from werkzeug.utils import import_string
 
 REANA_DB_CLOSE_POOL_CONNECTIONS = bool(
@@ -177,11 +175,11 @@ SLURM_SSH_BANNER_TIMEOUT = float(os.getenv("SLURM_SSH_BANNER_TIMEOUT", "60"))
 SLURM_SSH_AUTH_TIMEOUT = float(os.getenv("SLURM_SSH_AUTH_TIMEOUT", "60"))
 """Seconds to wait for SLURM SSH authentication response."""
 
-USE_KUEUE = bool(strtobool(os.getenv("USE_KUEUE", "False")))
+KUEUE_ENABLED = bool(strtobool(os.getenv("KUEUE_ENABLED", "False")))
 """Whether to use Kueue to manage job execution."""
 
-KUEUE_LOCAL_QUEUE_NAME = "local-queue-job"
-"""Name of the local queue to be used by Kueue."""
+KUEUE_DEFAULT_QUEUE = os.getenv("KUEUE_DEFAULT_QUEUE", "")
+"""Name of the default queue to be used by Kueue."""
 
 REANA_USER_ID = os.getenv("REANA_USER_ID")
 """User UUID of the owner of the workflow."""
