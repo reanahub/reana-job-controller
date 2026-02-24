@@ -240,3 +240,103 @@ def test_create_job_allows_vetted_images(app, job_spec, monkeypatch, vetting_con
 
     assert response.status_code == 400
     assert response.json == {"message": "Cannot create new jobs, shutting down"}
+
+
+@pytest.mark.parametrize(
+    "image",
+    ["/cvmfs/unpacked.cern.ch/registry.hub.docker.com/library/python:3.12", "a.sif"],
+)
+@pytest.mark.parametrize("enabled", [False, True])
+@patch("reana_job_controller.schemas.REANA_KUBERNETES_JOBS_TIMEOUT_LIMIT", "10")
+@patch(
+    "reana_job_controller.schemas.REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT", "20"
+)
+def test_create_job_apptainer_images_need_admin_setting(
+    app, job_spec, monkeypatch, image, enabled
+):
+    """Test that Kubernetes jobs refuse Apptainer images unless enabled."""
+    job_spec["compute_backend"] = "kubernetes"
+    job_spec["docker_img"] = image
+    job_spec["cmd"] = serialise_job_command("ls")
+    monkeypatch.setitem(app.config, "REANA_KUBERNETES_JOBS_APPTAINER_ENABLED", enabled)
+    monkeypatch.setitem(
+        app.config,
+        "REANA_VETTED_CONTAINER_IMAGES",
+        {"enabled": False, "allowlist": []},
+    )
+    monkeypatch.setitem(app.config, "SUPPORTED_COMPUTE_BACKENDS", ["kubernetes"])
+    monkeypatch.setitem(app.config, "COMPUTE_BACKENDS", {"kubernetes": lambda: Mock})
+
+    with (
+        patch(
+            "reana_job_controller.rest.get_cached_user_secrets",
+            return_value={},
+        ),
+        patch(
+            "reana_job_controller.rest.job_creation_condition.start_creation",
+            return_value=False,
+        ),
+        app.test_client() as client,
+    ):
+        response = client.post(
+            url_for("jobs.create_job"),
+            content_type="application/json",
+            data=json.dumps(job_spec),
+        )
+
+    if enabled:
+        assert response.json == {"message": "Cannot create new jobs, shutting down"}
+    else:
+        assert response.status_code == 403
+        assert "is not enabled on this cluster" in response.json["message"]
+
+
+@pytest.mark.parametrize(
+    "image,allowed",
+    [
+        ("my_tool.sif", False),
+        ("/var/reana/images/my_tool.sif", False),
+        ("/cvmfs/unpacked.cern.ch/images/my_tool.sif", True),
+    ],
+)
+@patch("reana_job_controller.schemas.REANA_KUBERNETES_JOBS_TIMEOUT_LIMIT", "10")
+@patch(
+    "reana_job_controller.schemas.REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT", "20"
+)
+def test_create_job_vetting_refuses_sif_files_outside_cvmfs(
+    app, job_spec, monkeypatch, image, allowed
+):
+    """Test that vetting accepts allowlisted SIF files only on CVMFS."""
+    job_spec["compute_backend"] = "test"
+    job_spec["docker_img"] = image
+    job_spec["cmd"] = serialise_job_command("ls")
+    monkeypatch.setitem(
+        app.config,
+        "REANA_VETTED_CONTAINER_IMAGES",
+        {"enabled": True, "allowlist": [image]},
+    )
+    monkeypatch.setitem(app.config, "SUPPORTED_COMPUTE_BACKENDS", ["test"])
+    monkeypatch.setitem(app.config, "COMPUTE_BACKENDS", {"test": lambda: Mock})
+
+    with (
+        patch(
+            "reana_job_controller.rest.get_cached_user_secrets",
+            return_value={},
+        ),
+        patch(
+            "reana_job_controller.rest.job_creation_condition.start_creation",
+            return_value=False,
+        ),
+        app.test_client() as client,
+    ):
+        response = client.post(
+            url_for("jobs.create_job"),
+            content_type="application/json",
+            data=json.dumps(job_spec),
+        )
+
+    if allowed:
+        assert response.json == {"message": "Cannot create new jobs, shutting down"}
+    else:
+        assert response.status_code == 403
+        assert "only SIF files on /cvmfs" in response.json["message"]
