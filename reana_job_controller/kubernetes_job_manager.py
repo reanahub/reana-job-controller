@@ -7,6 +7,7 @@
 """Kubernetes Job Manager."""
 
 import ast
+import base64
 import logging
 import os
 import traceback
@@ -47,6 +48,7 @@ from reana_commons.k8s.api_client import (
 from reana_commons.k8s.kerberos import get_kerberos_k8s_config
 from reana_commons.k8s.secrets import UserSecretsStore, UserSecrets
 from reana_commons.k8s.volumes import (
+    extract_cvmfs_repository,
     get_k8s_cvmfs_volumes,
     get_reana_shared_volume,
     get_workspace_volume,
@@ -64,6 +66,8 @@ from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_REQUEST,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT,
     REANA_KUBERNETES_JOBS_MIN_USER_UID,
+    REANA_UNPACKED_IMAGE_RUNNER,
+    REANA_UNPACKED_IMAGE_RUNNER_COMMAND,
     REANA_USER_ID,
     KUEUE_ENABLED,
     KUEUE_LOCAL_QUEUE_NAME,
@@ -97,6 +101,7 @@ class KubernetesJobManager(JobManager):
         kubernetes_cpu_limit=None,
         kubernetes_memory_request=None,
         kubernetes_memory_limit=None,
+        unpacked_img=None,
         voms_proxy=False,
         rucio=False,
         kubernetes_job_timeout: Optional[int] = None,
@@ -129,6 +134,10 @@ class KubernetesJobManager(JobManager):
         :type kubernetes_uid: int
         :param kubernetes_memory_limit: Memory limit for job container.
         :type kubernetes_memory_limit: str
+        :param unpacked_img: Force running the job via Apptainer (e.g. for an
+            unpacked CVMFS image). Apptainer is also auto-detected when
+            ``docker_img`` is a ``/cvmfs/`` path or a ``.sif`` file.
+        :type unpacked_img: bool
         :param kubernetes_job_timeout: Job timeout in seconds.
         :type kubernetes_job_timeout: int
         :param voms_proxy: Decides if a voms-proxy certificate should be
@@ -154,6 +163,7 @@ class KubernetesJobManager(JobManager):
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.kerberos = kerberos
+        self.unpacked_img = unpacked_img
         self.voms_proxy = voms_proxy
         self.rucio = rucio
         self.set_user_id(kubernetes_uid)
@@ -172,10 +182,80 @@ class KubernetesJobManager(JobManager):
             self._secrets = UserSecretsStore.fetch(REANA_USER_ID)
         return self._secrets
 
+    def _get_singularity_image(self):
+        """Return the image reference to run via Apptainer, or None for native Docker."""
+        if (
+            self.unpacked_img
+            or self.docker_img.startswith("/cvmfs/")
+            or self.docker_img.endswith(".sif")
+        ):
+            return self.docker_img
+        return None
+
+    def _prepare_unpacked_image(self):
+        """Prepare job for execution with a Singularity/Apptainer container image.
+
+        When ``docker_img`` is a CVMFS unpacked path or a ``.sif`` file,
+        the job is wrapped so that:
+        - The pod runs a lightweight Apptainer runner image instead
+        - The original command is executed inside the image via ``apptainer exec``
+        - The workflow workspace is bind-mounted into the container
+        - For CVMFS paths, the required repository is also auto-mounted
+
+        :returns: Tuple of ``(pod_shell, docker_img, cmd, cvmfs_mounts)``.
+            ``pod_shell`` is ``"sh"`` for Apptainer runner images and ``"bash"``
+            for plain Docker images.
+        """
+        singularity_img = self._get_singularity_image()
+        if singularity_img is None:
+            return "bash", self.docker_img, self.cmd, self.cvmfs_mounts
+
+        # Wrap command with base64-encode to avoid quoting issues
+        encoded_cmd = base64.b64encode(self.cmd.encode("utf-8")).decode("utf-8")
+
+        if singularity_img.startswith("/cvmfs/"):
+            # CVMFS unpacked image
+            if self.cvmfs_mounts and self.cvmfs_mounts != "false":
+                try:
+                    cvmfs_repos = ast.literal_eval(self.cvmfs_mounts)
+                except (ValueError, SyntaxError) as e:
+                    raise ValueError(
+                        f"Invalid cvmfs_mounts value {self.cvmfs_mounts!r}: {e}"
+                    ) from e
+            else:
+                cvmfs_repos = []
+
+            repository = extract_cvmfs_repository(singularity_img)
+            if repository not in cvmfs_repos:
+                cvmfs_repos.append(repository)
+            cvmfs_mounts = str(cvmfs_repos)
+
+            cmd = (
+                f"{REANA_UNPACKED_IMAGE_RUNNER_COMMAND} exec"
+                f" --bind /cvmfs"  # also mount the CVMFS repository volume
+                f" --bind {self.workflow_workspace}"
+                f" --pwd {self.workflow_workspace}"
+                f" {singularity_img}"
+                f' bash -c "echo {encoded_cmd} | base64 -d | bash"'
+            )
+        else:
+            # Vanilla Singularity image (.sif file)
+            cvmfs_mounts = self.cvmfs_mounts
+            cmd = (
+                f"{REANA_UNPACKED_IMAGE_RUNNER_COMMAND} exec"
+                f" --bind {self.workflow_workspace}"
+                f" --pwd {self.workflow_workspace}"
+                f" {singularity_img}"
+                f' bash -c "echo {encoded_cmd} | base64 -d | bash"'
+            )
+
+        return "sh", REANA_UNPACKED_IMAGE_RUNNER, cmd, cvmfs_mounts
+
     @JobManager.execution_hook
     def execute(self):
         """Execute a job in Kubernetes."""
         backend_job_id = build_unique_component_name("run-job")
+        pod_shell, docker_img, cmd, cvmfs_mounts = self._prepare_unpacked_image()
 
         self.job = {
             "kind": "Job",
@@ -204,9 +284,9 @@ class KubernetesJobManager(JobManager):
                         "automountServiceAccountToken": False,
                         "containers": [
                             {
-                                "image": self.docker_img,
-                                "command": ["bash", "-c"],
-                                "args": [self.cmd],
+                                "image": docker_img,
+                                "command": [pod_shell, "-c"],
+                                "args": [cmd],
                                 "name": "job",
                                 "env": [],
                                 "volumeMounts": [],
@@ -244,8 +324,8 @@ class KubernetesJobManager(JobManager):
         self.add_image_pull_secrets()
         self.add_kubernetes_job_timeout()
 
-        if self.cvmfs_mounts != "false":
-            cvmfs_repositories = ast.literal_eval(self.cvmfs_mounts)
+        if cvmfs_mounts != "false":
+            cvmfs_repositories = ast.literal_eval(cvmfs_mounts)
             volume_mounts, volumes = get_k8s_cvmfs_volumes(cvmfs_repositories)
             job_spec["containers"][0]["volumeMounts"].extend(volume_mounts)
             job_spec["volumes"].extend(volumes)
