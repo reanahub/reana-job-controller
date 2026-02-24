@@ -7,6 +7,7 @@
 """Kubernetes Job Manager."""
 
 import ast
+import base64
 import logging
 import os
 import traceback
@@ -46,6 +47,7 @@ from reana_commons.k8s.api_client import (
 from reana_commons.k8s.kerberos import get_kerberos_k8s_config
 from reana_commons.k8s.secrets import UserSecretsStore, UserSecrets
 from reana_commons.k8s.volumes import (
+    extract_cvmfs_repository,
     get_k8s_cvmfs_volumes,
     get_reana_shared_volume,
     get_workspace_volume,
@@ -62,6 +64,8 @@ from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_MAX_USER_CPU_LIMIT,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_REQUEST,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT,
+    REANA_UNPACKED_IMAGE_RUNNER,
+    REANA_UNPACKED_IMAGE_RUNNER_COMMAND,
     REANA_USER_ID,
     USE_KUEUE,
     KUEUE_LOCAL_QUEUE_NAME,
@@ -95,6 +99,7 @@ class KubernetesJobManager(JobManager):
         kubernetes_cpu_limit=None,
         kubernetes_memory_request=None,
         kubernetes_memory_limit=None,
+        unpacked_img=None,
         voms_proxy=False,
         rucio=False,
         kubernetes_job_timeout: Optional[int] = None,
@@ -127,6 +132,8 @@ class KubernetesJobManager(JobManager):
         :type kubernetes_uid: int
         :param kubernetes_memory_limit: Memory limit for job container.
         :type kubernetes_memory_limit: str
+        :param unpacked_img: Unpacked CVMFS container image path.
+        :type unpacked_img: str
         :param kubernetes_job_timeout: Job timeout in seconds.
         :type kubernetes_job_timeout: int
         :param voms_proxy: Decides if a voms-proxy certificate should be
@@ -152,6 +159,7 @@ class KubernetesJobManager(JobManager):
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.kerberos = kerberos
+        self.unpacked_img = unpacked_img
         self.voms_proxy = voms_proxy
         self.rucio = rucio
         self.set_user_id(kubernetes_uid)
@@ -170,10 +178,57 @@ class KubernetesJobManager(JobManager):
             self._secrets = UserSecretsStore.fetch(REANA_USER_ID)
         return self._secrets
 
+    def _prepare_unpacked_image(self):
+        """Prepare job for execution with an unpacked CVMFS container image.
+
+        When ``docker_img`` starts with ``/cvmfs/``, the job is transparently
+        wrapped so that:
+        - The pod runs a lightweight Apptainer runner image instead.
+        - The original command is base64-encoded and executed inside the
+          unpacked image via ``apptainer exec``.
+        - The required CVMFS repository is automatically added to
+          ``self.cvmfs_mounts`` so the volume gets mounted in the pod.
+        - The workflow workspace is bind-mounted into the container.
+
+        :returns: Shell to use for the pod command (``"sh"`` for the Apptainer
+            runner, ``"bash"`` for normal images).
+        """
+        if not self.docker_img.startswith("/cvmfs/"):
+            return "bash"
+
+        cvmfs_path = self.docker_img
+        repository = extract_cvmfs_repository(cvmfs_path)
+
+        # Merge the auto-detected CVMFS repository with user-requested ones
+        if self.cvmfs_mounts and self.cvmfs_mounts != "false":
+            cvmfs_repos = ast.literal_eval(self.cvmfs_mounts)
+        else:
+            cvmfs_repos = []
+        if repository not in cvmfs_repos:
+            cvmfs_repos.append(repository)
+        self.cvmfs_mounts = str(cvmfs_repos)
+
+        # Replace docker_img with the configurable Apptainer runner
+        self.docker_img = REANA_UNPACKED_IMAGE_RUNNER
+
+        # Wrap command: base64-encode to avoid all quoting issues
+        encoded_cmd = base64.b64encode(self.cmd.encode("utf-8")).decode("utf-8")
+        self.cmd = (
+            f"{REANA_UNPACKED_IMAGE_RUNNER_COMMAND} exec"
+            f" --no-setuid"
+            f" --bind /cvmfs"
+            f" --bind {self.workflow_workspace}"
+            f" {cvmfs_path}"
+            f" bash -c \"eval \\$(echo {encoded_cmd} | base64 -d)\""
+        )
+
+        return "sh"
+
     @JobManager.execution_hook
     def execute(self):
         """Execute a job in Kubernetes."""
         backend_job_id = build_unique_component_name("run-job")
+        pod_shell = self._prepare_unpacked_image()
 
         self.job = {
             "kind": "Job",
@@ -203,7 +258,7 @@ class KubernetesJobManager(JobManager):
                         "containers": [
                             {
                                 "image": self.docker_img,
-                                "command": ["bash", "-c"],
+                                "command": [pod_shell, "-c"],
                                 "args": [self.cmd],
                                 "name": "job",
                                 "env": [],
