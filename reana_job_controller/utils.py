@@ -248,19 +248,38 @@ class SSHClient:
     def establish_connection(self):
         """Establish the connection."""
         # self.paramiko.util.log_to_file('/tmp/paramiko.log')
-        self.ssh_client.connect(
-            hostname=self.hostname,
-            allow_agent=False,
-            auth_timeout=self.auth_timeout,
-            banner_timeout=self.banner_timeout,
-            gss_auth=True,
-            gss_host=self.hostname,
-            gss_trust_dns=True,
-            look_for_keys=False,
-            port=self.port,
-            timeout=self.timeout,
-            auth_strategy=self.auth_strategy,
-        )
+        ssh_key_path = os.environ.get("REANA_SLURM_SSH_KEY_PATH")
+        if ssh_key_path:
+            logging.info(
+                "Connecting to Slurm via SSH key: {}".format(ssh_key_path)
+            )
+            self.ssh_client.connect(
+                hostname=self.hostname,
+                username=os.environ.get("REANA_SLURM_USER"),
+                allow_agent=False,
+                auth_timeout=self.auth_timeout,
+                banner_timeout=self.banner_timeout,
+                gss_auth=False,
+                key_filename=ssh_key_path,
+                look_for_keys=False,
+                port=self.port,
+                timeout=self.timeout,
+            )
+        else:
+            logging.info("Connecting to Slurm via Kerberos (GSS-API).")
+            self.ssh_client.connect(
+                hostname=self.hostname,
+                allow_agent=False,
+                auth_timeout=self.auth_timeout,
+                banner_timeout=self.banner_timeout,
+                gss_auth=True,
+                gss_host=self.hostname,
+                gss_trust_dns=True,
+                look_for_keys=False,
+                port=self.port,
+                timeout=self.timeout,
+                auth_strategy=self.auth_strategy,
+            )
 
     def exec_command(self, command):
         """Execute command and return exit code."""
