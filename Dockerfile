@@ -142,7 +142,7 @@ CMD ["flask", "run", "-h", "0.0.0.0"]
 
 # Set image labels
 LABEL org.opencontainers.image.authors="team@reanahub.io"
-LABEL org.opencontainers.image.created="2026-01-06"
+LABEL org.opencontainers.image.created="2026-03-26"
 LABEL org.opencontainers.image.description="REANA reproducible analysis platform - job controller component"
 LABEL org.opencontainers.image.documentation="https://reana-job-controller.readthedocs.io/"
 LABEL org.opencontainers.image.licenses="MIT"
@@ -151,5 +151,5 @@ LABEL org.opencontainers.image.title="reana-job-controller"
 LABEL org.opencontainers.image.url="https://github.com/reanahub/reana-job-controller"
 LABEL org.opencontainers.image.vendor="reanahub"
 # x-release-please-start-version
-LABEL org.opencontainers.image.version="0.95.0-alpha.3"
+LABEL org.opencontainers.image.version="0.95.0-alpha.4"
 # x-release-please-end
