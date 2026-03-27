@@ -8,6 +8,7 @@
 
 """REANA-Job-Controller Job Manager tests."""
 
+import base64
 import json
 import uuid
 
@@ -332,3 +333,171 @@ def test_set_memory_limit(
     else:
         job_manager.set_memory_limit(memory_limit)
         assert job_manager.kubernetes_memory_limit == expected_value
+
+
+def test_execute_unpacked_cvmfs_image(
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    empty_user_secrets,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Test execution of a job with an unpacked /cvmfs image."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    cvmfs_image = "/cvmfs/unpacked.cern.ch/registry.hub.docker.com/library/python:3.9"
+    expected_command = "echo hello world"
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+
+    job_manager = KubernetesJobManager(
+        docker_img=cvmfs_image,
+        cmd=expected_command,
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client:
+        with mock.patch(
+            "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+            corev1_api_client_with_user_secrets(empty_user_secrets),
+        ):
+            kubernetes_job_id = job_manager.execute()
+            kubernetes_client.create_namespaced_job.assert_called_once()
+            body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+            job_spec = body["spec"]["template"]["spec"]
+            container = job_spec["containers"][0]
+
+            # Runner image should be the Apptainer image, not the CVMFS path
+            assert container["image"] == "ghcr.io/apptainer/apptainer:latest"
+
+            # Pod shell should be 'sh' (Apptainer runner is Alpine-based)
+            assert container["command"] == ["sh", "-c"]
+
+            # Command should contain apptainer exec with the CVMFS path
+            cmd = container["args"][0]
+            assert "apptainer exec" in cmd
+            assert cvmfs_image in cmd
+            assert "--bind /cvmfs" in cmd
+            assert f"--bind {workflow_workspace}" in cmd
+
+            # Base64-encoded command should decode back to original
+            # Extract the base64 part from: echo <b64> | base64 -d
+            b64_part = cmd.split("echo ")[1].split(" | base64")[0]
+            decoded = base64.b64decode(b64_part).decode("utf-8")
+            assert decoded == expected_command
+
+            # CVMFS volume should be mounted
+            cvmfs_mount_paths = [
+                m["mountPath"]
+                for m in container["volumeMounts"]
+                if m.get("name") == "cvmfs"
+            ]
+            assert any(
+                "/cvmfs/unpacked.cern.ch" in path for path in cvmfs_mount_paths
+            )
+
+
+def test_unpacked_image_merges_cvmfs_mounts(
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    empty_user_secrets,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Test that unpacked image auto-adds its CVMFS repo alongside user mounts."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+
+    job_manager = KubernetesJobManager(
+        docker_img="/cvmfs/unpacked.cern.ch/some/image",
+        cmd="ls",
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+        cvmfs_mounts="['sft.cern.ch']",
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client:
+        with mock.patch(
+            "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+            corev1_api_client_with_user_secrets(empty_user_secrets),
+        ):
+            job_manager.execute()
+            body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+            job_spec = body["spec"]["template"]["spec"]
+            container = job_spec["containers"][0]
+
+            # Both user-requested and auto-detected repos should be mounted
+            cvmfs_mount_paths = [
+                m["mountPath"]
+                for m in container["volumeMounts"]
+                if m.get("name") == "cvmfs"
+            ]
+            assert any("/cvmfs/sft.cern.ch" in p for p in cvmfs_mount_paths)
+            assert any("/cvmfs/unpacked.cern.ch" in p for p in cvmfs_mount_paths)
+
+
+def test_unpacked_image_special_characters(
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    empty_user_secrets,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Test that commands with special characters are safely base64-encoded."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+
+    special_cmd = "echo 'hello \"world\"' && cat file.txt | grep -E '^test$'"
+    job_manager = KubernetesJobManager(
+        docker_img="/cvmfs/unpacked.cern.ch/some/image",
+        cmd=special_cmd,
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client:
+        with mock.patch(
+            "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+            corev1_api_client_with_user_secrets(empty_user_secrets),
+        ):
+            job_manager.execute()
+            body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+            cmd = body["spec"]["template"]["spec"]["containers"][0]["args"][0]
+
+            # Extract and decode the base64 payload
+            b64_part = cmd.split("echo ")[1].split(" | base64")[0]
+            decoded = base64.b64decode(b64_part).decode("utf-8")
+            assert decoded == special_cmd
+
+
+def test_normal_image_not_affected(app):
+    """Test that non-CVMFS images are not affected by unpacked logic."""
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+    )
+    pod_shell = job_manager._prepare_unpacked_image()
+    assert pod_shell == "bash"
+    assert job_manager.docker_img == "docker.io/library/busybox"
+    assert job_manager.cmd == "ls"
