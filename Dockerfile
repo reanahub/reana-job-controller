@@ -52,13 +52,13 @@ ARG COMPUTE_BACKENDS=kubernetes
 RUN if echo "$COMPUTE_BACKENDS" | grep -q "htcondorcern"; then \
       set -e; \
       apt-get update -y; \
-      apt-get install --no-install-recommends -y wget alien gnupg2 condor; \
+      apt-get install --no-install-recommends -y wget rpm2cpio cpio gnupg2 condor; \
       wget -q -O ngbauth-submit.rpm https://linuxsoft.cern.ch/internal/repos/batch9al-stable/x86_64/os/Packages/n/ngbauth-submit-0.31-1.al9.cern.noarch.rpm; \
       wget -q -O myschedd.rpm https://linuxsoft.cern.ch/internal/repos/batch9al-stable/x86_64/os/Packages/m/myschedd-1.9-2.al9.cern.x86_64.rpm; \
-      yes | alien -i myschedd.rpm; \
-      yes | alien -i ngbauth-submit.rpm; \
-      rm -rf myschedd.rpm ngbauth-submit.rpm; \
-      apt-get remove -y gnupg2 wget alien; \
+      rpm2cpio /myschedd.rpm | cpio -idmv -D /; \
+      rpm2cpio /ngbauth-submit.rpm | cpio -idmv -D /; \
+      rm -f /myschedd.rpm /ngbauth-submit.rpm; \
+      apt-get remove -y gnupg2 wget rpm2cpio cpio; \
       apt-get autoremove -y; \
       apt-get clean; \
       rm -rf /var/lib/apt/lists/*; \
