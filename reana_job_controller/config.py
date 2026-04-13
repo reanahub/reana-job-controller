@@ -228,7 +228,7 @@ SLURM_SSH_BANNER_TIMEOUT = float(os.getenv("SLURM_SSH_BANNER_TIMEOUT", "60"))
 SLURM_SSH_AUTH_TIMEOUT = float(os.getenv("SLURM_SSH_AUTH_TIMEOUT", "60"))
 """Seconds to wait for SLURM SSH authentication response."""
 
-USE_KUEUE = bool(strtobool(os.getenv("USE_KUEUE", "False")))
+KUEUE_ENABLED = bool(strtobool(os.getenv("KUEUE_ENABLED", "False")))
 """Whether to use Kueue to manage job execution."""
 
 KUEUE_LOCAL_QUEUE_NAME = "local-queue-job"

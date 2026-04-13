@@ -63,7 +63,7 @@ from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_REQUEST,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT,
     REANA_USER_ID,
-    USE_KUEUE,
+    KUEUE_ENABLED,
     KUEUE_LOCAL_QUEUE_NAME,
 )
 from reana_job_controller.errors import ComputingBackendSubmissionError
@@ -183,7 +183,7 @@ class KubernetesJobManager(JobManager):
                 "namespace": REANA_RUNTIME_KUBERNETES_NAMESPACE,
                 "labels": (
                     {"kueue.x-k8s.io/queue-name": KUEUE_LOCAL_QUEUE_NAME}
-                    if USE_KUEUE
+                    if KUEUE_ENABLED
                     else {}
                 ),
             },
