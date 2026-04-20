@@ -265,3 +265,16 @@ C4P_REANA_REL_WORKFLOW_PATH = os.getenv(
     "C4P_REANA_REL_WORKFLOW_PATH", "reana/workflows"
 )
 """Path relative to the uses home directory of the REANA workflow space on the C4P login node."""
+
+REANA_DATASTORE_ENABLED = os.getenv("REANA_DATASTORE_ENABLED") == "true"
+"""Set datastore (s3) sidecar for interactive sessions enabled or disabled"""
+
+if REANA_DATASTORE_ENABLED:
+    REANA_DATASTORE_IMAGE = os.getenv("REANA_DATASTORE_IMAGE")
+    """Optional Image for datastore (s3) sidecar for interactive sessions"""
+
+    REANA_DATASTORE_SECRET = os.getenv("REANA_DATASTORE_SECRET")
+    """Optional secret for datastore (s3) sidecar for interactive sessions"""
+else:
+    REANA_DATASTORE_IMAGE = ""
+    REANA_DATASTORE_SECRET = ""
