@@ -210,7 +210,11 @@ class KubernetesJobManager(JobManager):
             echo "Error: Failed to mount s3 configurations within $TIMEOUT seconds. Please check you credentials"
             exit 1
             """
-            self.cmd = f"bash -c '{check_mounts_script}' && " + self.cmd + '&& curl -X POST http://localhost:5000/shutdown'
+            self.cmd = (
+                f"bash -c '{check_mounts_script}' && "
+                + self.cmd
+                + "&& curl -X POST http://localhost:5000/shutdown"
+            )
 
         self.job = {
             "kind": "Job",
@@ -246,7 +250,13 @@ class KubernetesJobManager(JobManager):
                                 "env": [],
                                 "volumeMounts": [
                                     *(
-                                        [{"name": "s3-mounts", "mountPath": "/data/s3/", "mountPropagation": "HostToContainer"}]
+                                        [
+                                            {
+                                                "name": "s3-mounts",
+                                                "mountPath": "/data/s3/",
+                                                "mountPropagation": "HostToContainer",
+                                            }
+                                        ]
                                         if REANA_DATASTORE_ENABLED and datastore_enabled
                                         else []
                                     )
@@ -260,8 +270,15 @@ class KubernetesJobManager(JobManager):
                                         "name": "datastore",
                                         "env": s3_env,
                                         "volumeMounts": [
-                                            {"name": "fuse-device", "mountPath": "/dev/fuse"},
-                                            {"name": "s3-mounts", "mountPath": "/s3-data", "mountPropagation": "Bidirectional"}
+                                            {
+                                                "name": "fuse-device",
+                                                "mountPath": "/dev/fuse",
+                                            },
+                                            {
+                                                "name": "s3-mounts",
+                                                "mountPath": "/s3-data",
+                                                "mountPropagation": "Bidirectional",
+                                            },
                                         ],
                                         "securityContext": {
                                             "runAsUser": 0,
@@ -275,15 +292,22 @@ class KubernetesJobManager(JobManager):
                                 if REANA_DATASTORE_ENABLED and datastore_enabled
                                 else []
                             ),
-                            ],
+                        ],
                         "initContainers": [],
                         "volumes": [
                             *(
                                 [
-                                    {"name": "fuse-device", "hostPath": {"path": "/dev/fuse", "type": "CharDevice"}},
-                                    {"name": "s3-mounts", "emptyDir": {}}
+                                    {
+                                        "name": "fuse-device",
+                                        "hostPath": {
+                                            "path": "/dev/fuse",
+                                            "type": "CharDevice",
+                                        },
+                                    },
+                                    {"name": "s3-mounts", "emptyDir": {}},
                                 ]
-                                if REANA_DATASTORE_ENABLED and datastore_enabled else []
+                                if REANA_DATASTORE_ENABLED and datastore_enabled
+                                else []
                             )
                         ],
                         "restartPolicy": "Never",
@@ -525,7 +549,7 @@ class KubernetesJobManager(JobManager):
         for secret_name in current_app.config["IMAGE_PULL_SECRETS"]:
             if secret_name:
                 image_pull_secrets.append({"name": secret_name})
-        if REANA_DATASTORE_ENABLED and REANA_DATASTORE_SECRET != '':
+        if REANA_DATASTORE_ENABLED and REANA_DATASTORE_SECRET != "":
             image_pull_secrets.append({"name": REANA_DATASTORE_SECRET})
 
         self.job["spec"]["template"]["spec"]["imagePullSecrets"] = image_pull_secrets
