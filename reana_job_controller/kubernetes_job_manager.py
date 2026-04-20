@@ -11,6 +11,7 @@ import logging
 import os
 import traceback
 from typing import Optional
+import requests
 
 from flask import current_app
 from kubernetes import client
@@ -68,6 +69,9 @@ from reana_job_controller.config import (
     REANA_USER_ID,
     KUEUE_ENABLED,
     KUEUE_LOCAL_QUEUE_NAME,
+    REANA_DATASTORE_ENABLED,
+    REANA_DATASTORE_SECRET,
+    REANA_DATASTORE_IMAGE,
 )
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
@@ -242,6 +246,43 @@ class KubernetesJobManager(JobManager):
         """Execute a job in Kubernetes."""
         backend_job_id = build_unique_component_name("run-job")
 
+        user_secrets = UserSecretsStore.fetch(REANA_USER_ID)
+        all_env = user_secrets.get_env_secrets_as_k8s_spec()
+        s3_env = []
+        for secret in all_env:
+            secret_name = secret.get("name", "")
+            if secret_name.startswith("S3_TO_LOCAL_"):
+                s3_env.append(secret)
+        datastore_enabled = False
+        if s3_env:
+            datastore_enabled = True
+
+        if datastore_enabled and REANA_DATASTORE_ENABLED:
+            check_mounts_script = """
+            #!/bin/bash
+
+            TARGET_DIR="/data/s3"
+            TIMEOUT=30
+            ELAPSED=0
+
+            while [ $ELAPSED -lt $TIMEOUT ]; do
+                if [ -d "$TARGET_DIR" ] && [ "$(ls -A "$TARGET_DIR")" ]; then
+                    exit 0
+                fi
+
+                sleep 1
+                ((ELAPSED++))
+            done
+
+            echo "Error: Failed to mount s3 configurations within $TIMEOUT seconds. Please check you credentials"
+            exit 1
+            """
+            self.cmd = (
+                f"bash -c '{check_mounts_script}' && "
+                + self.cmd
+                + "&& curl -X POST http://localhost:5000/shutdown"
+            )
+
         self.job = {
             "kind": "Job",
             "apiVersion": "batch/v1",
@@ -270,18 +311,73 @@ class KubernetesJobManager(JobManager):
                         "containers": [
                             {
                                 "image": self.docker_img,
+                                "name": "job",
                                 "command": ["bash", "-c"],
                                 "args": [self.cmd],
-                                "name": "job",
                                 "env": [],
+                                "volumeMounts": [
+                                    *(
+                                        [
+                                            {
+                                                "name": "s3-mounts",
+                                                "mountPath": "/data/s3/",
+                                                "mountPropagation": "HostToContainer",
+                                            }
+                                        ]
+                                        if REANA_DATASTORE_ENABLED and datastore_enabled
+                                        else []
+                                    )
+                                ],
                                 "securityContext": {"allowPrivilegeEscalation": False},
-                                "volumeMounts": [],
-                            }
+                            },
+                            *(
+                                [
+                                    {
+                                        "image": REANA_DATASTORE_IMAGE,
+                                        "name": "datastore",
+                                        "env": s3_env,
+                                        "volumeMounts": [
+                                            {
+                                                "name": "fuse-device",
+                                                "mountPath": "/dev/fuse",
+                                            },
+                                            {
+                                                "name": "s3-mounts",
+                                                "mountPath": "/s3-data",
+                                                "mountPropagation": "Bidirectional",
+                                            },
+                                        ],
+                                        "securityContext": {
+                                            "runAsUser": 0,
+                                            "allowPrivilegeEscalation": True,
+                                            "capabilities": {"add": ["SYS_ADMIN"]},
+                                            "privileged": True,
+                                        },
+                                        "imagePullPolicy": "Always",
+                                    }
+                                ]
+                                if REANA_DATASTORE_ENABLED and datastore_enabled
+                                else []
+                            ),
                         ],
                         "initContainers": [],
-                        "volumes": [],
+                        "volumes": [
+                            *(
+                                [
+                                    {
+                                        "name": "fuse-device",
+                                        "hostPath": {
+                                            "path": "/dev/fuse",
+                                            "type": "CharDevice",
+                                        },
+                                    },
+                                    {"name": "s3-mounts", "emptyDir": {}},
+                                ]
+                                if REANA_DATASTORE_ENABLED and datastore_enabled
+                                else []
+                            )
+                        ],
                         "restartPolicy": "Never",
-                        # No need to wait a long time for jobs to gracefully terminate
                         "terminationGracePeriodSeconds": 5,
                         "enableServiceLinks": False,
                     },
@@ -296,14 +392,16 @@ class KubernetesJobManager(JobManager):
         secret_env_vars = self.secrets.get_env_secrets_as_k8s_spec()
         job_spec = self.job["spec"]["template"]["spec"]
         job_spec["containers"][0]["env"].extend(secret_env_vars)
-        job_spec["volumes"].append(self.secrets.get_file_secrets_volume_as_k8s_specs())
+        job_spec["volumes"].append(
+            self.secrets.get_file_secrets_volume_as_k8s_specs())
 
         secrets_volume_mount = self.secrets.get_secrets_volume_mount_as_k8s_spec()
         job_spec["containers"][0]["volumeMounts"].append(secrets_volume_mount)
 
         if self.env_vars:
             for var, value in self.env_vars.items():
-                job_spec["containers"][0]["env"].append({"name": var, "value": value})
+                job_spec["containers"][0]["env"].append(
+                    {"name": var, "value": value})
 
         self.add_resource_requests_and_limits(job_spec)
         self.add_hostpath_volumes()
@@ -332,10 +430,12 @@ class KubernetesJobManager(JobManager):
             self._add_krb5_containers(self.secrets)
 
         if self.voms_proxy:
-            self._add_voms_proxy_init_container(secrets_volume_mount, secret_env_vars)
+            self._add_voms_proxy_init_container(
+                secrets_volume_mount, secret_env_vars)
 
         if self.rucio:
-            self._add_rucio_init_container(secrets_volume_mount, secret_env_vars)
+            self._add_rucio_init_container(
+                secrets_volume_mount, secret_env_vars)
 
         if REANA_RUNTIME_JOBS_KUBERNETES_NODE_LABEL:
             self.job["spec"]["template"]["spec"][
@@ -397,7 +497,8 @@ class KubernetesJobManager(JobManager):
                     container_log = pod_log_response.data.decode(
                         "utf-8", errors="replace"
                     )
-                    pod_logs += "{}: :\n {}\n".format(container.name, container_log)
+                    pod_logs += "{}: :\n {}\n".format(
+                        container.name, container_log)
                     if hasattr(container.state.terminated, "reason"):
                         if container.state.terminated.reason != "Completed":
                             message = "Job pod {} was terminated, reason: {}, message: {}".format(
@@ -406,7 +507,8 @@ class KubernetesJobManager(JobManager):
                                 container.state.terminated.message,
                             )
                             logging.warn(message)
-                        pod_logs += "\n{}\n".format(container.state.terminated.reason)
+                        pod_logs += "\n{}\n".format(
+                            container.state.terminated.reason)
                 elif container.state.waiting:
                     # No need to fetch logs, as the container has not started yet.
                     message = "Container {} failed, error: {}".format(
@@ -417,7 +519,8 @@ class KubernetesJobManager(JobManager):
 
             return pod_logs
         except client.rest.ApiException as e:
-            logging.error(f"Error from Kubernetes API while getting job logs: {e}")
+            logging.error(
+                f"Error from Kubernetes API while getting job logs: {e}")
             return None
         except Exception as e:
             logging.error(traceback.format_exc())
@@ -445,7 +548,8 @@ class KubernetesJobManager(JobManager):
                 label_selector=f"job-name={backend_job_id}",
             )
             if not job_pods.items:
-                logging.error(f"Could not find any pod for job {backend_job_id}")
+                logging.error(
+                    f"Could not find any pod for job {backend_job_id}")
                 return None
             job_pod = job_pods.items[0]
 
@@ -485,7 +589,8 @@ class KubernetesJobManager(JobManager):
         """
         try:
             propagation_policy = "Background" if asynchronous else "Foreground"
-            delete_options = V1DeleteOptions(propagation_policy=propagation_policy)
+            delete_options = V1DeleteOptions(
+                propagation_policy=propagation_policy)
             current_k8s_batchv1_api_client.delete_namespaced_job(
                 backend_job_id, REANA_RUNTIME_KUBERNETES_NAMESPACE, body=delete_options
             )
@@ -516,7 +621,8 @@ class KubernetesJobManager(JobManager):
                 v["name"] == shared_volume["name"]
                 for v in self.job["spec"]["template"]["spec"]["volumes"]
             ):
-                self.job["spec"]["template"]["spec"]["volumes"].append(shared_volume)
+                self.job["spec"]["template"]["spec"]["volumes"].append(
+                    shared_volume)
 
     def add_eos_volume(self):
         """Add EOS volume to a given job spec."""
@@ -536,13 +642,16 @@ class KubernetesJobManager(JobManager):
         for secret_name in current_app.config["IMAGE_PULL_SECRETS"]:
             if secret_name:
                 image_pull_secrets.append({"name": secret_name})
+        if REANA_DATASTORE_ENABLED and REANA_DATASTORE_SECRET != "":
+            image_pull_secrets.append({"name": REANA_DATASTORE_SECRET})
 
         self.job["spec"]["template"]["spec"]["imagePullSecrets"] = image_pull_secrets
 
     def validate_resources(self):
         """Validate that resource requests are less than or equal to limits."""
         if self.kubernetes_cpu_request and self.kubernetes_cpu_limit:
-            cpu_request = kubernetes_cpu_to_millicores(self.kubernetes_cpu_request)
+            cpu_request = kubernetes_cpu_to_millicores(
+                self.kubernetes_cpu_request)
             cpu_limit = kubernetes_cpu_to_millicores(self.kubernetes_cpu_limit)
             if cpu_request > cpu_limit:
                 raise REANAKubernetesRequestExceedsLimit(
@@ -550,8 +659,10 @@ class KubernetesJobManager(JobManager):
                 )
 
         if self.kubernetes_memory_request and self.kubernetes_memory_limit:
-            memory_request = kubernetes_memory_to_bytes(self.kubernetes_memory_request)
-            memory_limit = kubernetes_memory_to_bytes(self.kubernetes_memory_limit)
+            memory_request = kubernetes_memory_to_bytes(
+                self.kubernetes_memory_request)
+            memory_limit = kubernetes_memory_to_bytes(
+                self.kubernetes_memory_limit)
             if memory_request > memory_limit:
                 raise REANAKubernetesRequestExceedsLimit(
                     f"ERROR: Memory request ({self.kubernetes_memory_request}) cannot be greater than limit ({self.kubernetes_memory_limit}). If you are overriding the values, please check the default and maximum values for requests and limits with 'reana-client info' command."
@@ -588,7 +699,8 @@ class KubernetesJobManager(JobManager):
                 "name": mount["name"],
                 "mountPath": mount.get("mountPath", mount["hostPath"]),
             }
-            volume = {"name": mount["name"], "hostPath": {"path": mount["hostPath"]}}
+            volume = {"name": mount["name"],
+                      "hostPath": {"path": mount["hostPath"]}}
             volumes_to_mount.append((volume_mount, volume))
 
         self.add_volumes(volumes_to_mount)
@@ -612,7 +724,8 @@ class KubernetesJobManager(JobManager):
             kubernetes_uid=self.kubernetes_uid,
         )
 
-        self.job["spec"]["template"]["spec"]["volumes"].extend(krb5_config.volumes)
+        self.job["spec"]["template"]["spec"]["volumes"].extend(
+            krb5_config.volumes)
         self.job["spec"]["template"]["spec"]["containers"][0]["volumeMounts"].extend(
             krb5_config.volume_mounts
         )
@@ -723,7 +836,8 @@ class KubernetesJobManager(JobManager):
                     _restricted_container_security_context(self.kubernetes_uid)
                 )
 
-        self.job["spec"]["template"]["spec"]["volumes"].extend([ticket_cache_volume])
+        self.job["spec"]["template"]["spec"]["volumes"].extend(
+            [ticket_cache_volume])
         self.job["spec"]["template"]["spec"]["containers"][0]["volumeMounts"].extend(
             volume_mounts
         )
@@ -810,7 +924,8 @@ class KubernetesJobManager(JobManager):
                 _restricted_container_security_context(self.kubernetes_uid)
             )
 
-        self.job["spec"]["template"]["spec"]["volumes"].extend([ticket_cache_volume])
+        self.job["spec"]["template"]["spec"]["volumes"].extend(
+            [ticket_cache_volume])
         self.job["spec"]["template"]["spec"]["containers"][0]["volumeMounts"].extend(
             volume_mounts
         )
@@ -848,7 +963,8 @@ class KubernetesJobManager(JobManager):
             if not validate_kubernetes_cpu(kubernetes_cpu_request):
                 msg = f'The "kubernetes_cpu_request" requested {kubernetes_cpu_request} has wrong format.'
                 logging.error(
-                    "Error while validating Kubernetes CPU request: {}".format(msg)
+                    "Error while validating Kubernetes CPU request: {}".format(
+                        msg)
                 )
                 raise REANAKubernetesWrongCPUFormat(msg)
 
@@ -873,7 +989,8 @@ class KubernetesJobManager(JobManager):
             if not validate_kubernetes_cpu(kubernetes_cpu_limit):
                 msg = f'The "kubernetes_cpu_limit" requested {kubernetes_cpu_limit} has wrong format.'
                 logging.error(
-                    "Error while validating Kubernetes CPU limit: {}".format(msg)
+                    "Error while validating Kubernetes CPU limit: {}".format(
+                        msg)
                 )
                 raise REANAKubernetesWrongCPUFormat(msg)
 
@@ -898,7 +1015,8 @@ class KubernetesJobManager(JobManager):
             if not validate_kubernetes_memory(kubernetes_memory_request):
                 msg = f'The "kubernetes_memory_request" requested {kubernetes_memory_request} has wrong format.'
                 logging.error(
-                    "Error while validating Kubernetes memory request: {}".format(msg)
+                    "Error while validating Kubernetes memory request: {}".format(
+                        msg)
                 )
                 raise REANAKubernetesWrongMemoryFormat(msg)
 
@@ -926,7 +1044,8 @@ class KubernetesJobManager(JobManager):
             if not validate_kubernetes_memory(kubernetes_memory_limit):
                 msg = f'The "kubernetes_memory_limit" requested {kubernetes_memory_limit} has wrong format.'
                 logging.error(
-                    "Error while validating Kubernetes memory limit: {}".format(msg)
+                    "Error while validating Kubernetes memory limit: {}".format(
+                        msg)
                 )
                 raise REANAKubernetesWrongMemoryFormat(msg)
 
