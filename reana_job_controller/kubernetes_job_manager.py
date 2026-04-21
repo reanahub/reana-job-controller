@@ -194,12 +194,14 @@ class KubernetesJobManager(JobManager):
             check_mounts_script = """
             #!/bin/bash
 
-            TARGET_DIR="/data/s3"
+            TARGET_FILE="/data/s3/.readiness_probe.txt"
             TIMEOUT=30
             ELAPSED=0
 
             while [ $ELAPSED -lt $TIMEOUT ]; do
-                if [ -d "$TARGET_DIR" ] && [ "$(ls -A "$TARGET_DIR")" ]; then
+                # Check if file exists AND contains the string "READY"
+                if [ -f "$TARGET_FILE" ] && grep -q "READY" "$TARGET_FILE"; then
+                    echo "Mount verified: Readiness probe detected."
                     exit 0
                 fi
 
@@ -207,7 +209,8 @@ class KubernetesJobManager(JobManager):
                 ((ELAPSED++))
             done
 
-            echo "Error: Failed to mount s3 configurations within $TIMEOUT seconds. Please check you credentials"
+            echo "Error: Failed to find 'READY' in $TARGET_FILE within $TIMEOUT seconds."
+            echo "Please check your S3 mount status and credentials."
             exit 1
             """
             self.cmd = (
