@@ -1,6 +1,7 @@
 {
   "definitions": {
     "Job": {
+      "additionalProperties": false,
       "properties": {
         "cmd": {
           "type": "string"
@@ -16,11 +17,9 @@
           "type": "string"
         },
         "max_restart_count": {
-          "format": "int32",
           "type": "integer"
         },
         "restart_count": {
-          "format": "int32",
           "type": "integer"
         },
         "status": {
@@ -38,6 +37,7 @@
       "type": "object"
     },
     "JobRequest": {
+      "additionalProperties": false,
       "properties": {
         "c4p_additional_requirements": {
           "type": "string"
@@ -63,6 +63,7 @@
           "type": "string"
         },
         "env_vars": {
+          "additionalProperties": {},
           "default": {},
           "type": "object"
         },
@@ -85,7 +86,6 @@
           "type": "string"
         },
         "kubernetes_job_timeout": {
-          "format": "int32",
           "type": "integer"
         },
         "kubernetes_memory_limit": {
@@ -95,7 +95,6 @@
           "type": "string"
         },
         "kubernetes_uid": {
-          "format": "int32",
           "type": "integer"
         },
         "prettified_cmd": {

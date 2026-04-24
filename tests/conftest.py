@@ -41,7 +41,6 @@ def mocked_job():
 def job_spec():
     """Job spec dict."""
     job_spec = {
-        "experiment": "experiment",
         "docker_img": "image",
         "cmd": "cmd",
         "prettified_cmd": "prettified_cmd",

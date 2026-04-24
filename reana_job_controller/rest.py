@@ -13,6 +13,7 @@ import json
 import logging
 import threading
 
+import marshmallow
 from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.exc import OperationalError
 from reana_commons.errors import (
@@ -267,9 +268,10 @@ def create_job():  # noqa
         return jsonify({"message": "Empty request"}), 400
 
     # Validate and deserialize input
-    job_request, errors = job_request_schema.load(json_data)
-    if errors:
-        return jsonify({"message": errors}), 400
+    try:
+        job_request = job_request_schema.load(json_data)
+    except marshmallow.ValidationError as e:
+        return jsonify({"message": e.messages}), 400
 
     compute_backend = job_request.get(
         "compute_backend", current_app.config["DEFAULT_COMPUTE_BACKEND"]

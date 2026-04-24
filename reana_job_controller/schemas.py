@@ -27,7 +27,7 @@ class Job(Schema):
     max_restart_count = fields.Int(required=True)
     restart_count = fields.Int(required=True)
     status = fields.Str(required=True)
-    cvmfs_mounts = fields.String(missing="")
+    cvmfs_mounts = fields.String(load_default="")
 
 
 class JobRequest(Schema):
@@ -37,13 +37,16 @@ class JobRequest(Schema):
     workflow_workspace = fields.Str(required=True)
     workflow_uuid = fields.Str(required=True)
     cmd = fields.Function(
-        missing="", deserialize=deserialise_job_command, type="string"
+        serialize=lambda obj: "",
+        deserialize=deserialise_job_command,
+        load_default="",
+        metadata={"type": "string"},
     )
-    prettified_cmd = fields.Str(missing="")
+    prettified_cmd = fields.Str(load_default="")
     docker_img = fields.Str(required=True)
-    cvmfs_mounts = fields.String(missing="")
-    env_vars = fields.Dict(missing={})
-    shared_file_system = fields.Bool(missing=True)
+    cvmfs_mounts = fields.String(load_default="")
+    env_vars = fields.Dict(load_default={})
+    shared_file_system = fields.Bool(load_default=True)
     compute_backend = fields.Str(required=False)
     kerberos = fields.Bool(required=False)
     voms_proxy = fields.Bool(required=False)

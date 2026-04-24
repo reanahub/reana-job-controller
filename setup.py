@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -37,7 +37,7 @@ extras_require = {
         "htcondor>=9.0.17",
     ],
     "tests": [
-        "pytest-reana>=0.95.0a4,<0.96.0",
+        "pytest-reana>=0.95.0a9,<0.96.0",
     ],
     "ssh": ["paramiko[gssapi]>=3.2.0"],
     "mytoken": [
@@ -56,16 +56,14 @@ for key, reqs in extras_require.items():
     extras_require["all"].extend(reqs)
 
 install_requires = [
-    # apispec>=4.0 drops support for marshmallow<3
-    "apispec[yaml]>=3.0,<4.0",
+    "apispec[yaml]>=3.0",
     "apispec-webframeworks",
-    "Flask>=2.1.1,<2.3.0",  # same upper pin as invenio-base/reana-server
-    "Werkzeug>=2.1.0,<2.3.0",  # same upper pin as invenio-base
-    "jinja2<3.1.0",
+    "Flask>=3.0.0,<4.0.0",
+    "Werkzeug>=3.0.0",
     "fs>=2.0",
-    "marshmallow>2.13.0,<3.0.0",  # same upper pin as reana-server
-    "reana-commons[kubernetes]>=0.95.0a14,<0.96.0",
-    "reana-db>=0.95.0a6,<0.96.0",
+    "marshmallow>=3.5.0,<4.0.0",
+    "reana-commons[kubernetes]>=0.95.0a15,<0.96.0",
+    "reana-db>=0.95.0a7,<0.96.0",
     "retrying>=1.3.3",
 ]
 
