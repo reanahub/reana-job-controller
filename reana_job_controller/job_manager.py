@@ -150,4 +150,13 @@ class JobManager:
         env_vars[prefix + "_WORKSPACE"] = self.workflow_workspace
         env_vars[prefix + "_WORKFLOW_UUID"] = str(self.workflow_uuid)
         env_vars["DASK_SCHEDULER_URI"] = DASK_SCHEDULER_URI
+        if self.workflow_uuid:
+            workflow = (
+                Session.query(Workflow)
+                .filter_by(id_=self.workflow_uuid)
+                .one_or_none()
+            )
+            if workflow:
+                env_vars[prefix + "_WORKFLOW_NAME"] = workflow.name
+                env_vars[prefix + "_WORKFLOW_RUN_NUMBER"] = workflow.run_number
         return env_vars

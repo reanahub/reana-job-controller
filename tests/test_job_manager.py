@@ -82,19 +82,33 @@ def test_execute_kubernetes_job(
             command = containers[0]["args"]
             assert {"name": env_var_key, "value": env_var_value} in env_vars
             assert image == expected_image
+            env_var_names = {e["name"] for e in env_vars}
+            assert "REANA_WORKFLOW_NAME" in env_var_names
+            assert "REANA_WORKFLOW_RUN_NUMBER" in env_var_names
+            assert {
+                "name": "REANA_WORKFLOW_NAME",
+                "value": sample_serial_workflow_in_db.name,
+            } in env_vars
+            assert {
+                "name": "REANA_WORKFLOW_RUN_NUMBER",
+                "value": sample_serial_workflow_in_db.run_number,
+            } in env_vars
             if kerberos:
                 assert len(containers) == 2  # main job + sidecar
                 assert len(init_containers) == 1
                 assert init_containers[0]["name"] == KRB5_INIT_CONTAINER_NAME
-                assert len(env_vars) == 7  # KRB5CCNAME is added
+                # custom env + REANA_WORKSPACE + REANA_WORKFLOW_UUID + DASK_SCHEDULER_URI
+                # + REANA_WORKFLOW_NAME + REANA_WORKFLOW_RUN_NUMBER + two secrets + KRB5CCNAME
+                assert len(env_vars) == 9
                 assert "trap" in command[0] and expected_command in command[0]
                 assert "kinit -R" in containers[1]["args"][0]
                 assert containers[1]["name"] == KRB5_RENEW_CONTAINER_NAME
             else:
                 assert len(containers) == 1
                 assert len(init_containers) == 0
-                # custom env + REANA_WORKSPACE + REANA_WORKFLOW_UUID + DASK_SCHEDULER_URI + two secrets
-                assert len(env_vars) == 6
+                # custom env + REANA_WORKSPACE + REANA_WORKFLOW_UUID + DASK_SCHEDULER_URI
+                # + REANA_WORKFLOW_NAME + REANA_WORKFLOW_RUN_NUMBER + two secrets
+                assert len(env_vars) == 8
                 assert command == [expected_command]
 
 
