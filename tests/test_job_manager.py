@@ -163,6 +163,55 @@ def test_execution_hooks():
 
 
 @pytest.mark.parametrize(
+    "ttl_seconds,expected_in_spec",
+    [
+        (3600, True),
+        (None, False),
+    ],
+)
+def test_kubernetes_job_ttl(
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    empty_user_secrets,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+    ttl_seconds,
+    expected_in_spec,
+):
+    """Test that ttlSecondsAfterFinished is set in job spec only when configured."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+    monkeypatch.setattr(
+        "reana_job_controller.kubernetes_job_manager.REANA_KUBERNETES_JOBS_TTL_SECONDS_AFTER_FINISHED",
+        ttl_seconds,
+    )
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+    )
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client:
+        with mock.patch(
+            "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+            corev1_api_client_with_user_secrets(empty_user_secrets),
+        ):
+            job_manager.execute()
+            body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+            if expected_in_spec:
+                assert body["spec"]["ttlSecondsAfterFinished"] == ttl_seconds
+            else:
+                assert "ttlSecondsAfterFinished" not in body["spec"]
+
+
+@pytest.mark.parametrize(
     "k8s_phase,k8s_container_state,k8s_logs,pod_logs",
     [
         ("Pending", "ErrImagePull", "pull access denied", None),

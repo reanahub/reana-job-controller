@@ -192,6 +192,18 @@ Please see the following URL for more details
 https://kubernetes.io/docs/concepts/workloads/controllers/job/#job-termination-and-cleanup.
 """
 
+_ttl = os.getenv("REANA_KUBERNETES_JOBS_TTL_SECONDS_AFTER_FINISHED")
+REANA_KUBERNETES_JOBS_TTL_SECONDS_AFTER_FINISHED = int(_ttl) if _ttl else None
+"""Seconds after which a finished Kubernetes Job and its pods are deleted automatically.
+
+When set, the Kubernetes TTL controller garbage-collects completed and failed Jobs
+after the specified number of seconds, preventing unbounded accumulation of stale
+objects in the cluster. When unset (the default), no automatic cleanup is performed.
+
+Please see the following URL for more details
+https://kubernetes.io/docs/concepts/workloads/controllers/job/#ttl-mechanism-for-finished-jobs.
+"""
+
 REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT = os.getenv(
     "REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT"
 )

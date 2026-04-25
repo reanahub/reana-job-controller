@@ -62,6 +62,7 @@ from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_MAX_USER_CPU_LIMIT,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_REQUEST,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT,
+    REANA_KUBERNETES_JOBS_TTL_SECONDS_AFTER_FINISHED,
     REANA_USER_ID,
     KUEUE_ENABLED,
     KUEUE_LOCAL_QUEUE_NAME,
@@ -241,6 +242,7 @@ class KubernetesJobManager(JobManager):
         self.add_eos_volume()
         self.add_image_pull_secrets()
         self.add_kubernetes_job_timeout()
+        self.add_kubernetes_job_ttl()
 
         if self.cvmfs_mounts != "false":
             cvmfs_repositories = ast.literal_eval(self.cvmfs_mounts)
@@ -418,6 +420,18 @@ class KubernetesJobManager(JobManager):
             self.job["spec"]["template"]["spec"][
                 "activeDeadlineSeconds"
             ] = self.kubernetes_job_timeout
+
+    def add_kubernetes_job_ttl(self):
+        """Add TTL cleanup to the job spec.
+
+        When set, the Kubernetes TTL controller automatically deletes the Job
+        and its pods after the given number of seconds once the Job finishes,
+        preventing unbounded accumulation of stale objects in the cluster.
+        """
+        if REANA_KUBERNETES_JOBS_TTL_SECONDS_AFTER_FINISHED is not None:
+            self.job["spec"][
+                "ttlSecondsAfterFinished"
+            ] = REANA_KUBERNETES_JOBS_TTL_SECONDS_AFTER_FINISHED
 
     def add_workspace_volume(self):
         """Add workspace volume to a given job spec."""
