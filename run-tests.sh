@@ -34,7 +34,7 @@ clean_old_db_container() {
     OLD="$(docker ps --all --quiet --filter=name=postgres__reana-job-controller)"
     if [ -n "$OLD" ]; then
         echo '==> [INFO] Cleaning old DB container...'
-        docker stop postgres__reana-job-controller
+        docker rm -f postgres__reana-job-controller >/dev/null 2>&1 || true
     fi
 }
 
