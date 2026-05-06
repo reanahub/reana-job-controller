@@ -60,8 +60,8 @@ pynacl==1.6.2             # via paramiko
 python-dateutil==2.9.0.post0  # via arrow, bravado, bravado-core, kubernetes
 pytz==2026.1.post1        # via bravado-core
 pyyaml==6.0.3             # via apispec, bravado, bravado-core, kubernetes, reana-commons, swagger-spec-validator
-reana-commons[kubernetes]==0.95.0a15  # via reana-db, reana-job-controller (setup.py)
-reana-db==0.95.0a7        # via reana-job-controller (setup.py)
+reana-commons[kubernetes]==0.95.0a17	# via reana-db, reana-job-controller (setup.py)
+reana-db==0.95.0a9	# via reana-job-controller (setup.py)
 referencing==0.37.0       # via jsonschema, jsonschema-specifications
 requests==2.33.1          # via bravado, bravado-core, kubernetes, requests-oauthlib
 requests-oauthlib==2.0.0  # via kubernetes
