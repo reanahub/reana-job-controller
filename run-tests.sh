@@ -11,7 +11,7 @@ set -o nounset
 
 COMPONENT_NAME=reana-job-controller
 DOCKER_IMAGE_NAME=docker.io/reanahub/$COMPONENT_NAME
-PLATFORM="$(python -c 'import platform; print(platform.system())')"
+PLATFORM="$(python3 -c 'import platform; print(platform.system())')"
 
 # Verify that db container is running before continuing
 _check_ready() {
@@ -179,26 +179,42 @@ all() {
 }
 
 all_darwin() {
-    # Tests are run inside the docker container because there is
-    # no HTCondor Python package for MacOS
-    lint_hadolint
+    # Python tests and documentation checks are run inside the Docker
+    # container because there is no HTCondor Python package for MacOS.
     docker_build
+    format_black
+    format_prettier
+    format_shfmt
+    lint_commitlint
+    lint_flake8
+    lint_hadolint
+    lint_jsonlint
+    lint_manifest
+    lint_markdownlint
+    lint_pydocstyle
+    lint_shellcheck
+    lint_yamllint
     clean_old_db_container
     start_db_container
     RUN_TESTS_INSIDE_DOCKER="
     cd $COMPONENT_NAME &&
-    apt update && apt-get -y install libkrb5-dev git shellcheck  &&
+    apt update && apt-get -y install libkrb5-dev git &&
+    pip install --upgrade --ignore-installed pip 'setuptools<81' py &&
     pip install -r requirements.txt &&
     pip install -e .[all] && # Install test dependencies
-    pip install black &&
-    pip install flake8 &&
-    pip install pydocstyle &&
-    pip install check-manifest &&
     export REANA_SQLALCHEMY_DATABASE_URI=$REANA_SQLALCHEMY_DATABASE_URI &&
-    ./run-tests.sh --all &&
+    ./run-tests.sh --docs-openapi &&
+    ./run-tests.sh --docs-sphinx &&
     pytest"
     docker run -v "$(pwd)"/..:/code -ti $DOCKER_IMAGE_NAME bash -c "eval $RUN_TESTS_INSIDE_DOCKER"
     stop_db_container
+}
+
+run_all() {
+    case $PLATFORM in
+    Darwin*) all_darwin ;;
+    *) all ;;
+    esac
 }
 
 help() {
@@ -225,18 +241,13 @@ help() {
 }
 
 if [ $# -eq 0 ]; then
-    case $PLATFORM in
-    Darwin*) all_darwin ;;
-    *)
-        all
-        ;;
-    esac
+    run_all
     exit 0
 fi
 
 arg="$1"
 case $arg in
---all) all ;;
+--all) run_all ;;
 --help) help ;;
 --docker-build) docker_build ;;
 --docs-openapi) docs_openapi ;;
