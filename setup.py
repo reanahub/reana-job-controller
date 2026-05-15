@@ -60,6 +60,7 @@ install_requires = [
     "apispec[yaml]>=3.0",
     "apispec-webframeworks",
     "Flask>=3.0.0,<4.0.0",
+    "uWSGI>=2.0.31",
     "Werkzeug>=3.0.0",
     "fs>=2.0",
     "marshmallow>=3.5.0,<4.0.0",

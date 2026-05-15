@@ -75,6 +75,7 @@ swagger-spec-validator==3.0.4  # via bravado-core
 typing-extensions==4.15.0  # via aiohttp, aiosignal, alembic, bravado, gherkin-official, sqlalchemy, swagger-spec-validator
 tzdata==2026.2            # via kombu
 urllib3==2.7.0            # via kubernetes, requests
+uwsgi==2.0.31             # via reana-job-controller (setup.py)
 vine==5.1.0               # via amqp, kombu
 wcmatch==8.4.1            # via reana-commons
 webcolors==25.10.0        # via jsonschema

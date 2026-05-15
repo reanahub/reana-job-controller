@@ -1,5 +1,5 @@
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -29,6 +29,9 @@ RUN apt-get update -y && \
       krb5-user \
       libauthen-krb5-simple-perl \
       libkrb5-dev \
+      libpcre3 \
+      libpcre3-dev \
+      libpython3.12 \
       openssh-client \
       # matches version in setup.py/requirements.in
       python3-gssapi=1.8.2-1ubuntu1 \
@@ -39,7 +42,8 @@ RUN apt-get update -y && \
     pip install --no-cache-dir --upgrade 'setuptools<81' && \
     pip install --no-cache-dir -r /code/requirements.txt && \
     apt-get remove -y \
-      gcc && \
+      gcc \
+      libpcre3-dev && \
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -137,7 +141,7 @@ RUN userdel -r ubuntu
 # Expose ports to clients
 EXPOSE 5000
 
-# Run server
+# Run server (in a full REANA deployment, this is overridden at runtime by reana-workflow-controller)
 CMD ["flask", "run", "-h", "0.0.0.0"]
 
 # Set image labels
