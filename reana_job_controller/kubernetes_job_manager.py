@@ -1,5 +1,5 @@
 # This file is part of REANA.
-# Copyright (C) 2019, 2020, 2021, 2022, 2023, 2024, 2025 CERN.
+# Copyright (C) 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -32,6 +32,7 @@ from reana_commons.errors import (
     REANAKubernetesCPULimitExceeded,
     REANAKubernetesWrongCPUFormat,
     REANAKubernetesRequestExceedsLimit,
+    REANAKubernetesUIDBelowMinimum,
 )
 from reana_commons.job_utils import (
     validate_kubernetes_memory,
@@ -62,6 +63,7 @@ from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_MAX_USER_CPU_LIMIT,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_REQUEST,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT,
+    REANA_KUBERNETES_JOBS_MIN_USER_UID,
     REANA_USER_ID,
     KUEUE_ENABLED,
     KUEUE_LOCAL_QUEUE_NAME,
@@ -123,7 +125,7 @@ class KubernetesJobManager(JobManager):
         :type job_name: str
         :param kerberos: Decides if kerberos should be provided for job.
         :type kerberos: bool
-        :param kubernetes_uid: User ID for job container.
+        :param kubernetes_uid: UID for job container.
         :type kubernetes_uid: int
         :param kubernetes_memory_limit: Memory limit for job container.
         :type kubernetes_memory_limit: str
@@ -733,11 +735,22 @@ class KubernetesJobManager(JobManager):
         )
 
     def set_user_id(self, kubernetes_uid):
-        """Set user id for job pods. UIDs < 100 are refused for security."""
-        if kubernetes_uid and kubernetes_uid >= 100:
-            self.kubernetes_uid = kubernetes_uid
-        else:
+        """Set UID for job pods.
+
+        UIDs below the cluster-configured minimum
+        (``REANA_KUBERNETES_JOBS_MIN_USER_UID``) are refused for security.
+        """
+        if kubernetes_uid is None:
             self.kubernetes_uid = WORKFLOW_RUNTIME_USER_UID
+            return
+        if kubernetes_uid < REANA_KUBERNETES_JOBS_MIN_USER_UID:
+            msg = (
+                f'The "kubernetes_uid" requested ({kubernetes_uid}) is below '
+                f"the cluster-configured minimum "
+                f"({REANA_KUBERNETES_JOBS_MIN_USER_UID})."
+            )
+            raise REANAKubernetesUIDBelowMinimum(msg)
+        self.kubernetes_uid = kubernetes_uid
 
     def set_cpu_request(self, kubernetes_cpu_request):
         """Set CPU request for job pods. Validate if provided format is correct."""

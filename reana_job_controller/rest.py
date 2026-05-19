@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2018, 2019, 2020, 2021, 2022, 2023 CERN.
+# Copyright (C) 2018, 2019, 2020, 2021, 2022, 2023, 2026 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -21,6 +21,7 @@ from reana_commons.errors import (
     REANAKubernetesWrongMemoryFormat,
     REANAKubernetesCPULimitExceeded,
     REANAKubernetesWrongCPUFormat,
+    REANAKubernetesUIDBelowMinimum,
 )
 
 from reana_db.models import JobStatus
@@ -258,6 +259,16 @@ def create_job():  # noqa
         400:
           description: >-
             Request failed. The incoming data specification seems malformed.
+        403:
+          description: >-
+            Request failed. The job submission was refused, e.g. because a
+            requested resource (CPU, memory, UID) violates the
+            cluster-configured limits.
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
         500:
           description: >-
             Request failed. Internal controller error. The job could probably
@@ -302,6 +313,8 @@ def create_job():  # noqa
             return jsonify({"message": e.message}), 403
         except REANAKubernetesWrongMemoryFormat as e:
             return jsonify({"message": e.message}), 400
+        except REANAKubernetesUIDBelowMinimum as e:
+            return jsonify({"message": e.message}), 403
     if not job_creation_condition.start_creation():
         return jsonify({"message": "Cannot create new jobs, shutting down"}), 400
 

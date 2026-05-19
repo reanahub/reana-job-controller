@@ -283,6 +283,17 @@
           "400": {
             "description": "Request failed. The incoming data specification seems malformed."
           },
+          "403": {
+            "description": "Request failed. The job submission was refused, e.g. because a requested resource (CPU, memory, UID) violates the cluster-configured limits.",
+            "schema": {
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
           "500": {
             "description": "Request failed. Internal controller error. The job could probably not have been allocated."
           }

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2019, 2020, 2021, 2022, 2023, 2024, 2025 CERN.
+# Copyright (C) 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -14,11 +14,16 @@ import uuid
 import mock
 import pytest
 from reana_db.models import Job, JobStatus
-from reana_commons.config import KRB5_INIT_CONTAINER_NAME, KRB5_RENEW_CONTAINER_NAME
+from reana_commons.config import (
+    KRB5_INIT_CONTAINER_NAME,
+    KRB5_RENEW_CONTAINER_NAME,
+    WORKFLOW_RUNTIME_USER_UID,
+)
 from reana_commons.errors import (
     REANAKubernetesCPULimitExceeded,
     REANAKubernetesWrongCPUFormat,
     REANAKubernetesMemoryLimitExceeded,
+    REANAKubernetesUIDBelowMinimum,
     REANAKubernetesWrongMemoryFormat,
 )
 from reana_job_controller.job_manager import JobManager
@@ -332,3 +337,36 @@ def test_set_memory_limit(
     else:
         job_manager.set_memory_limit(memory_limit)
         assert job_manager.kubernetes_memory_limit == expected_value
+
+
+@pytest.mark.parametrize(
+    "kubernetes_uid,min_user_uid,should_raise,expected_value",
+    [
+        (1500, 100, False, 1500),  # UID well above minimum accepted as-is.
+        (100, 100, False, 100),  # UID equal to minimum accepted.
+        (1000, 1000, False, 1000),  # Accepted under admin-raised minimum.
+        (None, 100, False, WORKFLOW_RUNTIME_USER_UID),  # No UID: default.
+        (50, 100, True, None),  # Below default minimum: refused.
+        (500, 1000, True, None),  # Below admin-raised minimum: refused.
+        (0, 100, True, None),  # Root refused.
+    ],
+)
+def test_set_user_id(
+    app, monkeypatch, kubernetes_uid, min_user_uid, should_raise, expected_value
+):
+    """Test that the configurable UID minimum is honoured."""
+    monkeypatch.setattr(
+        "reana_job_controller.kubernetes_job_manager.REANA_KUBERNETES_JOBS_MIN_USER_UID",
+        min_user_uid,
+    )
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+    )
+    if should_raise:
+        with pytest.raises(REANAKubernetesUIDBelowMinimum):
+            job_manager.set_user_id(kubernetes_uid)
+    else:
+        job_manager.set_user_id(kubernetes_uid)
+        assert job_manager.kubernetes_uid == expected_value

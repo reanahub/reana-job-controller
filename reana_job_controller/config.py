@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -199,6 +199,18 @@ REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT = os.getenv(
 
 Please see the following URL for more details
 https://kubernetes.io/docs/concepts/workloads/controllers/job/#job-termination-and-cleanup.
+"""
+
+REANA_KUBERNETES_JOBS_MIN_USER_UID = int(
+    os.getenv("REANA_KUBERNETES_JOBS_MIN_USER_UID", 100)
+)
+"""Minimum accepted user runtime container UID that users can assign to their job
+containers via ``kubernetes_uid`` in ``reana.yaml``. Jobs requesting a smaller
+UID are refused at submission time with a clear error message.
+
+The default value of 100 blocks the root user (UID 0) and the statically
+reserved 1-99 system-user range. Cluster administrators can raise this minimum
+to align with Pod Security Standards "restricted" expectations.
 """
 
 SLURM_HEADNODE_HOSTNAME = os.getenv("SLURM_HOSTNAME", "hpc-batch.cern.ch")
