@@ -11,6 +11,7 @@ import logging
 import os
 import traceback
 from typing import Optional
+import requests
 
 from flask import current_app
 from kubernetes import client
@@ -65,6 +66,9 @@ from reana_job_controller.config import (
     REANA_USER_ID,
     KUEUE_ENABLED,
     KUEUE_LOCAL_QUEUE_NAME,
+    REANA_DATASTORE_ENABLED,
+    REANA_DATASTORE_SECRET,
+    REANA_DATASTORE_IMAGE,
 )
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
@@ -175,6 +179,46 @@ class KubernetesJobManager(JobManager):
         """Execute a job in Kubernetes."""
         backend_job_id = build_unique_component_name("run-job")
 
+        user_secrets = UserSecretsStore.fetch(REANA_USER_ID)
+        all_env = user_secrets.get_env_secrets_as_k8s_spec()
+        s3_env = []
+        for secret in all_env:
+            secret_name = secret.get("name", "")
+            if secret_name.startswith("S3_TO_LOCAL_"):
+                s3_env.append(secret)
+        datastore_enabled = False
+        if s3_env:
+            datastore_enabled = True
+
+        if datastore_enabled and REANA_DATASTORE_ENABLED:
+            check_mounts_script = """
+            #!/bin/bash
+
+            TARGET_FILE="/data/s3/.readiness_probe.txt"
+            TIMEOUT=30
+            ELAPSED=0
+
+            while [ $ELAPSED -lt $TIMEOUT ]; do
+                # Check if file exists AND contains the string "READY"
+                if [ -f "$TARGET_FILE" ] && grep -q "READY" "$TARGET_FILE"; then
+                    echo "Mount verified: Readiness probe detected."
+                    exit 0
+                fi
+
+                sleep 1
+                ((ELAPSED++))
+            done
+
+            echo "Error: Failed to find 'READY' in $TARGET_FILE within $TIMEOUT seconds."
+            echo "Please check your S3 mount status and credentials."
+            exit 1
+            """
+            self.cmd = (
+                f"bash -c '{check_mounts_script}' && "
+                + self.cmd
+                + "&& curl -X POST http://localhost:5000/shutdown"
+            )
+
         self.job = {
             "kind": "Job",
             "apiVersion": "batch/v1",
@@ -203,18 +247,73 @@ class KubernetesJobManager(JobManager):
                         "containers": [
                             {
                                 "image": self.docker_img,
+                                "name": "job",
                                 "command": ["bash", "-c"],
                                 "args": [self.cmd],
-                                "name": "job",
                                 "env": [],
-                                "volumeMounts": [],
+                                "volumeMounts": [
+                                    *(
+                                        [
+                                            {
+                                                "name": "s3-mounts",
+                                                "mountPath": "/data/s3/",
+                                                "mountPropagation": "HostToContainer",
+                                            }
+                                        ]
+                                        if REANA_DATASTORE_ENABLED and datastore_enabled
+                                        else []
+                                    )
+                                ],
                                 "securityContext": {"allowPrivilegeEscalation": False},
-                            }
+                            },
+                            *(
+                                [
+                                    {
+                                        "image": REANA_DATASTORE_IMAGE,
+                                        "name": "datastore",
+                                        "env": s3_env,
+                                        "volumeMounts": [
+                                            {
+                                                "name": "fuse-device",
+                                                "mountPath": "/dev/fuse",
+                                            },
+                                            {
+                                                "name": "s3-mounts",
+                                                "mountPath": "/s3-data",
+                                                "mountPropagation": "Bidirectional",
+                                            },
+                                        ],
+                                        "securityContext": {
+                                            "runAsUser": 0,
+                                            "allowPrivilegeEscalation": True,
+                                            "capabilities": {"add": ["SYS_ADMIN"]},
+                                            "privileged": True,
+                                        },
+                                        "imagePullPolicy": "Always",
+                                    }
+                                ]
+                                if REANA_DATASTORE_ENABLED and datastore_enabled
+                                else []
+                            ),
                         ],
                         "initContainers": [],
-                        "volumes": [],
+                        "volumes": [
+                            *(
+                                [
+                                    {
+                                        "name": "fuse-device",
+                                        "hostPath": {
+                                            "path": "/dev/fuse",
+                                            "type": "CharDevice",
+                                        },
+                                    },
+                                    {"name": "s3-mounts", "emptyDir": {}},
+                                ]
+                                if REANA_DATASTORE_ENABLED and datastore_enabled
+                                else []
+                            )
+                        ],
                         "restartPolicy": "Never",
-                        # No need to wait a long time for jobs to gracefully terminate
                         "terminationGracePeriodSeconds": 5,
                         "enableServiceLinks": False,
                     },
@@ -453,6 +552,8 @@ class KubernetesJobManager(JobManager):
         for secret_name in current_app.config["IMAGE_PULL_SECRETS"]:
             if secret_name:
                 image_pull_secrets.append({"name": secret_name})
+        if REANA_DATASTORE_ENABLED and REANA_DATASTORE_SECRET != "":
+            image_pull_secrets.append({"name": REANA_DATASTORE_SECRET})
 
         self.job["spec"]["template"]["spec"]["imagePullSecrets"] = image_pull_secrets
 
