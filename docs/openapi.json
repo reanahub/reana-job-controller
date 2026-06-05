@@ -73,6 +73,18 @@
         "htcondor_max_runtime": {
           "type": "string"
         },
+        "htcondor_request_cpus": {
+          "type": "string"
+        },
+        "htcondor_request_disk": {
+          "type": "string"
+        },
+        "htcondor_request_memory": {
+          "type": "string"
+        },
+        "htcondor_requirements": {
+          "type": "string"
+        },
         "job_name": {
           "type": "string"
         },
