@@ -37,7 +37,7 @@ extras_require = {
         "htcondor>=9.0.17",
     ],
     "tests": [
-        "reana-commons[kubernetes,tests]>=0.95.0a18,<0.96.0",
+        "reana-commons[kubernetes,tests]>=0.95.0a20,<0.96.0",
         "reana-db[tests]>=0.95.0a10,<0.96.0",
     ],
     "ssh": ["paramiko[gssapi]>=3.2.0"],
@@ -63,7 +63,7 @@ install_requires = [
     "Werkzeug>=3.0.0",
     "fs>=2.0",
     "marshmallow>=3.5.0,<4.0.0",
-    "reana-commons[kubernetes]>=0.95.0a18,<0.96.0",
+    "reana-commons[kubernetes]>=0.95.0a20,<0.96.0",
     "reana-db>=0.95.0a10,<0.96.0",
     "retrying>=1.3.3",
 ]
