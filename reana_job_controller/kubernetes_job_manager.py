@@ -311,12 +311,21 @@ class KubernetesJobManager(JobManager):
                 # the logs of all containers, even if they are still running, as the job
                 # will not continue running after this anyway.
                 if container.state.terminated or container.state.running:
-                    container_log = (
+                    # Read raw response body (``_preload_content=False``) and
+                    # decode it ourselves: kubernetes 36.x applies ``str()`` to
+                    # ``bytes`` payloads in its ``response_type='str'``
+                    # deserialiser, producing ``b'...'`` repr strings instead
+                    # of UTF-8 text.
+                    pod_log_response = (
                         current_k8s_corev1_api_client.read_namespaced_pod_log(
                             namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
                             name=job_pod.metadata.name,
                             container=container.name,
+                            _preload_content=False,
                         )
+                    )
+                    container_log = pod_log_response.data.decode(
+                        "utf-8", errors="replace"
                     )
                     pod_logs += "{}: :\n {}\n".format(container.name, container_log)
                     if hasattr(container.state.terminated, "reason"):

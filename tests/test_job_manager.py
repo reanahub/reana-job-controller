@@ -181,7 +181,9 @@ def test_kubernetes_get_job_logs(
 ):
     """Test retrieval of job logs."""
     k8s_corev1_api_client = mock.MagicMock()
-    k8s_corev1_api_client.read_namespaced_pod_log = lambda **kwargs: pod_logs
+    k8s_corev1_api_client.read_namespaced_pod_log = lambda **kwargs: (
+        mock.MagicMock(data=pod_logs.encode("utf-8")) if pod_logs else None
+    )
     with mock.patch(
         "reana_job_controller.kubernetes_job_manager.current_k8s_corev1_api_client",
         k8s_corev1_api_client,
@@ -190,6 +192,38 @@ def test_kubernetes_get_job_logs(
         assert (k8s_logs or pod_logs) in KubernetesJobManager.get_logs(
             job_pod.metadata.labels["job-name"], job_pod=job_pod
         )
+
+
+def test_kubernetes_get_job_logs_preserves_newlines(app, kubernetes_job_pod):
+    """Raw pod log bytes are decoded to str with real newlines preserved.
+
+    Guards against kubernetes 36.x's str-deserialiser regression that
+    turns ``bytes`` payloads into ``"b'...'"`` repr strings with literal
+    backslash-n inside.
+    """
+    pod_logs_bytes = b"variables\n---------\n(a0,a1,mean)\n"
+    k8s_corev1_api_client = mock.MagicMock()
+    k8s_corev1_api_client.read_namespaced_pod_log = mock.MagicMock(
+        return_value=mock.MagicMock(data=pod_logs_bytes)
+    )
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_corev1_api_client",
+        k8s_corev1_api_client,
+    ):
+        job_pod = kubernetes_job_pod("Succeeded", "Completed")
+        logs = KubernetesJobManager.get_logs(
+            job_pod.metadata.labels["job-name"], job_pod=job_pod
+        )
+        assert isinstance(logs, str)
+        assert pod_logs_bytes.decode("utf-8") in logs
+        assert "b'" not in logs
+        assert "\\n" not in logs
+        # Lock in the kubernetes 36.x workaround: the call MUST pass
+        # ``_preload_content=False`` so we get raw bytes from urllib3
+        # instead of the broken str-deserialiser output.
+        assert k8s_corev1_api_client.read_namespaced_pod_log.called
+        for call in k8s_corev1_api_client.read_namespaced_pod_log.call_args_list:
+            assert call.kwargs.get("_preload_content") is False
 
 
 @pytest.mark.parametrize(
