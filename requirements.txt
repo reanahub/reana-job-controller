@@ -4,29 +4,33 @@
 #
 #    pip-compile --annotation-style=line --extra=ssh --output-file=requirements.txt setup.py
 #
+aiohappyeyeballs==2.6.2   # via aiohttp
+aiohttp==3.14.0           # via kubernetes
+aiosignal==1.4.0          # via aiohttp
 alembic==1.18.4           # via reana-db
 amqp==5.3.1               # via kombu
 apispec[yaml]==6.10.0     # via apispec-webframeworks, reana-job-controller (setup.py)
 apispec-webframeworks==1.2.0  # via reana-job-controller (setup.py)
 appdirs==1.4.4            # via fs
-attrs==26.1.0             # via jsonschema
+attrs==26.1.0             # via aiohttp, jsonschema
 bcrypt==5.0.0             # via paramiko
 blinker==1.9.0            # via flask
 bracex==2.6               # via wcmatch
 bravado==10.3.2           # via reana-commons
 bravado-core==6.1.0       # via bravado, reana-commons
-certifi==2026.4.22        # via kubernetes, requests
+certifi==2026.5.20        # via kubernetes, requests
 cffi==2.0.0               # via cryptography, pynacl
 charset-normalizer==3.4.7  # via requests
 checksumdir==1.1.9        # via reana-commons
-click==8.3.3              # via flask, reana-commons
+click==8.4.1              # via flask, reana-commons
 cryptography==48.0.0      # via paramiko, sqlalchemy-utils
 durationpy==0.10          # via kubernetes
 flask==3.1.3              # via reana-job-controller (setup.py)
+frozenlist==1.8.0         # via aiohttp, aiosignal
 fs==2.4.16                # via reana-commons, reana-job-controller (setup.py)
 gherkin-official==39.1.0  # via reana-commons
-greenlet==3.5.0           # via sqlalchemy
-idna==3.14                # via jsonschema, requests
+greenlet==3.5.1           # via sqlalchemy
+idna==3.18                # via jsonschema, requests, yarl
 importlib-resources==7.1.0  # via swagger-spec-validator
 invoke==3.0.3             # via paramiko
 itsdangerous==2.2.0       # via flask
@@ -35,7 +39,7 @@ jsonpointer==3.1.1        # via jsonschema
 jsonref==1.1.0            # via bravado-core
 jsonschema[format]==3.2.0  # via bravado-core, reana-commons, swagger-spec-validator
 kombu==5.6.2              # via reana-commons
-kubernetes==35.0.0        # via reana-commons
+kubernetes==36.0.2        # via reana-commons
 mako==1.3.12              # via alembic
 markupsafe==3.0.3         # via flask, jinja2, mako, werkzeug
 marshmallow==3.26.2       # via reana-job-controller (setup.py)
@@ -43,10 +47,12 @@ mock==3.0.5               # via reana-commons
 monotonic==1.6            # via bravado
 msgpack==1.1.2            # via bravado-core
 msgpack-python==0.5.6     # via bravado
+multidict==6.7.1          # via aiohttp, yarl
 oauthlib==3.3.1           # via requests-oauthlib
 packaging==26.2           # via apispec, kombu, marshmallow
 paramiko[gssapi]==5.0.0   # via reana-job-controller (setup.py)
-parse==1.22.0             # via reana-commons
+parse==1.22.1             # via reana-commons
+propcache==0.5.2          # via aiohttp, yarl
 psycopg2-binary==2.9.12   # via reana-db
 pycparser==3.0            # via cffi
 pynacl==1.6.2             # via paramiko
@@ -54,19 +60,19 @@ pyrsistent==0.20.0        # via jsonschema
 python-dateutil==2.9.0.post0  # via bravado, bravado-core, kubernetes
 pytz==2026.2              # via bravado-core
 pyyaml==6.0.3             # via apispec, bravado, bravado-core, kubernetes, reana-commons, swagger-spec-validator
-reana-commons[kubernetes]==0.95.0a20	# via reana-db, reana-job-controller (setup.py)
-reana-db==0.95.0a10	# via reana-job-controller (setup.py)
-requests==2.34.0          # via bravado, bravado-core, kubernetes, requests-oauthlib
+reana-commons[kubernetes]==0.95.0a20  # via reana-db, reana-job-controller (setup.py)
+reana-db==0.95.0a10       # via reana-job-controller (setup.py)
+requests==2.34.2          # via bravado, bravado-core, kubernetes, requests-oauthlib
 requests-oauthlib==2.0.0  # via kubernetes
 retrying==1.4.2           # via reana-job-controller (setup.py)
 rfc3987==1.3.8            # via jsonschema
 simplejson==4.1.1         # via bravado, bravado-core
 six==1.17.0               # via bravado, bravado-core, fs, jsonschema, kubernetes, mock, python-dateutil
-sqlalchemy==2.0.49        # via alembic, reana-db, sqlalchemy-utils
+sqlalchemy==2.0.50        # via alembic, reana-db, sqlalchemy-utils
 sqlalchemy-utils[encrypted]==0.41.2  # via reana-db, sqlalchemy-utils
 strict-rfc3339==0.7       # via jsonschema
 swagger-spec-validator==3.0.4  # via bravado-core
-typing-extensions==4.15.0  # via alembic, bravado, gherkin-official, sqlalchemy, swagger-spec-validator
+typing-extensions==4.15.0  # via aiohttp, aiosignal, alembic, bravado, gherkin-official, sqlalchemy, swagger-spec-validator
 tzdata==2026.2            # via kombu
 urllib3==2.7.0            # via kubernetes, requests
 vine==5.1.0               # via amqp, kombu
@@ -74,6 +80,7 @@ wcmatch==8.4.1            # via reana-commons
 webcolors==25.10.0        # via jsonschema
 websocket-client==1.9.0   # via kubernetes
 werkzeug==3.1.8           # via flask, reana-commons, reana-job-controller (setup.py)
+yarl==1.24.2              # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
