@@ -11,9 +11,11 @@
 import json
 import uuid
 
+import pytest
 from flask import current_app, url_for
 from kubernetes.client.rest import ApiException
 from mock import Mock, patch
+from reana_commons.config import REANA_DEFAULT_SNAKEMAKE_ENV_IMAGE
 from reana_commons.job_utils import serialise_job_command
 
 
@@ -95,3 +97,79 @@ def test_create_job_unsupported_backend(app, job_spec):
         )
         assert res.json == {"job": expected_msg}
         assert res.status_code == 500
+
+
+@pytest.mark.parametrize(
+    "image",
+    [
+        REANA_DEFAULT_SNAKEMAKE_ENV_IMAGE,
+        "docker.io/library/ubuntu:24.04",
+        "",
+    ],
+)
+@patch("reana_job_controller.schemas.REANA_KUBERNETES_JOBS_TIMEOUT_LIMIT", "10")
+@patch(
+    "reana_job_controller.schemas.REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT", "20"
+)
+def test_create_job_rejects_unvetted_images(app, job_spec, image):
+    """Test that job submission rejects images outside the allowlist."""
+    job_spec["docker_img"] = image
+    job_spec["cmd"] = serialise_job_command("ls")
+    app.config["REANA_VETTED_CONTAINER_IMAGES"] = {
+        "enabled": True,
+        "allowlist": [],
+    }
+
+    with app.test_client() as client:
+        response = client.post(
+            url_for("jobs.create_job"),
+            content_type="application/json",
+            data=json.dumps(job_spec),
+        )
+
+    assert response.status_code == 403
+    assert response.json == {"message": f"Image not allowed: {image}"}
+
+
+@pytest.mark.parametrize(
+    "vetting_config",
+    [
+        {"enabled": False, "allowlist": []},
+        {
+            "enabled": True,
+            "allowlist": ["docker.io/library/ubuntu:24.04"],
+        },
+    ],
+)
+@patch("reana_job_controller.schemas.REANA_KUBERNETES_JOBS_TIMEOUT_LIMIT", "10")
+@patch(
+    "reana_job_controller.schemas.REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT", "20"
+)
+def test_create_job_allows_vetted_images(app, job_spec, monkeypatch, vetting_config):
+    """Test that allowed images pass vetting and reach job creation."""
+    job_spec["compute_backend"] = "test"
+    job_spec["docker_img"] = "docker.io/library/ubuntu:24.04"
+    job_spec["cmd"] = serialise_job_command("ls")
+    app.config["REANA_VETTED_CONTAINER_IMAGES"] = vetting_config
+    monkeypatch.setitem(app.config, "SUPPORTED_COMPUTE_BACKENDS", ["test"])
+    monkeypatch.setitem(app.config, "COMPUTE_BACKENDS", {"test": lambda: Mock})
+
+    with (
+        patch(
+            "reana_job_controller.rest.get_cached_user_secrets",
+            return_value={},
+        ),
+        patch(
+            "reana_job_controller.rest.job_creation_condition.start_creation",
+            return_value=False,
+        ),
+        app.test_client() as client,
+    ):
+        response = client.post(
+            url_for("jobs.create_job"),
+            content_type="application/json",
+            data=json.dumps(job_spec),
+        )
+
+    assert response.status_code == 400
+    assert response.json == {"message": "Cannot create new jobs, shutting down"}

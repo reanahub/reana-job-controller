@@ -9,6 +9,7 @@
 """Flask application configuration."""
 
 from distutils.util import strtobool
+import json
 import os
 import secrets
 
@@ -77,6 +78,14 @@ SUPPORTED_COMPUTE_BACKENDS = os.getenv(
     "COMPUTE_BACKENDS", DEFAULT_COMPUTE_BACKEND
 ).split(",")
 """List of supported compute backends provided as docker build arg."""
+
+REANA_VETTED_CONTAINER_IMAGES = json.loads(
+    os.getenv(
+        "REANA_VETTED_CONTAINER_IMAGES",
+        '{"enabled": false, "allowlist": []}',
+    )
+)
+"""Container images that users are allowed to use in their workflows."""
 
 
 VOMSPROXY_CONTAINER_IMAGE = os.getenv(

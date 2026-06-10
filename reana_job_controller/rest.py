@@ -284,6 +284,11 @@ def create_job():  # noqa
     except marshmallow.ValidationError as e:
         return jsonify({"message": e.messages}), 400
 
+    vetted_images = current_app.config["REANA_VETTED_CONTAINER_IMAGES"]
+    docker_img = job_request["docker_img"]
+    if vetted_images["enabled"] and docker_img not in vetted_images["allowlist"]:
+        return jsonify({"message": f"Image not allowed: {docker_img}"}), 403
+
     compute_backend = job_request.get(
         "compute_backend", current_app.config["DEFAULT_COMPUTE_BACKEND"]
     )
