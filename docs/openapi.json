@@ -45,7 +45,16 @@
         "c4p_cpu_cores": {
           "type": "string"
         },
+        "c4p_request_gpus": {
+          "type": "string"
+        },
         "c4p_memory_limit": {
+          "type": "string"
+        },
+        "c4p_notification": {
+          "type": "string"
+        },
+        "c4p_email_address": {
           "type": "string"
         },
         "cmd": {
