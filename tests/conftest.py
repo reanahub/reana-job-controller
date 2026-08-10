@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2017, 2018, 2019, 2020, 2021 CERN.
+# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2023, 2026 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -41,7 +41,6 @@ def mocked_job():
 def job_spec():
     """Job spec dict."""
     job_spec = {
-        "experiment": "experiment",
         "docker_img": "image",
         "cmd": "cmd",
         "prettified_cmd": "prettified_cmd",

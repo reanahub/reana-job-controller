@@ -1,6 +1,7 @@
 {
   "definitions": {
     "Job": {
+      "additionalProperties": false,
       "properties": {
         "cmd": {
           "type": "string"
@@ -16,11 +17,9 @@
           "type": "string"
         },
         "max_restart_count": {
-          "format": "int32",
           "type": "integer"
         },
         "restart_count": {
-          "format": "int32",
           "type": "integer"
         },
         "status": {
@@ -38,6 +37,7 @@
       "type": "object"
     },
     "JobRequest": {
+      "additionalProperties": false,
       "properties": {
         "c4p_additional_requirements": {
           "type": "string"
@@ -63,6 +63,7 @@
           "type": "string"
         },
         "env_vars": {
+          "additionalProperties": {},
           "default": {},
           "type": "object"
         },
@@ -70,6 +71,18 @@
           "type": "string"
         },
         "htcondor_max_runtime": {
+          "type": "string"
+        },
+        "htcondor_request_cpus": {
+          "type": "string"
+        },
+        "htcondor_request_disk": {
+          "type": "string"
+        },
+        "htcondor_request_memory": {
+          "type": "string"
+        },
+        "htcondor_requirements": {
           "type": "string"
         },
         "job_name": {
@@ -85,7 +98,6 @@
           "type": "string"
         },
         "kubernetes_job_timeout": {
-          "format": "int32",
           "type": "integer"
         },
         "kubernetes_memory_limit": {
@@ -95,7 +107,6 @@
           "type": "string"
         },
         "kubernetes_uid": {
-          "format": "int32",
           "type": "integer"
         },
         "prettified_cmd": {
@@ -140,7 +151,7 @@
   "info": {
     "description": "REANA Job Controller API",
     "title": "reana-job-controller",
-    "version": "0.95.0a4"
+    "version": "0.95.0a5"
   },
   "paths": {
     "/apispec": {},
@@ -283,6 +294,17 @@
           },
           "400": {
             "description": "Request failed. The incoming data specification seems malformed."
+          },
+          "403": {
+            "description": "Request failed. The job submission was refused, e.g. because a requested resource (CPU, memory, UID) violates the cluster-configured limits.",
+            "schema": {
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
           },
           "500": {
             "description": "Request failed. Internal controller error. The job could probably not have been allocated."

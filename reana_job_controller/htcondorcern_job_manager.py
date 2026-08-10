@@ -1,5 +1,5 @@
 # This file is part of REANA.
-# Copyright (C) 2019, 2020, 2021, 2022, 2023 CERN.
+# Copyright (C) 2019, 2020, 2021, 2022, 2023, 2024, 2026 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -21,6 +21,7 @@ from retrying import retry
 from reana_commons.config import HTCONDOR_JOB_FLAVOURS
 
 from reana_job_controller.job_manager import JobManager
+from reana_job_controller.schemas import htcondor_quantity_to_unit
 from reana_job_controller.utils import initialize_krb5_token
 
 thread_local = threading.local()
@@ -52,6 +53,10 @@ class HTCondorJobManagerCERN(JobManager):
         unpacked_img=False,
         htcondor_max_runtime="",
         htcondor_accounting_group=None,
+        htcondor_request_cpus="",
+        htcondor_request_memory="",
+        htcondor_request_disk="",
+        htcondor_requirements="",
         **kwargs,
     ):
         """Instantiate HTCondor job manager.
@@ -80,6 +85,27 @@ class HTCondorJobManagerCERN(JobManager):
         :type htcondor_max_runtime: str
         :param htcondor_accounting_group: Accounting group of a HTCondor job.
         :type htcondor_accounting_group: str
+        :param htcondor_request_cpus: Number of CPU cores requested for the
+            HTCondor job (positive integer as string).
+        :type htcondor_request_cpus: str
+        :param htcondor_request_memory: Memory requested for the HTCondor
+            job. Accepts a positive integer with an optional
+            ``K|KB|M|MB|G|GB|T|TB`` suffix (case-insensitive, binary
+            multipliers). When no suffix is given, the value is interpreted
+            in megabytes, the native unit of ``RequestMemory``. Examples:
+            ``"4096"``, ``"4 GB"``, ``"4gb"``.
+        :type htcondor_request_memory: str
+        :param htcondor_request_disk: Disk requested for the HTCondor job.
+            Same quantity syntax as ``htcondor_request_memory``; when no
+            suffix is given, the value is interpreted in kilobytes, the
+            native unit of ``RequestDisk``. Examples: ``"10000"``,
+            ``"10 GB"``, ``"10tb"``.
+        :type htcondor_request_disk: str
+        :param htcondor_requirements: HTCondor ``Requirements`` ClassAd
+            expression to select the machine(s) the job can run on. REANA
+            does not compose this with any backend-provided default; the
+            value is the full expression.
+        :type htcondor_requirements: str
         """
         super(HTCondorJobManagerCERN, self).__init__(
             docker_img=docker_img,
@@ -97,6 +123,10 @@ class HTCondorJobManagerCERN(JobManager):
         self.unpacked_img = unpacked_img
         self.htcondor_max_runtime = htcondor_max_runtime
         self.htcondor_accounting_group = htcondor_accounting_group
+        self.htcondor_request_cpus = htcondor_request_cpus
+        self.htcondor_request_memory = htcondor_request_memory
+        self.htcondor_request_disk = htcondor_request_disk
+        self.htcondor_requirements = htcondor_requirements
 
         # We need to import the htcondor package later during runtime after the Kerberos environment is fully initialised.
         # Without a valid Kerberos ticket, importing will exit with "ERROR: Unauthorized 401 - do you have authentication tokens? Error "/usr/bin/myschedd.sh |"
@@ -147,6 +177,18 @@ class HTCondorJobManagerCERN(JobManager):
             job_ad["MaxRunTime"] = 3600
         if self.htcondor_accounting_group:
             job_ad["AccountingGroup"] = self.htcondor_accounting_group
+        if self.htcondor_request_cpus:
+            job_ad["RequestCpus"] = int(self.htcondor_request_cpus)
+        if self.htcondor_request_memory:
+            job_ad["RequestMemory"] = htcondor_quantity_to_unit(
+                self.htcondor_request_memory, "M"
+            )
+        if self.htcondor_request_disk:
+            job_ad["RequestDisk"] = htcondor_quantity_to_unit(
+                self.htcondor_request_disk, "K"
+            )
+        if self.htcondor_requirements:
+            job_ad["Requirements"] = classad.ExprTree(self.htcondor_requirements)
         future = current_app.htcondor_executor.submit(self._submit, job_ad)
         clusterid = future.result()
         return clusterid

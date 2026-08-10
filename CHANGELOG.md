@@ -4,6 +4,12 @@
 
 # Changelog
 
+## [Unreleased](https://github.com/reanahub/reana-job-controller/compare/0.9.4...HEAD)
+
+### Documentation
+
+* **kubernetes:** note that user job containers now run with `capabilities.drop: [ALL]` and `seccompProfile: RuntimeDefault` when `K8S_USE_SECURITY_CONTEXT` is enabled, which may require adjustments for workflow images that depend on extra Linux capabilities or unconfined syscalls
+
 ## [0.9.4](https://github.com/reanahub/reana-job-controller/compare/0.9.3...0.9.4) (2024-11-29)
 
 ### Build

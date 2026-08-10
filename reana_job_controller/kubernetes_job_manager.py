@@ -1,5 +1,5 @@
 # This file is part of REANA.
-# Copyright (C) 2019, 2020, 2021, 2022, 2023, 2024, 2025 CERN.
+# Copyright (C) 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -20,6 +20,7 @@ from kubernetes.client.rest import ApiException
 from reana_commons.config import (
     K8S_CERN_EOS_AVAILABLE,
     K8S_CERN_EOS_MOUNT_CONFIGURATION,
+    K8S_USE_SECURITY_CONTEXT,
     KRB5_STATUS_FILE_LOCATION,
     REANA_JOB_HOSTPATH_MOUNTS,
     REANA_RUNTIME_KUBERNETES_NAMESPACE,
@@ -33,6 +34,7 @@ from reana_commons.errors import (
     REANAKubernetesCPULimitExceeded,
     REANAKubernetesWrongCPUFormat,
     REANAKubernetesRequestExceedsLimit,
+    REANAKubernetesUIDBelowMinimum,
 )
 from reana_commons.job_utils import (
     validate_kubernetes_memory,
@@ -63,8 +65,9 @@ from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_MAX_USER_CPU_LIMIT,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_REQUEST,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT,
+    REANA_KUBERNETES_JOBS_MIN_USER_UID,
     REANA_USER_ID,
-    USE_KUEUE,
+    KUEUE_ENABLED,
     KUEUE_LOCAL_QUEUE_NAME,
     REANA_DATASTORE_ENABLED,
     REANA_DATASTORE_SECRET,
@@ -72,6 +75,70 @@ from reana_job_controller.config import (
 )
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
+
+
+def _restricted_container_security_context(
+    kubernetes_uid: Optional[int] = None,
+    kubernetes_gid: int = WORKFLOW_RUNTIME_USER_GID,
+) -> dict:
+    """Return a PSA-restricted container security context."""
+    security_context = {
+        "runAsNonRoot": True,
+        "allowPrivilegeEscalation": False,
+        "capabilities": {"drop": ["ALL"]},
+        "seccompProfile": {"type": "RuntimeDefault"},
+    }
+    if kubernetes_uid is not None:
+        security_context["runAsUser"] = int(kubernetes_uid)
+        security_context["runAsGroup"] = int(kubernetes_gid)
+    return security_context
+
+
+def _normalize_kerberos_container_security_context(
+    kerberos_config, kubernetes_uid: int
+):
+    """Backfill missing Kerberos security-context fields from older commons releases."""
+    if not K8S_USE_SECURITY_CONTEXT:
+        return kerberos_config
+
+    for container_name in ("init_container", "renew_container"):
+        container = getattr(kerberos_config, container_name, None)
+        if not container:
+            continue
+
+        expected_security_context = _restricted_container_security_context(
+            kubernetes_uid
+        )
+        if "securityContext" not in container:
+            container["securityContext"] = expected_security_context
+            continue
+
+        for field, value in expected_security_context.items():
+            if field not in container["securityContext"]:
+                container["securityContext"][field] = value
+
+    return kerberos_config
+
+
+def _get_compatible_kerberos_k8s_config(secrets, kubernetes_uid: int):
+    """Return Kerberos k8s config across released and unreleased commons APIs."""
+    try:
+        kerberos_config = get_kerberos_k8s_config(
+            secrets,
+            kubernetes_uid=kubernetes_uid,
+            use_security_context=K8S_USE_SECURITY_CONTEXT,
+        )
+    except TypeError as exc:
+        if "unexpected keyword argument 'use_security_context'" not in str(exc):
+            raise
+        kerberos_config = get_kerberos_k8s_config(
+            secrets,
+            kubernetes_uid=kubernetes_uid,
+        )
+    return _normalize_kerberos_container_security_context(
+        kerberos_config,
+        kubernetes_uid,
+    )
 
 
 class KubernetesJobManager(JobManager):
@@ -127,7 +194,7 @@ class KubernetesJobManager(JobManager):
         :type job_name: str
         :param kerberos: Decides if kerberos should be provided for job.
         :type kerberos: bool
-        :param kubernetes_uid: User ID for job container.
+        :param kubernetes_uid: UID for job container.
         :type kubernetes_uid: int
         :param kubernetes_memory_limit: Memory limit for job container.
         :type kubernetes_memory_limit: str
@@ -227,7 +294,7 @@ class KubernetesJobManager(JobManager):
                 "namespace": REANA_RUNTIME_KUBERNETES_NAMESPACE,
                 "labels": (
                     {"kueue.x-k8s.io/queue-name": KUEUE_LOCAL_QUEUE_NAME}
-                    if USE_KUEUE
+                    if KUEUE_ENABLED
                     else {}
                 ),
             },
@@ -320,18 +387,24 @@ class KubernetesJobManager(JobManager):
                 },
             },
         }
+        if K8S_USE_SECURITY_CONTEXT:
+            self.job["spec"]["template"]["spec"]["containers"][0][
+                "securityContext"
+            ] = _restricted_container_security_context()
 
         secret_env_vars = self.secrets.get_env_secrets_as_k8s_spec()
         job_spec = self.job["spec"]["template"]["spec"]
         job_spec["containers"][0]["env"].extend(secret_env_vars)
-        job_spec["volumes"].append(self.secrets.get_file_secrets_volume_as_k8s_specs())
+        job_spec["volumes"].append(
+            self.secrets.get_file_secrets_volume_as_k8s_specs())
 
         secrets_volume_mount = self.secrets.get_secrets_volume_mount_as_k8s_spec()
         job_spec["containers"][0]["volumeMounts"].append(secrets_volume_mount)
 
         if self.env_vars:
             for var, value in self.env_vars.items():
-                job_spec["containers"][0]["env"].append({"name": var, "value": value})
+                job_spec["containers"][0]["env"].append(
+                    {"name": var, "value": value})
 
         self.add_resource_requests_and_limits(job_spec)
         self.add_hostpath_volumes()
@@ -347,20 +420,25 @@ class KubernetesJobManager(JobManager):
             job_spec["containers"][0]["volumeMounts"].extend(volume_mounts)
             job_spec["volumes"].extend(volumes)
 
-        self.job["spec"]["template"]["spec"]["securityContext"] = (
-            client.V1PodSecurityContext(
-                run_as_group=WORKFLOW_RUNTIME_USER_GID, run_as_user=self.kubernetes_uid
+        if K8S_USE_SECURITY_CONTEXT:
+            self.job["spec"]["template"]["spec"]["securityContext"] = (
+                client.V1PodSecurityContext(
+                    run_as_group=int(WORKFLOW_RUNTIME_USER_GID),
+                    run_as_user=int(self.kubernetes_uid),
+                    run_as_non_root=True,
+                )
             )
-        )
 
         if self.kerberos:
             self._add_krb5_containers(self.secrets)
 
         if self.voms_proxy:
-            self._add_voms_proxy_init_container(secrets_volume_mount, secret_env_vars)
+            self._add_voms_proxy_init_container(
+                secrets_volume_mount, secret_env_vars)
 
         if self.rucio:
-            self._add_rucio_init_container(secrets_volume_mount, secret_env_vars)
+            self._add_rucio_init_container(
+                secrets_volume_mount, secret_env_vars)
 
         if REANA_RUNTIME_JOBS_KUBERNETES_NODE_LABEL:
             self.job["spec"]["template"]["spec"][
@@ -406,14 +484,24 @@ class KubernetesJobManager(JobManager):
                 # the logs of all containers, even if they are still running, as the job
                 # will not continue running after this anyway.
                 if container.state.terminated or container.state.running:
-                    container_log = (
+                    # Read raw response body (``_preload_content=False``) and
+                    # decode it ourselves: kubernetes 36.x applies ``str()`` to
+                    # ``bytes`` payloads in its ``response_type='str'``
+                    # deserialiser, producing ``b'...'`` repr strings instead
+                    # of UTF-8 text.
+                    pod_log_response = (
                         current_k8s_corev1_api_client.read_namespaced_pod_log(
                             namespace=REANA_RUNTIME_KUBERNETES_NAMESPACE,
                             name=job_pod.metadata.name,
                             container=container.name,
+                            _preload_content=False,
                         )
                     )
-                    pod_logs += "{}: :\n {}\n".format(container.name, container_log)
+                    container_log = pod_log_response.data.decode(
+                        "utf-8", errors="replace"
+                    )
+                    pod_logs += "{}: :\n {}\n".format(
+                        container.name, container_log)
                     if hasattr(container.state.terminated, "reason"):
                         if container.state.terminated.reason != "Completed":
                             message = "Job pod {} was terminated, reason: {}, message: {}".format(
@@ -422,7 +510,8 @@ class KubernetesJobManager(JobManager):
                                 container.state.terminated.message,
                             )
                             logging.warn(message)
-                        pod_logs += "\n{}\n".format(container.state.terminated.reason)
+                        pod_logs += "\n{}\n".format(
+                            container.state.terminated.reason)
                 elif container.state.waiting:
                     # No need to fetch logs, as the container has not started yet.
                     message = "Container {} failed, error: {}".format(
@@ -433,7 +522,8 @@ class KubernetesJobManager(JobManager):
 
             return pod_logs
         except client.rest.ApiException as e:
-            logging.error(f"Error from Kubernetes API while getting job logs: {e}")
+            logging.error(
+                f"Error from Kubernetes API while getting job logs: {e}")
             return None
         except Exception as e:
             logging.error(traceback.format_exc())
@@ -461,7 +551,8 @@ class KubernetesJobManager(JobManager):
                 label_selector=f"job-name={backend_job_id}",
             )
             if not job_pods.items:
-                logging.error(f"Could not find any pod for job {backend_job_id}")
+                logging.error(
+                    f"Could not find any pod for job {backend_job_id}")
                 return None
             job_pod = job_pods.items[0]
 
@@ -501,7 +592,8 @@ class KubernetesJobManager(JobManager):
         """
         try:
             propagation_policy = "Background" if asynchronous else "Foreground"
-            delete_options = V1DeleteOptions(propagation_policy=propagation_policy)
+            delete_options = V1DeleteOptions(
+                propagation_policy=propagation_policy)
             current_k8s_batchv1_api_client.delete_namespaced_job(
                 backend_job_id, REANA_RUNTIME_KUBERNETES_NAMESPACE, body=delete_options
             )
@@ -532,7 +624,8 @@ class KubernetesJobManager(JobManager):
                 v["name"] == shared_volume["name"]
                 for v in self.job["spec"]["template"]["spec"]["volumes"]
             ):
-                self.job["spec"]["template"]["spec"]["volumes"].append(shared_volume)
+                self.job["spec"]["template"]["spec"]["volumes"].append(
+                    shared_volume)
 
     def add_eos_volume(self):
         """Add EOS volume to a given job spec."""
@@ -560,7 +653,8 @@ class KubernetesJobManager(JobManager):
     def validate_resources(self):
         """Validate that resource requests are less than or equal to limits."""
         if self.kubernetes_cpu_request and self.kubernetes_cpu_limit:
-            cpu_request = kubernetes_cpu_to_millicores(self.kubernetes_cpu_request)
+            cpu_request = kubernetes_cpu_to_millicores(
+                self.kubernetes_cpu_request)
             cpu_limit = kubernetes_cpu_to_millicores(self.kubernetes_cpu_limit)
             if cpu_request > cpu_limit:
                 raise REANAKubernetesRequestExceedsLimit(
@@ -568,8 +662,10 @@ class KubernetesJobManager(JobManager):
                 )
 
         if self.kubernetes_memory_request and self.kubernetes_memory_limit:
-            memory_request = kubernetes_memory_to_bytes(self.kubernetes_memory_request)
-            memory_limit = kubernetes_memory_to_bytes(self.kubernetes_memory_limit)
+            memory_request = kubernetes_memory_to_bytes(
+                self.kubernetes_memory_request)
+            memory_limit = kubernetes_memory_to_bytes(
+                self.kubernetes_memory_limit)
             if memory_request > memory_limit:
                 raise REANAKubernetesRequestExceedsLimit(
                     f"ERROR: Memory request ({self.kubernetes_memory_request}) cannot be greater than limit ({self.kubernetes_memory_limit}). If you are overriding the values, please check the default and maximum values for requests and limits with 'reana-client info' command."
@@ -606,7 +702,8 @@ class KubernetesJobManager(JobManager):
                 "name": mount["name"],
                 "mountPath": mount.get("mountPath", mount["hostPath"]),
             }
-            volume = {"name": mount["name"], "hostPath": {"path": mount["hostPath"]}}
+            volume = {"name": mount["name"],
+                      "hostPath": {"path": mount["hostPath"]}}
             volumes_to_mount.append((volume_mount, volume))
 
         self.add_volumes(volumes_to_mount)
@@ -625,12 +722,13 @@ class KubernetesJobManager(JobManager):
 
     def _add_krb5_containers(self, secrets):
         """Add krb5 init and renew containers for a job."""
-        krb5_config = get_kerberos_k8s_config(
+        krb5_config = _get_compatible_kerberos_k8s_config(
             secrets,
             kubernetes_uid=self.kubernetes_uid,
         )
 
-        self.job["spec"]["template"]["spec"]["volumes"].extend(krb5_config.volumes)
+        self.job["spec"]["template"]["spec"]["volumes"].extend(
+            krb5_config.volumes)
         self.job["spec"]["template"]["spec"]["containers"][0]["volumeMounts"].extend(
             krb5_config.volume_mounts
         )
@@ -684,11 +782,9 @@ class KubernetesJobManager(JobManager):
                         echo "[ERROR] VOMSPROXY_FILE {voms_proxy_user_file} does not exist in user secrets."; \
                         exit; \
                      fi; \
-                     cp /etc/reana/secrets/{voms_proxy_user_file} {voms_proxy_file_path}; \
-                     chown {kubernetes_uid} {voms_proxy_file_path}'.format(
+                     cp /etc/reana/secrets/{voms_proxy_user_file} {voms_proxy_file_path}'.format(
                         voms_proxy_user_file=voms_proxy_user_file,
                         voms_proxy_file_path=voms_proxy_file_path,
-                        kubernetes_uid=self.kubernetes_uid,
                     ),
                 ],
                 "name": current_app.config["VOMSPROXY_CONTAINER_NAME"],
@@ -696,6 +792,10 @@ class KubernetesJobManager(JobManager):
                 "volumeMounts": [secrets_volume_mount] + volume_mounts,
                 "env": secret_env_vars,
             }
+            if K8S_USE_SECURITY_CONTEXT:
+                voms_proxy_container["securityContext"] = (
+                    _restricted_container_security_context(self.kubernetes_uid)
+                )
         else:
             # single-user deployment mode, where we generate VOMS proxy file in the sidecar from user secrets
             voms_proxy_container = {
@@ -724,11 +824,9 @@ class KubernetesJobManager(JobManager):
                          echo $VOMSPROXY_PASS | base64 -d | voms-proxy-init \
                          --voms {voms_proxy_vo} --key /tmp/userkey.pem \
                          --cert $(readlink -f /etc/reana/secrets/usercert.pem) \
-                         --pwstdin --out {voms_proxy_file_path}; \
-                         chown {kubernetes_uid} {voms_proxy_file_path}'.format(
+                         --pwstdin --out {voms_proxy_file_path}'.format(
                         voms_proxy_vo=voms_proxy_vo.lower(),
                         voms_proxy_file_path=voms_proxy_file_path,
-                        kubernetes_uid=self.kubernetes_uid,
                     ),
                 ],
                 "name": current_app.config["VOMSPROXY_CONTAINER_NAME"],
@@ -736,8 +834,13 @@ class KubernetesJobManager(JobManager):
                 "volumeMounts": [secrets_volume_mount] + volume_mounts,
                 "env": secret_env_vars,
             }
+            if K8S_USE_SECURITY_CONTEXT:
+                voms_proxy_container["securityContext"] = (
+                    _restricted_container_security_context(self.kubernetes_uid)
+                )
 
-        self.job["spec"]["template"]["spec"]["volumes"].extend([ticket_cache_volume])
+        self.job["spec"]["template"]["spec"]["volumes"].extend(
+            [ticket_cache_volume])
         self.job["spec"]["template"]["spec"]["containers"][0]["volumeMounts"].extend(
             volume_mounts
         )
@@ -819,8 +922,13 @@ class KubernetesJobManager(JobManager):
             "volumeMounts": [secrets_volume_mount] + volume_mounts,
             "env": secret_env_vars,
         }
+        if K8S_USE_SECURITY_CONTEXT:
+            rucio_config_container["securityContext"] = (
+                _restricted_container_security_context(self.kubernetes_uid)
+            )
 
-        self.job["spec"]["template"]["spec"]["volumes"].extend([ticket_cache_volume])
+        self.job["spec"]["template"]["spec"]["volumes"].extend(
+            [ticket_cache_volume])
         self.job["spec"]["template"]["spec"]["containers"][0]["volumeMounts"].extend(
             volume_mounts
         )
@@ -834,11 +942,23 @@ class KubernetesJobManager(JobManager):
         )
 
     def set_user_id(self, kubernetes_uid):
-        """Set user id for job pods. UIDs < 100 are refused for security."""
-        if kubernetes_uid and kubernetes_uid >= 100:
-            self.kubernetes_uid = kubernetes_uid
-        else:
-            self.kubernetes_uid = WORKFLOW_RUNTIME_USER_UID
+        """Set UID for job pods.
+
+        UIDs below the cluster-configured minimum are refused for security.
+        """
+        if kubernetes_uid is None:
+            self.kubernetes_uid = int(WORKFLOW_RUNTIME_USER_UID)
+            return
+
+        kubernetes_uid = int(kubernetes_uid)
+        min_user_uid = int(REANA_KUBERNETES_JOBS_MIN_USER_UID)
+        if kubernetes_uid < min_user_uid:
+            msg = (
+                f'The "kubernetes_uid" requested ({kubernetes_uid}) is below '
+                f"the minimum allowed UID ({min_user_uid})."
+            )
+            raise REANAKubernetesUIDBelowMinimum(msg)
+        self.kubernetes_uid = kubernetes_uid
 
     def set_cpu_request(self, kubernetes_cpu_request):
         """Set CPU request for job pods. Validate if provided format is correct."""
@@ -846,7 +966,8 @@ class KubernetesJobManager(JobManager):
             if not validate_kubernetes_cpu(kubernetes_cpu_request):
                 msg = f'The "kubernetes_cpu_request" requested {kubernetes_cpu_request} has wrong format.'
                 logging.error(
-                    "Error while validating Kubernetes CPU request: {}".format(msg)
+                    "Error while validating Kubernetes CPU request: {}".format(
+                        msg)
                 )
                 raise REANAKubernetesWrongCPUFormat(msg)
 
@@ -871,7 +992,8 @@ class KubernetesJobManager(JobManager):
             if not validate_kubernetes_cpu(kubernetes_cpu_limit):
                 msg = f'The "kubernetes_cpu_limit" requested {kubernetes_cpu_limit} has wrong format.'
                 logging.error(
-                    "Error while validating Kubernetes CPU limit: {}".format(msg)
+                    "Error while validating Kubernetes CPU limit: {}".format(
+                        msg)
                 )
                 raise REANAKubernetesWrongCPUFormat(msg)
 
@@ -896,7 +1018,8 @@ class KubernetesJobManager(JobManager):
             if not validate_kubernetes_memory(kubernetes_memory_request):
                 msg = f'The "kubernetes_memory_request" requested {kubernetes_memory_request} has wrong format.'
                 logging.error(
-                    "Error while validating Kubernetes memory request: {}".format(msg)
+                    "Error while validating Kubernetes memory request: {}".format(
+                        msg)
                 )
                 raise REANAKubernetesWrongMemoryFormat(msg)
 
@@ -924,7 +1047,8 @@ class KubernetesJobManager(JobManager):
             if not validate_kubernetes_memory(kubernetes_memory_limit):
                 msg = f'The "kubernetes_memory_limit" requested {kubernetes_memory_limit} has wrong format.'
                 logging.error(
-                    "Error while validating Kubernetes memory limit: {}".format(msg)
+                    "Error while validating Kubernetes memory limit: {}".format(
+                        msg)
                 )
                 raise REANAKubernetesWrongMemoryFormat(msg)
 

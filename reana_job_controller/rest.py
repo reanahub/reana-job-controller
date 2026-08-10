@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2018, 2019, 2020, 2021, 2022, 2023 CERN.
+# Copyright (C) 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -13,6 +13,7 @@ import json
 import logging
 import threading
 
+import marshmallow
 from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.exc import OperationalError
 from reana_commons.errors import (
@@ -20,6 +21,7 @@ from reana_commons.errors import (
     REANAKubernetesWrongMemoryFormat,
     REANAKubernetesCPULimitExceeded,
     REANAKubernetesWrongCPUFormat,
+    REANAKubernetesUIDBelowMinimum,
 )
 
 from reana_db.models import JobStatus
@@ -257,6 +259,16 @@ def create_job():  # noqa
         400:
           description: >-
             Request failed. The incoming data specification seems malformed.
+        403:
+          description: >-
+            Request failed. The job submission was refused, e.g. because a
+            requested resource (CPU, memory, UID) violates the
+            cluster-configured limits.
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
         500:
           description: >-
             Request failed. Internal controller error. The job could probably
@@ -267,9 +279,15 @@ def create_job():  # noqa
         return jsonify({"message": "Empty request"}), 400
 
     # Validate and deserialize input
-    job_request, errors = job_request_schema.load(json_data)
-    if errors:
-        return jsonify({"message": errors}), 400
+    try:
+        job_request = job_request_schema.load(json_data)
+    except marshmallow.ValidationError as e:
+        return jsonify({"message": e.messages}), 400
+
+    vetted_images = current_app.config["REANA_VETTED_CONTAINER_IMAGES"]
+    docker_img = job_request["docker_img"]
+    if vetted_images["enabled"] and docker_img not in vetted_images["allowlist"]:
+        return jsonify({"message": f"Image not allowed: {docker_img}"}), 403
 
     compute_backend = job_request.get(
         "compute_backend", current_app.config["DEFAULT_COMPUTE_BACKEND"]
@@ -300,6 +318,8 @@ def create_job():  # noqa
             return jsonify({"message": e.message}), 403
         except REANAKubernetesWrongMemoryFormat as e:
             return jsonify({"message": e.message}), 400
+        except REANAKubernetesUIDBelowMinimum as e:
+            return jsonify({"message": e.message}), 403
     if not job_creation_condition.start_creation():
         return jsonify({"message": "Cannot create new jobs, shutting down"}), 400
 
