@@ -258,33 +258,35 @@ class KubernetesJobManager(JobManager):
             datastore_enabled = True
 
         if datastore_enabled and REANA_DATASTORE_ENABLED:
-            check_mounts_script = """
-            #!/bin/bash
+            # Wrap the command to wait for datastore sidecar to mount S3 buckets
+            # Use file-based readiness check: wait for /data/s3 to exist and have content
+            script_prefix = """#!/bin/bash
 
-            TARGET_FILE="/data/s3/.readiness_probe.txt"
-            TIMEOUT=30
-            ELAPSED=0
+# Readiness check - wait for datastore sidecar to mount S3 buckets
+MOUNT_PATH="/data/s3"
+TIMEOUT=30
+ELAPSED=0
 
-            while [ $ELAPSED -lt $TIMEOUT ]; do
-                # Check if file exists AND contains the string "READY"
-                if [ -f "$TARGET_FILE" ] && grep -q "READY" "$TARGET_FILE"; then
-                    echo "Mount verified: Readiness probe detected."
-                    exit 0
-                fi
+echo "Waiting for S3 mounts to be ready..."
 
-                sleep 1
-                ((ELAPSED++))
-            done
+while [ $ELAPSED -lt $TIMEOUT ]; do
+    if [ -d "$MOUNT_PATH" ] && [ "$(ls -A "$MOUNT_PATH" 2>/dev/null)" ]; then
+        echo "Mount verified: $MOUNT_PATH directory exists and is not empty."
+        break
+    fi
+    sleep 1
+    ((ELAPSED++))
+done
 
-            echo "Error: Failed to find 'READY' in $TARGET_FILE within $TIMEOUT seconds."
-            echo "Please check your S3 mount status and credentials."
-            exit 1
-            """
-            self.cmd = (
-                f"bash -c '{check_mounts_script}' && "
-                + self.cmd
-                + "&& curl -X POST http://localhost:5000/shutdown"
-            )
+if [ $ELAPSED -ge $TIMEOUT ]; then
+    echo "Error: S3 mounts did not become ready within $TIMEOUT seconds."
+    echo "Please check your S3 mount status and credentials."
+    exit 1
+fi
+
+"""
+            # Combine: prefix + original cmd (no shutdown hook - Kubernetes handles cleanup)
+            self.cmd = script_prefix + self.cmd
 
         self.job = {
             "kind": "Job",
@@ -339,6 +341,10 @@ class KubernetesJobManager(JobManager):
                                         "image": REANA_DATASTORE_IMAGE,
                                         "name": "datastore",
                                         "env": s3_env,
+                                        "ports": [
+                                            {"containerPort": 5000,
+                                                "name": "http", "protocol": "TCP"}
+                                        ],
                                         "volumeMounts": [
                                             {
                                                 "name": "fuse-device",
@@ -352,9 +358,48 @@ class KubernetesJobManager(JobManager):
                                         ],
                                         "securityContext": {
                                             "runAsUser": 0,
+                                            "runAsNonRoot": False,
                                             "allowPrivilegeEscalation": True,
-                                            "capabilities": {"add": ["SYS_ADMIN"]},
+                                            "capabilities": {
+                                                "add": ["SYS_ADMIN"],
+                                                "drop": ["ALL"]
+                                            },
                                             "privileged": True,
+                                            "seccompProfile": {"type": "RuntimeDefault"},
+                                        },
+                                        "readinessProbe": {
+                                            "httpGet": {
+                                                "path": "/health",
+                                                "port": 5000,
+                                                "scheme": "HTTP"
+                                            },
+                                            "initialDelaySeconds": 5,
+                                            "periodSeconds": 5,
+                                            "timeoutSeconds": 2,
+                                            "successThreshold": 1,
+                                            "failureThreshold": 3
+                                        },
+                                        "livenessProbe": {
+                                            "httpGet": {
+                                                "path": "/health",
+                                                "port": 5000,
+                                                "scheme": "HTTP"
+                                            },
+                                            "initialDelaySeconds": 10,
+                                            "periodSeconds": 10,
+                                            "timeoutSeconds": 2,
+                                            "successThreshold": 1,
+                                            "failureThreshold": 3
+                                        },
+                                        "resources": {
+                                            "requests": {
+                                                "cpu": "100m",
+                                                "memory": "256Mi"
+                                            },
+                                            "limits": {
+                                                "cpu": "500m",
+                                                "memory": "512Mi"
+                                            }
                                         },
                                         "imagePullPolicy": "Always",
                                     }
@@ -374,7 +419,13 @@ class KubernetesJobManager(JobManager):
                                             "type": "CharDevice",
                                         },
                                     },
-                                    {"name": "s3-mounts", "emptyDir": {}},
+                                    {
+                                        "name": "s3-mounts",
+                                        "emptyDir": {
+                                            "medium": "Memory",
+                                            "sizeLimit": "1Gi"
+                                        }
+                                    },
                                 ]
                                 if REANA_DATASTORE_ENABLED and datastore_enabled
                                 else []
@@ -421,12 +472,16 @@ class KubernetesJobManager(JobManager):
             job_spec["volumes"].extend(volumes)
 
         if K8S_USE_SECURITY_CONTEXT:
+            pod_security_context_kwargs = {
+                "run_as_group": int(WORKFLOW_RUNTIME_USER_GID),
+                "run_as_user": int(self.kubernetes_uid),
+            }
+            # Don't set run_as_non_root at pod level if datastore is enabled
+            # (datastore container needs to run as root for FUSE)
+            if not datastore_enabled:
+                pod_security_context_kwargs["run_as_non_root"] = True
             self.job["spec"]["template"]["spec"]["securityContext"] = (
-                client.V1PodSecurityContext(
-                    run_as_group=int(WORKFLOW_RUNTIME_USER_GID),
-                    run_as_user=int(self.kubernetes_uid),
-                    run_as_non_root=True,
-                )
+                client.V1PodSecurityContext(**pod_security_context_kwargs)
             )
 
         if self.kerberos:
