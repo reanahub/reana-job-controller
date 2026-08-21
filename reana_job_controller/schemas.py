@@ -183,6 +183,7 @@ class JobRequest(Schema):
     kerberos = fields.Bool(required=False)
     voms_proxy = fields.Bool(required=False)
     rucio = fields.Bool(required=False)
+    secret_names = fields.List(fields.Str(), required=False)
     kubernetes_uid = fields.Int(required=False)
     kubernetes_cpu_request = fields.Str(required=False)
     kubernetes_cpu_limit = fields.Str(required=False)

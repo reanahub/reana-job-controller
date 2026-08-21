@@ -203,6 +203,199 @@ def test_slurm_image_cache_names_do_not_clash():
     assert len(stems) == 2
 
 
+def test_execute_kubernetes_job_filters_secret_names(
+    app,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    user0,
+    user_secrets,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Test execution of Kubernetes job with a filtered secret allowlist."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+        secret_names=["username", ".keytab"],
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client:
+        with mock.patch(
+            "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+            corev1_api_client_with_user_secrets(user_secrets),
+        ):
+            job_manager.execute()
+            body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+            job_spec = body["spec"]["template"]["spec"]
+            env_names = {
+                env_var["name"] for env_var in job_spec["containers"][0]["env"]
+            }
+            secret_volume = next(
+                volume
+                for volume in job_spec["volumes"]
+                if volume["name"].startswith("reana-secretsstore")
+            )
+
+            assert "username" in env_names
+            assert "password" not in env_names
+            assert secret_volume["secret"]["items"] == [
+                {"key": ".keytab", "path": ".keytab"}
+            ]
+
+
+def test_execute_kubernetes_job_does_not_mount_env_only_secret_scope(
+    app,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    user0,
+    user_secrets,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """An env-only scope must not project file secrets through an empty volume."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+        secret_names=["username"],
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client:
+        with mock.patch(
+            "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+            corev1_api_client_with_user_secrets(user_secrets),
+        ):
+            job_manager.execute()
+
+    job_spec = kubernetes_client.create_namespaced_job.call_args[1]["body"]["spec"][
+        "template"
+    ]["spec"]
+    assert "username" in {
+        env_var["name"] for env_var in job_spec["containers"][0]["env"]
+    }
+    assert not any(
+        volume["name"].startswith("reana-secretsstore")
+        for volume in job_spec["volumes"]
+    )
+
+
+def test_execute_kubernetes_job_keeps_feature_secrets_for_kerberos(
+    app,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Kerberos jobs keep feature secrets even when ordinary ones are scoped away."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+    kerberos_user_secrets = {
+        "ordinary": _build_user_secret("1", "env"),
+        "CERN_USER": _build_user_secret("johndoe", "env"),
+        "CERN_KEYTAB": _build_user_secret(".keytab", "env"),
+        ".keytab": _build_user_secret("keytab file", "file"),
+    }
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+        kerberos=True,
+        secret_names=[],
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client:
+        with mock.patch(
+            "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+            corev1_api_client_with_user_secrets(kerberos_user_secrets),
+        ):
+            job_manager.execute()
+            body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+            job_spec = body["spec"]["template"]["spec"]
+            env_names = {
+                env_var["name"] for env_var in job_spec["containers"][0]["env"]
+            }
+            secret_volume = next(
+                volume
+                for volume in job_spec["volumes"]
+                if volume["name"].startswith("reana-secretsstore")
+            )
+
+            assert "CERN_USER" in env_names
+            assert "CERN_KEYTAB" in env_names
+            assert "ordinary" not in env_names
+            assert secret_volume["secret"]["items"] == [
+                {"key": ".keytab", "path": ".keytab"}
+            ]
+
+
+def test_execute_kubernetes_job_keeps_feature_secrets_for_voms_proxy(
+    app,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """VOMS jobs must derive feature secret values from the scoped secret set."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+    monkeypatch.delenv("VONAME", raising=False)
+    monkeypatch.delenv("VOMSPROXY_FILE", raising=False)
+    voms_user_secrets = {
+        "ordinary": _build_user_secret("1", "env"),
+        "VOMSPROXY_FILE": _build_user_secret("proxy.pem", "env"),
+        "proxy.pem": _build_user_secret("proxy file", "file"),
+    }
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+        voms_proxy=True,
+        secret_names=[],
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client, mock.patch(
+        "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+        corev1_api_client_with_user_secrets(voms_user_secrets),
+    ):
+        job_manager.execute()
+        body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+        init_container = next(
+            container
+            for container in body["spec"]["template"]["spec"]["initContainers"]
+            if container["name"] == app.config["VOMSPROXY_CONTAINER_NAME"]
+        )
+
+        assert "proxy.pem" in init_container["args"][1]
+        assert "voms-proxy-init" not in init_container["args"][1]
+
+
 def test_execute_kubernetes_job_with_voms_proxy_init_container(
     app,
     session,
@@ -249,6 +442,59 @@ def test_execute_kubernetes_job_with_voms_proxy_init_container(
                 "capabilities": {"drop": ["ALL"]},
                 "seccompProfile": {"type": "RuntimeDefault"},
             }
+
+
+def test_execute_kubernetes_job_keeps_feature_secrets_for_rucio(
+    app,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Rucio jobs must derive feature secret values from the scoped secret set."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+    monkeypatch.delenv("VONAME", raising=False)
+    monkeypatch.delenv("RUCIO_USERNAME", raising=False)
+    monkeypatch.delenv("RUCIO_RUCIO_HOST", raising=False)
+    monkeypatch.delenv("RUCIO_AUTH_HOST", raising=False)
+    rucio_user_secrets = {
+        "ordinary": _build_user_secret("1", "env"),
+        "VONAME": _build_user_secret("atlas", "env"),
+        "RUCIO_USERNAME": _build_user_secret("johndoe", "env"),
+        "RUCIO_RUCIO_HOST": _build_user_secret("https://rucio.example", "env"),
+        "RUCIO_AUTH_HOST": _build_user_secret("https://auth.example", "env"),
+    }
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+        rucio=True,
+        secret_names=[],
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client, mock.patch(
+        "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+        corev1_api_client_with_user_secrets(rucio_user_secrets),
+    ):
+        job_manager.execute()
+        body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+        init_container = next(
+            container
+            for container in body["spec"]["template"]["spec"]["initContainers"]
+            if container["name"] == app.config["RUCIO_CONTAINER_NAME"]
+        )
+
+        assert "RUCIO_CFG_ACCOUNT=johndoe" in init_container["args"][1]
+        assert "RUCIO_CFG_CLIENT_VO=atlas" in init_container["args"][1]
+        assert "RUCIO_CFG_RUCIO_HOST=https://rucio.example" in init_container["args"][1]
+        assert "RUCIO_CFG_AUTH_HOST=https://auth.example" in init_container["args"][1]
 
 
 def test_execute_kubernetes_job_with_rucio_init_container(

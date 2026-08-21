@@ -11,6 +11,7 @@
 import copy
 import json
 import logging
+import os
 import threading
 
 import marshmallow
@@ -22,6 +23,7 @@ from reana_commons.errors import (
     REANAKubernetesCPULimitExceeded,
     REANAKubernetesWrongCPUFormat,
     REANAKubernetesUIDBelowMinimum,
+    REANASecretDoesNotExist,
 )
 
 from reana_db.models import JobStatus
@@ -64,7 +66,15 @@ def get_cached_user_secrets() -> UserSecrets:
     """Return cached user secrets."""
     global _SECRETS_CACHE
     if _SECRETS_CACHE is None:
-        _SECRETS_CACHE = UserSecretsStore.fetch(config.REANA_USER_ID)
+        secrets_types = os.getenv("REANA_USER_SECRETS_TYPES")
+        if secrets_types is not None:
+            _SECRETS_CACHE = UserSecrets.from_pod_secrets(
+                user_id=config.REANA_USER_ID,
+                secrets_types=json.loads(secrets_types),
+                mount_path=os.getenv("REANA_USER_SECRET_MOUNT_PATH"),
+            )
+        else:
+            _SECRETS_CACHE = UserSecretsStore.fetch(config.REANA_USER_ID)
     return _SECRETS_CACHE
 
 
@@ -327,6 +337,8 @@ def create_job():  # noqa
             return jsonify({"message": e.message}), 400
         except REANAKubernetesUIDBelowMinimum as e:
             return jsonify({"message": e.message}), 403
+        except REANASecretDoesNotExist as e:
+            return jsonify({"message": str(e)}), 400
     if not job_creation_condition.start_creation():
         return jsonify({"message": "Cannot create new jobs, shutting down"}), 400
 
@@ -336,6 +348,8 @@ def create_job():  # noqa
         msg = f"Job submission failed because of DB connection issues. \n{e}"
         logging.error(msg, exc_info=True)
         return jsonify({"message": msg}), 500
+    except REANASecretDoesNotExist as e:
+        return jsonify({"message": str(e)}), 400
     except Exception as e:
         msg = f"Job submission failed. \n{e}"
         logging.error(msg, exc_info=True)

@@ -18,7 +18,6 @@ from logging import Formatter, LogRecord
 
 from io import StringIO
 from typing import List, Tuple
-
 from reana_db.database import Session
 from reana_db.models import Workflow
 
@@ -71,10 +70,17 @@ def update_workflow_logs(workflow_uuid, log_message):
         logging.error("Exception while saving logs: {}".format(str(e)), exc_info=True)
 
 
-def initialize_krb5_token(workflow_uuid):
-    """Create kerberos ticket from mounted keytab_file."""
-    cern_user = os.environ.get("CERN_USER")
-    keytab_file = os.environ.get("CERN_KEYTAB")
+def initialize_krb5_token(workflow_uuid, secrets=None):
+    """Create kerberos ticket from the scoped user secrets."""
+    cern_user_secret = secrets.get_secret("CERN_USER") if secrets else None
+    keytab_secret = secrets.get_secret("CERN_KEYTAB") if secrets else None
+
+    cern_user = (
+        cern_user_secret.value_str if cern_user_secret else os.environ.get("CERN_USER")
+    )
+    keytab_file = (
+        keytab_secret.value_str if keytab_secret else os.environ.get("CERN_KEYTAB")
+    )
     cmd = "kinit -kt /etc/reana/secrets/{} {}@CERN.CH".format(keytab_file, cern_user)
 
     if cern_user:

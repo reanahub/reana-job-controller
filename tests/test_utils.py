@@ -12,8 +12,12 @@ from unittest import mock
 import pytest
 
 import reana_job_controller.utils as utils
+from reana_commons.k8s.secrets import Secret, UserSecrets
 from reana_job_controller.config import SLURM_PARTITION
-from reana_job_controller.utils import MultilineFormatter
+from reana_job_controller.utils import (
+    MultilineFormatter,
+    initialize_krb5_token,
+)
 
 """REANA-Job-Controller utils tests."""
 
@@ -214,3 +218,25 @@ def test_ssh_client_exec_command_raises_remote_errors():
 def test_slurm_partition_uses_current_cern_default():
     """Test default Slurm partition follows the current CERN cluster."""
     assert SLURM_PARTITION == "photon"
+
+
+def test_initialize_krb5_token_uses_scoped_secrets(monkeypatch):
+    """Kerberos auth should read credentials from the scoped secret set."""
+    scoped_secrets = UserSecrets(
+        user_id="123",
+        k8s_secret_name="k8s-secret",
+        secrets=[
+            Secret("CERN_USER", "env", "johndoe"),
+            Secret("CERN_KEYTAB", "env", ".keytab"),
+        ],
+    )
+    monkeypatch.delenv("CERN_USER", raising=False)
+    monkeypatch.delenv("CERN_KEYTAB", raising=False)
+
+    with mock.patch("reana_job_controller.utils.subprocess.check_output") as mocked:
+        initialize_krb5_token("workflow-uuid", secrets=scoped_secrets)
+
+    mocked.assert_called_once_with(
+        "kinit -kt /etc/reana/secrets/.keytab johndoe@CERN.CH",
+        shell=True,
+    )

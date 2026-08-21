@@ -14,7 +14,10 @@ import shlex
 from stat import S_ISDIR
 
 from reana_job_controller.job_manager import JobManager
-from reana_job_controller.utils import SSHClient, initialize_krb5_token
+from reana_job_controller.utils import (
+    SSHClient,
+    initialize_krb5_token,
+)
 from reana_job_controller.config import (
     SLURM_HEADNODE_GSS_HOSTNAME,
     SLURM_HEADNODE_HOSTNAME,
@@ -53,6 +56,9 @@ class SlurmJobManagerCERN(JobManager):
         cvmfs_mounts="false",
         shared_file_system=False,
         job_name=None,
+        kerberos=False,
+        secret_names=None,
+        secrets=None,
         slurm_partition=SLURM_PARTITION,
         slurm_job_timelimit=SLURM_JOB_TIMELIMIT,
         **kwargs,
@@ -94,6 +100,9 @@ class SlurmJobManagerCERN(JobManager):
         self.workflow_workspace = workflow_workspace
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
+        self.kerberos = kerberos
+        self.secret_names = secret_names
+        self.secrets = secrets
         self.job_file = "job.sh"
         self.job_description_file = "job_description.sh"
         self.partition = slurm_partition
@@ -129,7 +138,15 @@ class SlurmJobManagerCERN(JobManager):
     def execute(self):
         """Execute / submit a job with Slurm."""
         self.cmd = self._encode_cmd(self.cmd)
-        initialize_krb5_token(workflow_uuid=self.workflow_uuid)
+        kerberos_secrets = (
+            self.secrets.get_scoped_secrets(self.secret_names, kerberos=True)
+            if self.secrets
+            else None
+        )
+        initialize_krb5_token(
+            workflow_uuid=self.workflow_uuid,
+            secrets=kerberos_secrets,
+        )
         self.slurm_connection = SSHClient(
             hostname=SLURM_HEADNODE_HOSTNAME,
             gss_host=SLURM_HEADNODE_GSS_HOSTNAME,

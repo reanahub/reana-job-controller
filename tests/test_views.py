@@ -10,13 +10,16 @@
 
 import json
 import uuid
+from pathlib import Path
 
 import pytest
 from flask import current_app, url_for
 from kubernetes.client.rest import ApiException
 from mock import Mock, patch
 from reana_commons.config import REANA_DEFAULT_SNAKEMAKE_ENV_IMAGE
+from reana_commons.errors import REANASecretDoesNotExist
 from reana_commons.job_utils import serialise_job_command
+from reana_job_controller import rest
 
 from reana_job_controller.job_db import JOB_DB
 
@@ -240,3 +243,78 @@ def test_create_job_allows_vetted_images(app, job_spec, monkeypatch, vetting_con
 
     assert response.status_code == 400
     assert response.json == {"message": "Cannot create new jobs, shutting down"}
+
+
+@patch("reana_job_controller.schemas.REANA_KUBERNETES_JOBS_TIMEOUT_LIMIT", "10")
+@patch(
+    "reana_job_controller.schemas.REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT", "20"
+)
+def test_create_job_returns_400_for_constructor_time_secret_scope_errors(
+    app,
+    job_spec,
+    monkeypatch,
+):
+    """Secret scoping errors raised before execute() should still return 400."""
+
+    class ExplodingManager:
+        def __init__(self, **kwargs):
+            raise REANASecretDoesNotExist(["missing"])
+
+    job_spec["compute_backend"] = "test"
+    job_spec["cmd"] = serialise_job_command("ls")
+    app.config["REANA_VETTED_CONTAINER_IMAGES"] = {
+        "enabled": False,
+        "allowlist": [],
+    }
+    monkeypatch.setitem(app.config, "SUPPORTED_COMPUTE_BACKENDS", ["test"])
+    monkeypatch.setitem(
+        app.config,
+        "COMPUTE_BACKENDS",
+        {"test": lambda: ExplodingManager},
+    )
+
+    with (
+        patch(
+            "reana_job_controller.rest.get_cached_user_secrets",
+            return_value={},
+        ),
+        patch(
+            "reana_job_controller.rest.job_creation_condition.start_creation"
+        ) as start,
+        app.test_client() as client,
+    ):
+        response = client.post(
+            url_for("jobs.create_job"),
+            content_type="application/json",
+            data=json.dumps(job_spec),
+        )
+
+    assert response.status_code == 400
+    assert response.json == {
+        "message": "Operation cancelled. Secrets ['missing'] do not exist."
+    }
+    start.assert_not_called()
+
+
+def test_get_cached_user_secrets_rebuilds_from_scoped_pod_secrets(
+    tmp_path, monkeypatch
+):
+    """Scoped sidecar caches should be rebuilt from pod env/files, not k8s fetches."""
+    keytab_path = Path(tmp_path) / ".keytab"
+    keytab_path.write_bytes(b"keytab file")
+
+    rest._SECRETS_CACHE = None
+    monkeypatch.setenv(
+        "REANA_USER_SECRETS_TYPES", json.dumps({"username": "env", ".keytab": "file"})
+    )
+    monkeypatch.setenv("REANA_USER_SECRET_MOUNT_PATH", str(tmp_path))
+    monkeypatch.setenv("username", "johndoe")
+    monkeypatch.setattr("reana_job_controller.config.REANA_USER_ID", "123")
+
+    with patch("reana_job_controller.rest.UserSecretsStore.fetch") as fetch:
+        user_secrets = rest.get_cached_user_secrets()
+
+    assert user_secrets.get_secret("username").value_str == "johndoe"
+    assert user_secrets.get_secret(".keytab").value_bytes == b"keytab file"
+    fetch.assert_not_called()
+    rest._SECRETS_CACHE = None

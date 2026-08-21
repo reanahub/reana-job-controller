@@ -145,6 +145,12 @@ class KubernetesJobManager(JobManager):
     MAX_NUM_JOB_RESTARTS = 0
     """Maximum number of job restarts in case of internal failures."""
 
+    @staticmethod
+    def _get_secret_value(secrets: UserSecrets, name: str, default: str = "") -> str:
+        """Return a secret value as string when present."""
+        secret = secrets.get_secret(name)
+        return secret.value_str if secret else default
+
     def __init__(
         self,
         docker_img=None,
@@ -164,6 +170,7 @@ class KubernetesJobManager(JobManager):
         kubernetes_memory_limit=None,
         voms_proxy=False,
         rucio=False,
+        secret_names=None,
         kubernetes_job_timeout: Optional[int] = None,
         secrets: Optional[UserSecrets] = None,
         **kwargs,
@@ -202,6 +209,9 @@ class KubernetesJobManager(JobManager):
         :param rucio: Decides if a rucio environment should be provided
             for job.
         :type rucio: bool
+        :param secret_names: Explicit allowlist of user secret names to expose
+            to the job pod. If unset, all user secrets remain available.
+        :type secret_names: Optional[list[str]]
         :param secrets: User secrets, if none they will be fetched from k8s.
         :type secrets: Optional[UserSecrets]
         """
@@ -221,6 +231,7 @@ class KubernetesJobManager(JobManager):
         self.kerberos = kerberos
         self.voms_proxy = voms_proxy
         self.rucio = rucio
+        self.secret_names = secret_names
         self.set_user_id(kubernetes_uid)
         self.workflow_uuid = workflow_uuid
         self.kubernetes_job_timeout = kubernetes_job_timeout
@@ -293,13 +304,25 @@ class KubernetesJobManager(JobManager):
                 "securityContext"
             ] = _restricted_container_security_context()
 
-        secret_env_vars = self.secrets.get_env_secrets_as_k8s_spec()
         job_spec = self.job["spec"]["template"]["spec"]
-        job_spec["containers"][0]["env"].extend(secret_env_vars)
-        job_spec["volumes"].append(self.secrets.get_file_secrets_volume_as_k8s_specs())
-
-        secrets_volume_mount = self.secrets.get_secrets_volume_mount_as_k8s_spec()
-        job_spec["containers"][0]["volumeMounts"].append(secrets_volume_mount)
+        exposed_secrets = self.secrets.get_scoped_secrets(
+            self.secret_names,
+            kerberos=self.kerberos,
+            voms_proxy=self.voms_proxy,
+            rucio=self.rucio,
+        )
+        secret_env_vars = exposed_secrets.get_env_secrets_as_k8s_spec()
+        secrets_volume_mount = None
+        if exposed_secrets.get_secrets():
+            job_spec["containers"][0]["env"].extend(secret_env_vars)
+        if exposed_secrets.has_file_secrets():
+            job_spec["volumes"].append(
+                exposed_secrets.get_file_secrets_volume_as_k8s_specs()
+            )
+            secrets_volume_mount = (
+                exposed_secrets.get_secrets_volume_mount_as_k8s_spec()
+            )
+            job_spec["containers"][0]["volumeMounts"].append(secrets_volume_mount)
 
         if self.env_vars:
             for var, value in self.env_vars.items():
@@ -329,13 +352,13 @@ class KubernetesJobManager(JobManager):
             )
 
         if self.kerberos:
-            self._add_krb5_containers(self.secrets)
+            self._add_krb5_containers(exposed_secrets)
 
         if self.voms_proxy:
-            self._add_voms_proxy_init_container(secrets_volume_mount, secret_env_vars)
+            self._add_voms_proxy_init_container(secrets_volume_mount, exposed_secrets)
 
         if self.rucio:
-            self._add_rucio_init_container(secrets_volume_mount, secret_env_vars)
+            self._add_rucio_init_container(secrets_volume_mount, exposed_secrets)
 
         if REANA_RUNTIME_JOBS_KUBERNETES_NODE_LABEL:
             self.job["spec"]["template"]["spec"][
@@ -637,8 +660,9 @@ class KubernetesJobManager(JobManager):
             f"trap 'touch {KRB5_STATUS_FILE_LOCATION}' EXIT; " + self.cmd
         ]
 
-    def _add_voms_proxy_init_container(self, secrets_volume_mount, secret_env_vars):
+    def _add_voms_proxy_init_container(self, secrets_volume_mount, exposed_secrets):
         """Add sidecar container for a job."""
+        secret_env_vars = exposed_secrets.get_env_secrets_as_k8s_spec()
         ticket_cache_volume = {"name": "voms-proxy-cache", "emptyDir": {}}
         volume_mounts = [
             {
@@ -652,8 +676,8 @@ class KubernetesJobManager(JobManager):
             current_app.config["VOMSPROXY_CERT_CACHE_FILENAME"],
         )
 
-        voms_proxy_vo = os.environ.get("VONAME", "")
-        voms_proxy_user_file = os.environ.get("VOMSPROXY_FILE", "")
+        voms_proxy_vo = self._get_secret_value(exposed_secrets, "VONAME")
+        voms_proxy_user_file = self._get_secret_value(exposed_secrets, "VOMSPROXY_FILE")
 
         if voms_proxy_user_file:
             # multi-user deployment mode, where we rely on VOMS proxy file supplied by the user
@@ -738,8 +762,9 @@ class KubernetesJobManager(JobManager):
             voms_proxy_container
         )
 
-    def _add_rucio_init_container(self, secrets_volume_mount, secret_env_vars):
+    def _add_rucio_init_container(self, secrets_volume_mount, exposed_secrets):
         """Add sidecar container for a job."""
+        secret_env_vars = exposed_secrets.get_env_secrets_as_k8s_spec()
         ticket_cache_volume = {"name": "rucio-cache", "emptyDir": {}}
         volume_mounts = [
             {
@@ -758,8 +783,8 @@ class KubernetesJobManager(JobManager):
             current_app.config["RUCIO_CERN_BUNDLE_CACHE_FILENAME"],
         )
 
-        rucio_account = os.environ.get("RUCIO_USERNAME", "")
-        voms_proxy_vo = os.environ.get("VONAME", "")
+        rucio_account = self._get_secret_value(exposed_secrets, "RUCIO_USERNAME")
+        voms_proxy_vo = self._get_secret_value(exposed_secrets, "VONAME")
 
         # Detect Rucio hosts from VO names
         if voms_proxy_vo == "atlas":
@@ -770,8 +795,16 @@ class KubernetesJobManager(JobManager):
             rucio_auth_host = f"https://{voms_proxy_vo}-rucio-auth.cern.ch"
 
         # Allow overriding detected Rucio hosts by user-provided environment variables
-        rucio_host = os.environ.get("RUCIO_RUCIO_HOST", rucio_host)
-        rucio_auth_host = os.environ.get("RUCIO_AUTH_HOST", rucio_auth_host)
+        rucio_host = self._get_secret_value(
+            exposed_secrets,
+            "RUCIO_RUCIO_HOST",
+            rucio_host,
+        )
+        rucio_auth_host = self._get_secret_value(
+            exposed_secrets,
+            "RUCIO_AUTH_HOST",
+            rucio_auth_host,
+        )
 
         rucio_config_container = {
             "image": current_app.config["RUCIO_CONTAINER_IMAGE"],

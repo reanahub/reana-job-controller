@@ -67,6 +67,8 @@ class HTCondorJobManagerCERN(JobManager):
         shared_file_system=False,
         job_name=None,
         kerberos=False,
+        secret_names=None,
+        secrets=None,
         kubernetes_uid=None,
         unpacked_img=False,
         htcondor_max_runtime="",
@@ -139,6 +141,8 @@ class HTCondorJobManagerCERN(JobManager):
         self.shared_file_system = shared_file_system
         self.workflow = self._get_workflow()
         self.unpacked_img = unpacked_img
+        self.secret_names = secret_names
+        self.secrets = secrets
         self.htcondor_max_runtime = htcondor_max_runtime
         self.htcondor_accounting_group = htcondor_accounting_group
         self.htcondor_request_cpus = htcondor_request_cpus
@@ -159,7 +163,15 @@ class HTCondorJobManagerCERN(JobManager):
         # Import HTCondor only after initialising Kerberos. Importing the module
         # evaluates the ``myschedd.sh`` configuration, which requires a valid
         # ticket.
-        initialize_krb5_token(workflow_uuid=self.workflow_uuid)
+        kerberos_secrets = (
+            self.secrets.get_scoped_secrets(self.secret_names, kerberos=True)
+            if self.secrets
+            else None
+        )
+        initialize_krb5_token(
+            workflow_uuid=self.workflow_uuid,
+            secrets=kerberos_secrets,
+        )
         globals()["htcondor"] = __import__("htcondor2")
 
     @JobManager.execution_hook

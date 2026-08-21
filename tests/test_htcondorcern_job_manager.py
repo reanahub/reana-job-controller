@@ -17,6 +17,7 @@ import pytest
 classad = pytest.importorskip("classad2")
 htcondor = pytest.importorskip("htcondor2")
 
+from reana_commons.k8s.secrets import Secret, UserSecrets  # noqa: E402
 from reana_job_controller import htcondorcern_job_manager  # noqa: E402
 from reana_job_controller import job_monitor  # noqa: E402
 
@@ -138,6 +139,38 @@ def test_constructor_defaults_htcondor_request_attributes_to_empty(
     assert manager.htcondor_request_memory == ""
     assert manager.htcondor_request_disk == ""
     assert manager.htcondor_requirements == ""
+
+
+def test_constructor_scopes_kerberos_secrets_for_backend_auth(manager_dependencies):
+    """HTCondor auth should preserve Kerberos secrets even with ``secret_names: []``."""
+    all_user_secrets = UserSecrets(
+        user_id="123",
+        k8s_secret_name="k8s-secret",
+        secrets=[
+            Secret("ordinary", "env", "1"),
+            Secret("CERN_USER", "env", "johndoe"),
+            Secret("CERN_KEYTAB", "env", ".keytab"),
+            Secret(".keytab", "file", b"keytab"),
+        ],
+    )
+
+    with mock.patch.object(
+        htcondorcern_job_manager,
+        "initialize_krb5_token",
+    ) as initialize_krb5_token:
+        htcondorcern_job_manager.HTCondorJobManagerCERN(
+            docker_img="img",
+            cmd="ls",
+            env_vars={},
+            workflow_uuid="uuid",
+            workflow_workspace="/data",
+            job_name="job",
+            secret_names=[],
+            secrets=all_user_secrets,
+        )
+
+    scoped_secrets = initialize_krb5_token.call_args.kwargs["secrets"]
+    assert list(scoped_secrets.secrets) == ["CERN_USER", "CERN_KEYTAB", ".keytab"]
 
 
 # --- submit-description mapping in execute() ----------------------------------

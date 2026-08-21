@@ -116,6 +116,12 @@
         "rucio": {
           "type": "boolean"
         },
+        "secret_names": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "shared_file_system": {
           "default": true,
           "type": "boolean"
