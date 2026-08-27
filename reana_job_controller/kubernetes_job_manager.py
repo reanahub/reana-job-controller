@@ -262,6 +262,7 @@ class KubernetesJobManager(JobManager):
                         "name": backend_job_id,
                         "labels": {
                             "reana-run-job-workflow-uuid": self.workflow_uuid,
+                            "workflow-uuid": self.workflow_uuid,
                             "user-uuid": REANA_USER_ID,
                         },
                     },
