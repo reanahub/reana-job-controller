@@ -388,10 +388,10 @@ def test_execute_sets_requirements_as_complete_classad_expression(captured_submi
 
 def test_execute_formats_multiple_environment_variables(captured_submit):
     """Environment variables must use HTCondor's portable new syntax."""
-    submit = captured_submit(env_vars={"CACHE": "on", "LABEL": "two words"})
+    submit = captured_submit(env_vars={"OPTION": "on", "LABEL": "two words"})
     environment = submit["environment"]
 
-    assert environment.startswith("\"'CACHE=on' 'LABEL=two words' ")
+    assert environment.startswith("\"'OPTION=on' 'LABEL=two words' ")
     assert "'REANA_WORKSPACE=/data'" in environment
     assert "'REANA_WORKFLOW_UUID=uuid'" in environment
     assert environment.endswith('"')
@@ -415,7 +415,7 @@ def test_execute_rejects_submit_command_injection(captured_submit, forbidden_cha
 
 def test_execute_rejects_environment_command_injection(captured_submit):
     """Environment values must not inject additional submit-file lines."""
-    env_vars = {"CACHE": "on\nMY.MaxRunTime = 999999"}
+    env_vars = {"OPTION": "on\nMY.MaxRunTime = 999999"}
 
     with pytest.raises(ValueError, match="environment"):
         captured_submit(env_vars=env_vars)
