@@ -4,6 +4,89 @@
 
 # Changelog
 
+## [0.9.5](https://github.com/reanahub/reana-job-controller/compare/0.9.4...0.9.5) (2026-09-01)
+
+
+### Build
+
+* **deps:** update reana-auth-vomsproxy to 1.3.1 ([#486](https://github.com/reanahub/reana-job-controller/issues/486)) ([1827c82](https://github.com/reanahub/reana-job-controller/commit/1827c8248793d1c08a9843904fccf04bb4fba30b))
+* **deps:** update reana-auth-vomsproxy to 1.3.1 ([#486](https://github.com/reanahub/reana-job-controller/issues/486)) ([dacbfa0](https://github.com/reanahub/reana-job-controller/commit/dacbfa03490d0374701664e77dbaf70a8a00e3fc))
+* **docker:** replace alien with rpm2cpio for RPM conversion ([#507](https://github.com/reanahub/reana-job-controller/issues/507)) ([0d418ce](https://github.com/reanahub/reana-job-controller/commit/0d418cecded89ada4c7f414fc3a3b46e0c0369e9))
+* **docker:** use uWSGI server instead of Flask ([#517](https://github.com/reanahub/reana-job-controller/issues/517)) ([a8e49b4](https://github.com/reanahub/reana-job-controller/commit/a8e49b4c22b8eb57fb221b308ac32459697e4302))
+* **htcondorcern:** source CERN security config from RPMs ([#354](https://github.com/reanahub/reana-job-controller/issues/354)) ([af55efb](https://github.com/reanahub/reana-job-controller/commit/af55efb651c7e38426c8e3aff710c61339a38f88))
+* **python:** pin paramiko below 5 to keep GSSAPI ([#528](https://github.com/reanahub/reana-job-controller/issues/528)) ([a13bf31](https://github.com/reanahub/reana-job-controller/commit/a13bf319c8b541e5ef7d35c696a7f098bd76db97))
+* **python:** pin setuptools below 81 ([#500](https://github.com/reanahub/reana-job-controller/issues/500)) ([b9c76c4](https://github.com/reanahub/reana-job-controller/commit/b9c76c4b7ffbb6f98ed5828468bb6ba465b29b7d))
+* **python:** upgrade to Flask 3.x ([#514](https://github.com/reanahub/reana-job-controller/issues/514)) ([4258c39](https://github.com/reanahub/reana-job-controller/commit/4258c395c24b73abe7dc73a7a9259b7d811f9218))
+
+
+### Features
+
+* **config:** allow customising minimum Kubernetes job user ID ([#518](https://github.com/reanahub/reana-job-controller/issues/518)) ([029d405](https://github.com/reanahub/reana-job-controller/commit/029d405cad000465a6d3a858f73afa12ad411358))
+* **docker:** support HTCondor submission on ARM64 ([#530](https://github.com/reanahub/reana-job-controller/issues/530)) ([50ebd2a](https://github.com/reanahub/reana-job-controller/commit/50ebd2a162f081d7e16243b4ab58ab065d7125b3))
+* **htcondorcern:** add CPU/memory/disk/requirements hints ([#521](https://github.com/reanahub/reana-job-controller/issues/521)) ([88bc106](https://github.com/reanahub/reana-job-controller/commit/88bc106c878bcc95da5c09b17e5c8a72f2863607))
+* **job-manager:** add `user-uuid` label to runtime job pods ([#496](https://github.com/reanahub/reana-job-controller/issues/496)) ([a3479a1](https://github.com/reanahub/reana-job-controller/commit/a3479a1ab5a2747595aacc6ed86e6831a0c286c8))
+* **job-manager:** add Kueue scheduling option for user workloads ([#492](https://github.com/reanahub/reana-job-controller/issues/492)) ([f014442](https://github.com/reanahub/reana-job-controller/commit/f0144421bdd280f4c0a4f919b3af98b17d66e4c5))
+* **kubernetes:** add resource settings in Kubernetes jobs ([#484](https://github.com/reanahub/reana-job-controller/issues/484)) ([1827c82](https://github.com/reanahub/reana-job-controller/commit/1827c8248793d1c08a9843904fccf04bb4fba30b))
+* **kubernetes:** add resource settings in Kubernetes jobs ([#484](https://github.com/reanahub/reana-job-controller/issues/484)) ([4753ce2](https://github.com/reanahub/reana-job-controller/commit/4753ce227efa2bd5b48046d0e650569a0c91abf4))
+* **kubernetes:** set explicit runAsNonRoot on job pods ([#519](https://github.com/reanahub/reana-job-controller/issues/519)) ([bd91b2b](https://github.com/reanahub/reana-job-controller/commit/bd91b2b5823104599c93636a7f7ddb02fc39ad19))
+* **rest:** reject unvetted images at job submission ([#523](https://github.com/reanahub/reana-job-controller/issues/523)) ([ec85ea4](https://github.com/reanahub/reana-job-controller/commit/ec85ea4b475277dde5b19bee96d8697fa43ef535))
+* **runtime:** bootstrap job-controller as non-root ([#527](https://github.com/reanahub/reana-job-controller/issues/527)) ([8fd6e80](https://github.com/reanahub/reana-job-controller/commit/8fd6e808b72da289264abb273c1e6073a3089449))
+* **slurmcern:** cache SIF images across workflows ([#528](https://github.com/reanahub/reana-job-controller/issues/528)) ([6b7cacf](https://github.com/reanahub/reana-job-controller/commit/6b7cacfbf6e564aa2f333216e35afac31709901e))
+
+
+### Bug fixes
+
+* **config:** update reana-auth-vomsproxy to 1.3.1 to fix WLCG IAM ([#481](https://github.com/reanahub/reana-job-controller/issues/481)) ([48c362f](https://github.com/reanahub/reana-job-controller/commit/48c362fc975d9ee0e18af2f4fcd5ede6ed923134))
+* **config:** use glob for egg-info in flake8 exclude ([#516](https://github.com/reanahub/reana-job-controller/issues/516)) ([fcd7a71](https://github.com/reanahub/reana-job-controller/commit/fcd7a71fec16b095daa3667e93a2b1b79f8e934e))
+* **config:** use KUEUE_ENABLED consistently ([#510](https://github.com/reanahub/reana-job-controller/issues/510)) ([336b52e](https://github.com/reanahub/reana-job-controller/commit/336b52e8550fce41179e1cfb86d62d0db73912b9))
+* **git:** update .gitignore to exclude modules directory ([#520](https://github.com/reanahub/reana-job-controller/issues/520)) ([627c09e](https://github.com/reanahub/reana-job-controller/commit/627c09ed2bb0c8ac08721a0f41118e316ad60407))
+* **htcondorcern:** detect returned Kerberos caches ([#354](https://github.com/reanahub/reana-job-controller/issues/354)) ([b2e0947](https://github.com/reanahub/reana-job-controller/commit/b2e0947d11090b0d39b427f769bf413c60603965))
+* **htcondorcern:** enable ngauth reverse DNS fallback ([#354](https://github.com/reanahub/reana-job-controller/issues/354)) ([5420827](https://github.com/reanahub/reana-job-controller/commit/54208275284fd64d996ce1ad3d3c092281586b5f))
+* **htcondorcern:** forward Kerberos credentials to jobs ([#354](https://github.com/reanahub/reana-job-controller/issues/354)) ([aee11af](https://github.com/reanahub/reana-job-controller/commit/aee11af3bda5b63141440b83f1879eb12e720fb0))
+* **htcondorcern:** harden staged output handling ([#530](https://github.com/reanahub/reana-job-controller/issues/530)) ([e7eb531](https://github.com/reanahub/reana-job-controller/commit/e7eb531bba194f3bbdd1f32976728c42570c2713))
+* **htcondorcern:** preserve workspace through Docker entrypoints ([#532](https://github.com/reanahub/reana-job-controller/issues/532)) ([4e28813](https://github.com/reanahub/reana-job-controller/commit/4e288136ca9a1c9dcef852e7abe3a0190ebdef32)), closes [#531](https://github.com/reanahub/reana-job-controller/issues/531)
+* **htcondorcern:** stage returned job outputs ([#530](https://github.com/reanahub/reana-job-controller/issues/530)) ([7ad17b8](https://github.com/reanahub/reana-job-controller/commit/7ad17b8d114b56d5be97a56618970f2091439033))
+* **job-manager:** default job env_vars to empty dictionary ([#528](https://github.com/reanahub/reana-job-controller/issues/528)) ([4ce5025](https://github.com/reanahub/reana-job-controller/commit/4ce5025c8338fa3d52fbada9c11f36c5b17fa4dc))
+* **kubernetes:** bypass kubernetes 36 pod log deserialiser ([#522](https://github.com/reanahub/reana-job-controller/issues/522)) ([11a222e](https://github.com/reanahub/reana-job-controller/commit/11a222e153f4b4c8987c83a34ef837235bab02b8))
+* **slurmcern:** preserve Kerberos host for GSSAPI ([#528](https://github.com/reanahub/reana-job-controller/issues/528)) ([393bc66](https://github.com/reanahub/reana-job-controller/commit/393bc66666221d8c909a23f582e1f16f84fc6e88))
+* **slurmcern:** reuse pulled container images ([#528](https://github.com/reanahub/reana-job-controller/issues/528)) ([7f0855d](https://github.com/reanahub/reana-job-controller/commit/7f0855d097020dff5a64033d6b880594d667eef1))
+* **slurmcern:** update default partition to photon ([#528](https://github.com/reanahub/reana-job-controller/issues/528)) ([8fdde05](https://github.com/reanahub/reana-job-controller/commit/8fdde05067e13a197f09e23c8657cdad016d8c8d))
+
+
+### Code refactoring
+
+* **htcondorcern:** migrate Python bindings to htcondor2 ([#530](https://github.com/reanahub/reana-job-controller/issues/530)) ([dbfe697](https://github.com/reanahub/reana-job-controller/commit/dbfe697dd090fd789ae0e8c3f1c24d8a98aad2ad))
+* **pytest:** drop pytest-reana for reana-commons[tests] ([#515](https://github.com/reanahub/reana-job-controller/issues/515)) ([680d1d2](https://github.com/reanahub/reana-job-controller/commit/680d1d2a4d933d3c0577c9d5c8d63191a882b54d))
+
+
+### Code style
+
+* **docker:** clean Kerberos patch whitespace ([#530](https://github.com/reanahub/reana-job-controller/issues/530)) ([cf09d33](https://github.com/reanahub/reana-job-controller/commit/cf09d3315dd28e1129c0253fe8595d7525adcfc6))
+* **python:** adapt code base to the new black version ([#500](https://github.com/reanahub/reana-job-controller/issues/500)) ([4a3033e](https://github.com/reanahub/reana-job-controller/commit/4a3033e89ca7512558686788520fece93b6d3d9a))
+
+
+### Test suite
+
+* **kubernetes:** expect default UID as integer ([#528](https://github.com/reanahub/reana-job-controller/issues/528)) ([250912a](https://github.com/reanahub/reana-job-controller/commit/250912a1a2b681ab388c4fed5a4910d7480e172e))
+
+
+### Continuous integration
+
+* **commitlint:** fix local running of commit linter on macOS ([#487](https://github.com/reanahub/reana-job-controller/issues/487)) ([7cd4707](https://github.com/reanahub/reana-job-controller/commit/7cd4707b5fac76cb671a67d7af102cd1db543442))
+* **docker:** run containerised tests as root on Darwin ([#528](https://github.com/reanahub/reana-job-controller/issues/528)) ([e0f4501](https://github.com/reanahub/reana-job-controller/commit/e0f45011fc346c3eb4959c722d06e4c98332fa6f))
+* **docker:** skip false positive secret check ([#528](https://github.com/reanahub/reana-job-controller/issues/528)) ([e794e25](https://github.com/reanahub/reana-job-controller/commit/e794e25ee1b081d12630d7ed1a2bb6ad30152734))
+* **jsonlint:** add JSON linting ([#491](https://github.com/reanahub/reana-job-controller/issues/491)) ([872a983](https://github.com/reanahub/reana-job-controller/commit/872a9838336ed273cc4835d865e24d270e7936f2))
+* **markdownlint:** add Markdown linting ([#491](https://github.com/reanahub/reana-job-controller/issues/491)) ([3809916](https://github.com/reanahub/reana-job-controller/commit/380991695984d80ff1762f706ce18037a2c202f3))
+* **markdownlint:** less permissive global configuration ([#503](https://github.com/reanahub/reana-job-controller/issues/503)) ([fda1b31](https://github.com/reanahub/reana-job-controller/commit/fda1b31d7da7157e7b93c2f9620f32c046974401))
+* **prettier:** add Prettier code formatting checks ([#491](https://github.com/reanahub/reana-job-controller/issues/491)) ([128ca8d](https://github.com/reanahub/reana-job-controller/commit/128ca8d5ddf2347aeb8f98929a6d380a3ef47b27))
+* **run-tests:** add usage help and refactor options ([#503](https://github.com/reanahub/reana-job-controller/issues/503)) ([565e808](https://github.com/reanahub/reana-job-controller/commit/565e808c1be8a86517b88fecf2428f3cda799a32))
+* **run-tests:** fix macOS test workflow ([#515](https://github.com/reanahub/reana-job-controller/issues/515)) ([8afc0cb](https://github.com/reanahub/reana-job-controller/commit/8afc0cbd551a9b51d88457291d632b5ca51854f9))
+* **run-tests:** improve old DB container cleanup ([#514](https://github.com/reanahub/reana-job-controller/issues/514)) ([7d5657a](https://github.com/reanahub/reana-job-controller/commit/7d5657aef4abfc3d97062927469f238b9a6a95b7))
+* **runners:** upgrade CI runners to Ubuntu 22.04 ([#486](https://github.com/reanahub/reana-job-controller/issues/486)) ([1827c82](https://github.com/reanahub/reana-job-controller/commit/1827c8248793d1c08a9843904fccf04bb4fba30b))
+* **runners:** upgrade CI runners to Ubuntu 22.04 ([#486](https://github.com/reanahub/reana-job-controller/issues/486)) ([bfbbd7c](https://github.com/reanahub/reana-job-controller/commit/bfbbd7c63e12ca3f56cc13fd356c3db389af7bf7))
+* **shfmt:** add shell script formatting checks ([#491](https://github.com/reanahub/reana-job-controller/issues/491)) ([65a7389](https://github.com/reanahub/reana-job-controller/commit/65a7389336e0865c8a827ce95aeedeec1c505b86))
+* **yamllint:** add YAML linting ([#489](https://github.com/reanahub/reana-job-controller/issues/489)) ([112afe5](https://github.com/reanahub/reana-job-controller/commit/112afe5812b0d6b570ef5bfda532769fb4863f6d)), closes [#488](https://github.com/reanahub/reana-job-controller/issues/488)
+
 ## [Unreleased](https://github.com/reanahub/reana-job-controller/compare/0.9.4...HEAD)
 
 ### Documentation
