@@ -31,7 +31,6 @@ from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_db import (
     JOB_DB,
     job_exists,
-    job_is_cached,
     retrieve_all_jobs,
     retrieve_backend_job_id,
     retrieve_job,
@@ -108,74 +107,6 @@ class JobCreationCondition:
 
 
 job_creation_condition = JobCreationCondition()
-
-
-@blueprint.route("/job_cache", methods=["GET"])
-def check_if_cached():
-    r"""Check if job is cached.
-
-    ---
-    get:
-      summary: Returns boolean depicting if job is in cache.
-      description: >-
-        This resource takes a job specification and the
-        workflow json, and checks if the job to be created,
-        already exists in the cache.
-      operationId: check_if_cached
-      parameters:
-       - name: job_spec
-         in: query
-         description: Required. Specification of the job.
-         required: true
-         type: string
-       - name: workflow_json
-         in: query
-         description: Required. Specification of the workflow.
-         required: true
-         type: string
-       - name: workflow_workspace
-         in: query
-         description: Required. Path to workflow workspace.
-         required: true
-         type: string
-      produces:
-       - application/json
-      responses:
-        200:
-          description: >-
-            Request succeeded. Returns boolean depicting if job is in
-            cache.
-          examples:
-            application/json:
-              {
-                "cached": True,
-                "result_path": "/reana/default/0000/xe2123d/archive/asd213"
-              }
-        400:
-          description: >-
-            Request failed. The incoming data specification seems malformed.
-        500:
-          description: >-
-            Request failed. Internal controller error.
-
-    """
-    job_spec = json.loads(request.args["job_spec"])
-    workflow_json = json.loads(request.args["workflow_json"])
-    workflow_workspace = request.args["workflow_workspace"]
-    result = job_is_cached(job_spec, workflow_json, workflow_workspace)
-    if result:
-        return (
-            jsonify(
-                {
-                    "cached": True,
-                    "result_path": result["result_path"],
-                    "job_id": result["job_id"],
-                }
-            ),
-            200,
-        )
-    else:
-        return jsonify({"cached": False, "result_path": None}), 200
 
 
 @blueprint.route("/jobs", methods=["GET"])

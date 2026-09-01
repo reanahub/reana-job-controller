@@ -11,11 +11,10 @@
 import json
 import uuid
 
-from reana_commons.utils import calculate_file_access_time
 from reana_db.database import Session
-from reana_db.models import Job as JobTable, JobCache, JobStatus, Workflow
+from reana_db.models import Job as JobTable, JobStatus
 
-from reana_job_controller.config import CACHE_ENABLED, DASK_SCHEDULER_URI
+from reana_job_controller.config import DASK_SCHEDULER_URI
 
 
 class JobManager:
@@ -64,8 +63,6 @@ class JobManager:
             inst.before_execution()
             backend_job_id = fn(inst, *args, **kwargs)
             inst.create_job_in_db(backend_job_id)
-            if CACHE_ENABLED:
-                inst.cache_job()
             return backend_job_id
 
         return wrapper
@@ -128,18 +125,6 @@ class JobManager:
             prettified_cmd=self.prettified_cmd,
         )
         Session.add(job_db_entry)
-        Session.commit()
-
-    def cache_job(self):
-        """Cache a job."""
-        workflow = (
-            Session.query(Workflow).filter_by(id_=self.workflow_uuid).one_or_none()
-        )
-        access_times = calculate_file_access_time(workflow.workspace_path)
-        prepared_job_cache = JobCache()
-        prepared_job_cache.job_id = self.job_id
-        prepared_job_cache.access_times = access_times
-        Session.add(prepared_job_cache)
         Session.commit()
 
     def update_job_status(self):
