@@ -14,7 +14,6 @@ import shlex
 import shutil
 import stat
 import threading
-from shutil import copyfile
 
 import classad2 as classad
 from flask import current_app
@@ -35,6 +34,7 @@ class HTCondorJobManagerCERN(JobManager):
 
     FILE_TRANSFER_DIRECTORY_PREFIX = "reana_job."
     FILE_TRANSFER_DIRECTORY_SUFFIX = ".filetransfer"
+    DOCKER_WRAPPER_PATH = "/etc/job_wrapper.sh"
     INTERNAL_OUTPUT_FILES = {
         ".chirp.config",
         ".job.ad",
@@ -157,9 +157,17 @@ class HTCondorJobManagerCERN(JobManager):
                 self.FILE_TRANSFER_DIRECTORY_SUFFIX,
             ),
         )
+        wrapper_prefix = (
+            "job_singularity_wrapper" if self.unpacked_img else "job_wrapper"
+        )
+        self.wrapper_filename = "{}.{}.sh".format(wrapper_prefix, self.job_id)
+        self.wrapper_path = os.path.join(
+            self.file_transfer_workspace, self.wrapper_filename
+        )
         self.input_file_signatures = {}
         self.input_symlinks = set()
         self.internal_output_files = set(self.INTERNAL_OUTPUT_FILES)
+        self.internal_output_files.add(self.wrapper_filename)
         cern_user = os.environ.get("CERN_USER")
         self.kerberos_cache_files = set()
         if self.kerberos and not cern_user:
@@ -183,11 +191,8 @@ class HTCondorJobManagerCERN(JobManager):
     def execute(self):
         """Execute / submit a job with HTCondor."""
         os.chdir(self.workflow_workspace)
-        executable_name = (
-            "job_wrapper.sh" if not self.unpacked_img else "job_singularity_wrapper.sh"
-        )
-        transfer_input_files = self._prepare_file_transfer()
         try:
+            transfer_input_files = self._prepare_file_transfer()
             submit_description = {
                 "description": (
                     self.workflow.get_full_workflow_name() + "_" + self.job_name
@@ -212,7 +217,7 @@ class HTCondorJobManagerCERN(JobManager):
                 submit_description["shell"] = (
                     'cd "${{_CONDOR_JOB_IWD:?_CONDOR_JOB_IWD is not set}}" && '
                     'exec /bin/bash "$_CONDOR_JOB_IWD/{0}" {1}'.format(
-                        executable_name, arguments
+                        self.wrapper_filename, arguments
                     )
                 )
                 # Keep image initialisation enabled explicitly. False is the
@@ -225,9 +230,7 @@ class HTCondorJobManagerCERN(JobManager):
                 submit_description["MY.WantDocker"] = "True"
                 submit_description["MY.DockerNetworkType"] = classad.quote("host")
             else:
-                submit_description["executable"] = os.path.join(
-                    self.workflow_workspace, executable_name
-                )
+                submit_description["executable"] = self.wrapper_path
             if self.htcondor_max_runtime in HTCONDOR_JOB_FLAVOURS.keys():
                 submit_description["MY.JobFlavour"] = classad.quote(
                     self.htcondor_max_runtime
@@ -429,14 +432,17 @@ class HTCondorJobManagerCERN(JobManager):
         return file_signatures, symlinks
 
     def _prepare_file_transfer(self):
-        """Prepare an empty local destination for the returned sandbox."""
+        """Prepare job inputs and a local destination for the returned sandbox."""
+        os.makedirs(self.file_transfer_workspace)
+        self._copy_wrapper_file()
         input_files = self._get_input_files().split(",")
         input_files = [filename for filename in input_files if filename]
         self.input_file_signatures, self.input_symlinks = self._snapshot_workspace()
-        os.makedirs(self.file_transfer_workspace)
-        return ",".join(
+        transfer_input_files = [
             os.path.join(self.workflow_workspace, filename) for filename in input_files
-        )
+        ]
+        transfer_input_files.append(self.wrapper_path)
+        return ",".join(transfer_input_files)
 
     def cleanup_file_transfer(self):
         """Remove the local HTCondor file-transfer workspace."""
@@ -617,8 +623,7 @@ class HTCondorJobManagerCERN(JobManager):
     def _get_input_files(self):
         """Get files and dirs from workflow space."""
         input_files = []
-        self._copy_wrapper_file()
-        forbidden_files = [".job.ad", ".machine.ad", ".chirp.config"]
+        forbidden_files = {".job.ad", ".machine.ad", ".chirp.config"}
         skip_extensions = (".err", ".log", ".out")
         for item in os.listdir(self.workflow_workspace):
             if (
@@ -632,13 +637,22 @@ class HTCondorJobManagerCERN(JobManager):
         return ",".join(input_files)
 
     def _copy_wrapper_file(self):
-        """Copy job wrapper file to workspace."""
+        """Write the job wrapper into its per-job transfer directory.
+
+        The unpacked-image wrapper runs outside the container and binds the
+        execute scratch directory into /srv. Keep its existing scratch lookup;
+        Docker instead validates the IWD restored by its submit shell.
+        """
         try:
             if not self.unpacked_img:
-                copyfile(
-                    "/etc/job_wrapper.sh",
-                    os.path.join(self.workflow_workspace + "/" + "job_wrapper.sh"),
-                )
+                with open(self.DOCKER_WRAPPER_PATH, "rb") as wrapper_file:
+                    wrapper = wrapper_file.read()
+                if self.kerberos:
+                    wrapper = self._with_kerberos_cache_cleanup(
+                        wrapper.decode("utf-8")
+                    ).encode("utf-8")
+                with open(self.wrapper_path, "wb") as wrapper_file:
+                    wrapper_file.write(wrapper)
             else:
                 docker_img = shlex.quote(self.docker_img)
                 command = shlex.quote(self._format_arguments() + " | bash")
@@ -663,12 +677,6 @@ case "$kerberos_cache" in
         ;;
 esac
 
-if [ ! -r "$kerberos_cache" ]; then
-    printf '%s\\n' "HTCondor Kerberos cache is not readable." >&2
-    exit 1
-fi
-
-container_cache="/srv/${{kerberos_cache#"$scratch_directory"/}}"
 cleanup_kerberos_cache() {{
     if ! rm -f -- "$kerberos_cache" "${{kerberos_cache}}.tmp"; then
         printf '%s\\n' "Failed to remove HTCondor Kerberos cache." >&2
@@ -676,6 +684,12 @@ cleanup_kerberos_cache() {{
 }}
 trap cleanup_kerberos_cache EXIT
 
+if [ ! -r "$kerberos_cache" ]; then
+    printf '%s\\n' "HTCondor Kerberos cache is not readable." >&2
+    exit 1
+fi
+
+container_cache="/srv/${{kerberos_cache#"$scratch_directory"/}}"
 singularity exec \\
     --home "$scratch_directory:/srv" \\
     --bind "$scratch_directory:/srv" \\
@@ -695,16 +709,63 @@ singularity exec \\
     {docker_img} \\
     bash -c {command}
 """.format(docker_img=docker_img, command=command)
-                wrapper_path = os.path.join(
-                    self.workflow_workspace, "job_singularity_wrapper.sh"
-                )
-                with open(wrapper_path, "w") as wrapper_file:
+                with open(self.wrapper_path, "w") as wrapper_file:
                     wrapper_file.write(template)
         except Exception as e:
             logging.error(
                 "Failed to copy job wrapper file: {0}".format(e), exc_info=True
             )
             raise e
+
+    @staticmethod
+    def _with_kerberos_cache_cleanup(wrapper):
+        """Validate the Docker job's Kerberos cache and remove it on exit."""
+        shebang, separator, body = wrapper.partition("\n")
+        if shebang != "#!/bin/bash" or not separator:
+            raise RuntimeError("The HTCondor Docker wrapper has an invalid shebang")
+
+        # This prologue shares a shell with the separately maintained Docker
+        # wrapper, so prefix its names to avoid changing the cleanup target.
+        kerberos_setup = r"""reana_scratch_directory="${_CONDOR_JOB_IWD:?_CONDOR_JOB_IWD is not set}"
+reana_scratch_directory="${reana_scratch_directory%/}"
+
+if [ -z "${KRB5CCNAME+x}" ]; then
+    printf '%s\n' "HTCondor did not provide KRB5CCNAME." >&2
+    exit 1
+fi
+
+case "$KRB5CCNAME" in
+    FILE:*) reana_kerberos_cache="${KRB5CCNAME#FILE:}" ;;
+    *)
+        printf '%s\n' \
+            "HTCondor Kerberos cache is not a FILE cache." >&2
+        exit 1
+        ;;
+esac
+
+case "$reana_kerberos_cache" in
+    "$reana_scratch_directory"/*) ;;
+    *)
+        printf '%s\n' \
+            "HTCondor Kerberos cache is outside the job scratch directory." >&2
+        exit 1
+        ;;
+esac
+
+reana_cleanup_kerberos_cache() {
+    if ! rm -f -- "$reana_kerberos_cache" "${reana_kerberos_cache}.tmp"; then
+        printf '%s\n' "Failed to remove HTCondor Kerberos cache." >&2
+    fi
+    return 0
+}
+trap reana_cleanup_kerberos_cache EXIT
+
+if [ ! -f "$reana_kerberos_cache" ] || [ ! -r "$reana_kerberos_cache" ]; then
+    printf '%s\n' "HTCondor Kerberos cache is not a readable file." >&2
+    exit 1
+fi"""
+
+        return "{}\n\n{}\n\n{}".format(shebang, kerberos_setup, body)
 
     @retry(stop_max_attempt_number=MAX_NUM_RETRIES, wait_fixed=RETRY_WAIT_TIME)
     def _submit(self, submit):
