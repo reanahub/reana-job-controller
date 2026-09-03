@@ -18,7 +18,7 @@ from typing import Iterable
 
 from reana_commons.workspace import is_directory, open_file, walk
 from reana_db.database import Session
-from reana_db.models import Workflow
+from reana_db.models import User, Workflow
 from reana_job_controller.job_manager import JobManager
 from reana_job_controller.utils import SSHClient, motley_cue_auth_strategy_factory
 from reana_job_controller.config import (
@@ -31,7 +31,6 @@ from reana_job_controller.config import (
     C4P_REQUEST_GPUS,
     C4P_MEMORY_LIMIT,
     C4P_NOTIFICATION,
-    C4P_EMAIL_ADDRESS,
     C4P_ADDITIONAL_REQUIREMENTS,
     C4P_REANA_REL_WORKFLOW_PATH,
 )
@@ -62,7 +61,6 @@ class Compute4PUNCHJobManager(JobManager):
         c4p_request_gpus=C4P_REQUEST_GPUS,
         c4p_memory_limit=C4P_MEMORY_LIMIT,
         c4p_notification=C4P_NOTIFICATION,
-        c4p_email_address=C4P_EMAIL_ADDRESS,
         c4p_additional_requirements=C4P_ADDITIONAL_REQUIREMENTS,
         **kwargs,
     ):
@@ -95,8 +93,6 @@ class Compute4PUNCHJobManager(JobManager):
         :type c4p_memory_limit: str
         :param c4p_notification: notification option to be used on C4P
         :type c4p_notification: str
-        :param c4p_email_address: user email address to be used on C4P
-        :type c4p_email_address: str
         :param c4p_additional_requirements: additional HTCondor requirements for the job
         :type c4p_additional_requirements: str
         """
@@ -133,7 +129,6 @@ class Compute4PUNCHJobManager(JobManager):
         self.c4p_request_gpus = c4p_request_gpus
         self.c4p_memory_limit = c4p_memory_limit
         self.c4p_notification = c4p_notification
-        self.c4p_email_address = c4p_email_address
         self.c4p_additional_requirements = c4p_additional_requirements
 
     @JobManager.execution_hook
@@ -280,8 +275,8 @@ class Compute4PUNCHJobManager(JobManager):
                 else ""
             ),
             (
-                f"notify_user = {self.c4p_email_address}"
-                if self.c4p_email_address
+                f"notify_user = {self.email_workflow_owner}"
+                if self.email_workflow_owner
                 else ""
             ),
             f'+SINGULARITY_JOB_CONTAINER = "{self.docker_img}"',
@@ -419,3 +414,9 @@ class Compute4PUNCHJobManager(JobManager):
         )
         if workflow:
             return workflow
+
+    @property
+    def email_workflow_owner(self):
+        """Get the email from the workflow owner."""
+        user = Session.query(User).filter_by(id_=self.workflow.owner_id).one_or_none()
+        return user.email if user else None

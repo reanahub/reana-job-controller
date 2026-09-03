@@ -214,7 +214,6 @@ class JobRequest(Schema):
     c4p_request_gpus = fields.Str(required=False)
     c4p_memory_limit = fields.Str(required=False)
     c4p_notification = fields.Str(required=False)
-    c4p_email_address = fields.Str(required=False)
     c4p_additional_requirements = fields.Str(required=False)
 
     @pre_load

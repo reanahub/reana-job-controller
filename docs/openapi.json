@@ -54,9 +54,6 @@
         "c4p_notification": {
           "type": "string"
         },
-        "c4p_email_address": {
-          "type": "string"
-        },
         "cmd": {
           "default": "",
           "type": "string"
