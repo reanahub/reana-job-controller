@@ -12,12 +12,13 @@
 import logging
 import re
 
-from marshmallow import Schema, fields, ValidationError, pre_load
+from marshmallow import Schema, fields, ValidationError, pre_load, validate
 from reana_commons.job_utils import deserialise_job_command
 
 from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_TIMEOUT_LIMIT,
     REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT,
+    C4P_NOTIFICATION_OPTIONS,
 )
 
 try:
@@ -210,10 +211,10 @@ class JobRequest(Schema):
     )
     slurm_partition = fields.Str(required=False)
     slurm_time = fields.Str(required=False)
-    c4p_cpu_cores = fields.Str(required=False)
-    c4p_request_gpus = fields.Str(required=False)
+    c4p_cpu_cores = fields.Int(required=False, validate=validate.Range(min=1))
+    c4p_request_gpus = fields.Int(required=False, validate=validate.Range(min=1))
     c4p_memory_limit = fields.Str(required=False)
-    c4p_notification = fields.Str(required=False)
+    c4p_notification = fields.Str(required=False, validate=validate.OneOf(C4P_NOTIFICATION_OPTIONS))
     c4p_additional_requirements = fields.Str(required=False)
 
     @pre_load
