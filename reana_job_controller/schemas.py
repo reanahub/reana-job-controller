@@ -211,8 +211,8 @@ class JobRequest(Schema):
     )
     slurm_partition = fields.Str(required=False)
     slurm_time = fields.Str(required=False)
-    c4p_cpu_cores = fields.Int(required=False, validate=validate.Range(min=1))
-    c4p_request_gpus = fields.Int(required=False, validate=validate.Range(min=1))
+    c4p_cpu_cores = fields.Str(required=False, validate=validate_c4p_resource)
+    c4p_request_gpus = fields.Str(required=False, validate=validate_c4p_resource)
     c4p_memory_limit = fields.Str(required=False)
     c4p_notification = fields.Str(required=False, validate=validate.OneOf(C4P_NOTIFICATION_OPTIONS))
     c4p_additional_requirements = fields.Str(required=False)
@@ -268,3 +268,21 @@ class JobRequest(Schema):
 
         in_data["kubernetes_job_timeout"] = job_timeout
         return in_data
+
+    def validate_c4p_resource(value):
+    """Validate C4P CPU/GPU count."""
+    try:
+        count = int(value)
+    except (ValueError, TypeError):
+        raise ValidationError(
+            f"C4P CPU/GPU count must be an integer. Provided value is '{value}'."
+        )
+
+    if count < 1:
+        raise ValidationError(
+            f"C4P CPU/GPU count must be a positive integer. Provided value is {value}."
+        )
+
+    return value
+
+

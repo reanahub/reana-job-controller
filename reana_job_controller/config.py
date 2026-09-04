@@ -285,10 +285,11 @@ C4P_REQUEST_GPUS = os.getenv("C4P_REQUEST_GPUS", "")
 C4P_MEMORY_LIMIT = os.getenv("C4P_MEMORY_LIMIT", "20000")
 """Maximum amount memory used by the REANA jobs."""
 
-C4P_NOTIFICATION_OPTIONS = [ "Always", "Complete", "Start", "Error", "Never"]
+C4P_NOTIFICATION_OPTIONS = [ "Always", "Complete", "Error", "Never"]
+"""Notification options supported by the C4P HTCondor version (Condor Version: 23.6.2): <Always | Complete | Error | Never>."""
 
 C4P_NOTIFICATION = os.getenv("C4P_NOTIFICATION", "")
-""" Notification option used by the REANA jobs <Always | Complete | Start | Error | Never>."""
+"""Notification for C4P jobs."""
 
 C4P_ADDITIONAL_REQUIREMENTS = os.getenv("C4P_ADDITIONAL_REQUIREMENTS", "")
 """Additional requirements to run the REANA jobs on C4P nodes."""
