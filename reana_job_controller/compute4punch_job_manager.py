@@ -276,7 +276,7 @@ class Compute4PUNCHJobManager(JobManager):
             ),
             (
                 f"notify_user = {self.email_workflow_owner}"
-                if self.email_workflow_owner
+                if self.email_workflow_owner and self.c4p_notification
                 else ""
             ),
             f'+SINGULARITY_JOB_CONTAINER = "{self.docker_img}"',
