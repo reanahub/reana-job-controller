@@ -45,6 +45,9 @@
         "c4p_cpu_cores": {
           "type": "string"
         },
+        "c4p_gpu_count": {
+          "type": "string"
+        },
         "c4p_memory_limit": {
           "type": "string"
         },
@@ -55,9 +58,6 @@
             "Error",
             "Never"
           ],
-          "type": "string"
-        },
-        "c4p_request_gpus": {
           "type": "string"
         },
         "cmd": {

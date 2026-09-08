@@ -58,7 +58,7 @@ class Compute4PUNCHJobManager(JobManager):
         shared_file_system=False,
         job_name=None,
         c4p_cpu_cores=C4P_CPU_CORES,
-        c4p_request_gpus=C4P_REQUEST_GPUS,
+        c4p_gpu_count=C4P_REQUEST_GPUS,
         c4p_memory_limit=C4P_MEMORY_LIMIT,
         c4p_notification=C4P_NOTIFICATION,
         c4p_additional_requirements=C4P_ADDITIONAL_REQUIREMENTS,
@@ -87,8 +87,8 @@ class Compute4PUNCHJobManager(JobManager):
         :type job_name: str
         :param c4p_cpu_cores: number of CPU cores to use on C4P
         :type c4p_cpu_cores: str
-        :param c4p_request_gpus: number of GPUs to use on C4P
-        :type c4p_request_gpus: str
+        :param c4p_gpu_count: number of GPUs to use on C4P
+        :type c4p_gpu_count: str
         :param c4p_memory_limit: maximum memory to be used on C4P
         :type c4p_memory_limit: str
         :param c4p_notification: notification option to be used on C4P
@@ -126,7 +126,7 @@ class Compute4PUNCHJobManager(JobManager):
         )
 
         self.c4p_cpu_cores = c4p_cpu_cores
-        self.c4p_request_gpus = c4p_request_gpus
+        self.c4p_gpu_count = c4p_gpu_count
         self.c4p_memory_limit = c4p_memory_limit
         self.c4p_notification = c4p_notification
         self.c4p_additional_requirements = c4p_additional_requirements
@@ -264,8 +264,8 @@ class Compute4PUNCHJobManager(JobManager):
             f"transfer_output_files = {job_outputs}",
             f"request_cpus = {self.c4p_cpu_cores}",
             (
-                f"request_gpus = {self.c4p_request_gpus}"
-                if self.c4p_request_gpus
+                f"request_gpus = {self.c4p_gpu_count}"
+                if self.c4p_gpu_count
                 else ""
             ),
             f"request_memory = {self.c4p_memory_limit}",

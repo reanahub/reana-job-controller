@@ -215,9 +215,9 @@ class JobRequest(Schema):
         required=False,
         validate=_validate_positive_integer_string("c4p_cpu_cores"),
     )
-    c4p_request_gpus = fields.Str(
+    c4p_gpu_count = fields.Str(
         required=False,
-        validate=_validate_positive_integer_string("c4p_request_gpus"),
+        validate=_validate_positive_integer_string("c4p_gpu_count"),
     )
     c4p_memory_limit = fields.Str(required=False)
     c4p_notification = fields.Str(
