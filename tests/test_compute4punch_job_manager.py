@@ -19,8 +19,11 @@ from reana_job_controller.compute4punch_job_manager import (
 
 
 @pytest.fixture
-def manager():
+def manager(monkeypatch):
     """Create a Compute4PUNCH job manager with external dependencies mocked."""
+    monkeypatch.setattr(Compute4PUNCHJobManager, "C4P_HOME_PATH", "")
+    monkeypatch.setattr(Compute4PUNCHJobManager, "C4P_WORKSPACE_PATH", "")
+
     with (
         mock.patch.object(compute4punch_job_manager, "SSHClient"),
         mock.patch.object(
@@ -38,8 +41,19 @@ def manager():
         )
 
 
-def test_include_notification(manager):
-    """Include notification when configured."""
+@pytest.mark.parametrize(
+    "notification",
+    ["", "Always", "Complete", "Error", "Never"],
+)
+def test_notification(manager, notification):
+    """Test notification directive and notification recipient.
+
+    When a notification mode is configured, the corresponding notification
+    directive and the notification recipient, i.e. the workflow owner's email,
+    are included in the JDL. When no notification mode is configured, both
+    the notification directive and the notification recipient are absent
+    from the JDL.
+    """
     workflow = mock.MagicMock()
     workflow.get_full_workflow_name.return_value = "workflow"
 
@@ -57,43 +71,20 @@ def test_include_notification(manager):
             return_value="alice.hertzog@example.org",
         ),
     ):
-        manager.c4p_notification = "Complete"
-
+        manager.c4p_notification = notification
         manager._create_c4p_job_description(job_inputs=[])
 
     command = manager.c4p_connection.exec_command.call_args.args[0]
-    assert "notification = Complete" in command
+
+    if notification:
+        assert f"notification = {notification}" in command
+        assert "notify_user = alice.hertzog@example.org" in command
+    else:
+        assert "notification =" not in command
+        assert "notify_user =" not in command
 
 
-def test_omit_notification(manager):
-    """Omit notification when not configured."""
-    workflow = mock.MagicMock()
-    workflow.get_full_workflow_name.return_value = "workflow"
-
-    with (
-        mock.patch.object(
-            Compute4PUNCHJobManager,
-            "workflow",
-            new_callable=mock.PropertyMock,
-            return_value=workflow,
-        ),
-        mock.patch.object(
-            Compute4PUNCHJobManager,
-            "email_workflow_owner",
-            new_callable=mock.PropertyMock,
-            return_value="alice.hertzog@example.org",
-        ),
-    ):
-        manager.c4p_notification = None
-
-        manager._create_c4p_job_description(job_inputs=[])
-
-    command = manager.c4p_connection.exec_command.call_args.args[0]
-    assert "notification =" not in command
-    assert "notify_user =" not in command
-
-
-def test_email_workflow_owner(manager):
+def test_retrieve_email_workflow_owner(manager):
     """Return workflow owner email address."""
     workflow = mock.MagicMock()
     workflow.owner_id = "owner-id"
@@ -120,17 +111,14 @@ def test_email_workflow_owner(manager):
         assert manager.email_workflow_owner == "alice.hertzog@example.org"
 
 
-def test_include_email_workflow_owner(manager):
-    """Use workflow owner email address as notification recipient."""
+@pytest.mark.parametrize(
+    "gpu_count",
+    ["2", ""],
+)
+def test_gpu_request(manager, gpu_count):
+    """Include or omit GPU request depending on configuration."""
     workflow = mock.MagicMock()
-    workflow.owner_id = "owner-id"
     workflow.get_full_workflow_name.return_value = "workflow"
-
-    user = mock.MagicMock()
-    user.email = "alice.hertzog@example.org"
-
-    user_query = mock.MagicMock()
-    user_query.filter_by.return_value.one_or_none.return_value = user
 
     with (
         mock.patch.object(
@@ -140,14 +128,18 @@ def test_include_email_workflow_owner(manager):
             return_value=workflow,
         ),
         mock.patch.object(
-            compute4punch_job_manager.Session,
-            "query",
-            return_value=user_query,
+            Compute4PUNCHJobManager,
+            "email_workflow_owner",
+            new_callable=mock.PropertyMock,
+            return_value=None,
         ),
     ):
-        manager.c4p_notification = "Complete"
+        manager.c4p_gpu_count = gpu_count
         manager._create_c4p_job_description(job_inputs=[])
 
     command = manager.c4p_connection.exec_command.call_args.args[0]
-    assert "notification = Complete" in command
-    assert "notify_user = alice.hertzog@example.org" in command
+
+    if gpu_count:
+        assert f"request_gpus = {gpu_count}" in command
+    else:
+        assert "request_gpus =" not in command

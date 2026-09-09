@@ -171,7 +171,7 @@ def test_htcondor_quantity_to_unit_rejects_invalid(bad_value):
 )
 @pytest.mark.parametrize(
     "value",
-    ["2", "8"],
+    ["2", ""],
 )
 def test_c4p_resource_accepted(field, value):
     """Positive integer strings are accepted for C4P CPU/GPU counts."""
@@ -185,7 +185,7 @@ def test_c4p_resource_accepted(field, value):
 )
 @pytest.mark.parametrize(
     "bad_value",
-    ["0", "-1", "one"],
+    ["0", "-2", "two"],
 )
 def test_c4p_resource_rejected(field, bad_value):
     """Invalid values are rejected for C4P CPU/GPU counts."""
