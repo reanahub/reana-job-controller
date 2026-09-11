@@ -13,9 +13,8 @@ import mock
 import pytest
 
 from reana_job_controller import compute4punch_job_manager
-from reana_job_controller.compute4punch_job_manager import (
-    Compute4PUNCHJobManager,
-)
+from reana_job_controller.compute4punch_job_manager import Compute4PUNCHJobManager
+from reana_job_controller.config import C4P_CPU_CORES
 
 
 @pytest.fixture
@@ -43,9 +42,9 @@ def manager(monkeypatch):
 
 @pytest.mark.parametrize(
     "notification",
-    ["", "Always", "Complete", "Error", "Never"],
+    ["Always", "Complete", "Error", "Never", ""],
 )
-def test_notification(manager, notification):
+def test_notification_in_jdl(manager, notification):
     """Test notification directive and notification recipient.
 
     When a notification mode is configured, the corresponding notification
@@ -71,7 +70,7 @@ def test_notification(manager, notification):
             return_value="alice.hertzog@example.org",
         ),
     ):
-        manager.c4p_notification = notification
+        manager.set_c4p_notification(notification)
         manager._create_c4p_job_description(job_inputs=[])
 
     command = manager.c4p_connection.exec_command.call_args.args[0]
@@ -112,10 +111,44 @@ def test_retrieve_email_workflow_owner(manager):
 
 
 @pytest.mark.parametrize(
+    "cpu_cores",
+    ["2", ""],
+)
+def test_cpu_in_jdl(manager, cpu_cores):
+    """Include CPU request using the configured default when not specified."""
+    workflow = mock.MagicMock()
+    workflow.get_full_workflow_name.return_value = "workflow"
+
+    with (
+        mock.patch.object(
+            Compute4PUNCHJobManager,
+            "workflow",
+            new_callable=mock.PropertyMock,
+            return_value=workflow,
+        ),
+        mock.patch.object(
+            Compute4PUNCHJobManager,
+            "email_workflow_owner",
+            new_callable=mock.PropertyMock,
+            return_value=None,
+        ),
+    ):
+        manager.set_c4p_cpu_cores(cpu_cores)
+        manager._create_c4p_job_description(job_inputs=[])
+
+    command = manager.c4p_connection.exec_command.call_args.args[0]
+
+    if cpu_cores == "2":
+        assert f"request_cpus = {cpu_cores}" in command
+    else:
+        assert f"request_cpus = {C4P_CPU_CORES}" in command
+
+
+@pytest.mark.parametrize(
     "gpu_count",
     ["2", ""],
 )
-def test_gpu_request(manager, gpu_count):
+def test_gpu_in_jdl(manager, gpu_count):
     """Include or omit GPU request depending on configuration."""
     workflow = mock.MagicMock()
     workflow.get_full_workflow_name.return_value = "workflow"
@@ -134,12 +167,12 @@ def test_gpu_request(manager, gpu_count):
             return_value=None,
         ),
     ):
-        manager.c4p_gpu_count = gpu_count
+        manager.set_c4p_gpu_count(gpu_count)
         manager._create_c4p_job_description(job_inputs=[])
 
     command = manager.c4p_connection.exec_command.call_args.args[0]
 
-    if gpu_count:
+    if gpu_count == "2":
         assert f"request_gpus = {gpu_count}" in command
     else:
         assert "request_gpus =" not in command

@@ -279,7 +279,7 @@ C4P_SSH_AUTH_TIMEOUT = float(os.getenv("C4P_SSH_AUTH_TIMEOUT", "60"))
 C4P_CPU_CORES = os.getenv("C4P_CPU_CORES", "8")
 """Number of CPU cores used to run the REANA jobs."""
 
-C4P_REQUEST_GPUS = os.getenv("C4P_REQUEST_GPUS", "")
+C4P_GPU_COUNT = os.getenv("C4P_GPU_COUNT", "")
 """Number of GPUs used to run the REANA jobs."""
 
 C4P_MEMORY_LIMIT = os.getenv("C4P_MEMORY_LIMIT", "20000")
