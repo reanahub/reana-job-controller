@@ -18,7 +18,7 @@ from typing import Iterable
 
 from reana_commons.workspace import is_directory, open_file, walk
 from reana_db.database import Session
-from reana_db.models import User, Workflow
+from reana_db.models import Workflow
 from reana_job_controller.job_manager import JobManager
 from reana_job_controller.utils import SSHClient, motley_cue_auth_strategy_factory
 from reana_commons.job_utils import validate_htcondor_cpu_gpu
@@ -254,6 +254,7 @@ class Compute4PUNCHJobManager(JobManager):
         job_inputs = ",".join(job_inputs)
         job_outputs = "."  # download everything from remote job
         job_environment = (f"{key}={value}" for key, value in self.env_vars.items())
+        email_workflow_owner = self.email_workflow_owner
         job_description_template = [
             f"executable = {os.path.basename(self.job_execution_script_path)}",
             "use_oauth_services = helmholtz",
@@ -279,8 +280,8 @@ class Compute4PUNCHJobManager(JobManager):
                 else ""
             ),
             (
-                f"notify_user = {self.email_workflow_owner}"
-                if self.email_workflow_owner and self.c4p_notification
+                f"notify_user = {email_workflow_owner}"
+                if email_workflow_owner and self.c4p_notification
                 else ""
             ),
             f'+SINGULARITY_JOB_CONTAINER = "{self.docker_img}"',
@@ -412,18 +413,18 @@ class Compute4PUNCHJobManager(JobManager):
 
     @property
     def workflow(self):
-        """Get workflow from db."""
-        workflow = (
-            Session.query(Workflow).filter_by(id_=self.workflow_uuid).one_or_none()
-        )
-        if workflow:
-            return workflow
+        """Get workflow from db once."""
+        if not hasattr(self, "_workflow"):
+            self._workflow = (
+                Session.query(Workflow).filter_by(id_=self.workflow_uuid).one_or_none()
+            )
+        return self._workflow
 
     @property
     def email_workflow_owner(self):
         """Get the email from the workflow owner."""
-        user = Session.query(User).filter_by(id_=self.workflow.owner_id).one_or_none()
-        return user.email if user else None
+        workflow = self.workflow
+        return workflow.owner.email if workflow and workflow.owner else None
 
     def set_c4p_cpu_cores(self, c4p_cpu_cores):
         """Set C4P CPU cores and validate the value."""

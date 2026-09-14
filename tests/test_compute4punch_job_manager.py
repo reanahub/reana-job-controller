@@ -44,14 +44,15 @@ def manager(monkeypatch):
     "notification",
     ["Always", "Complete", "Error", "Never", ""],
 )
-def test_notification_in_jdl(manager, notification):
+def test_notification_directive_and_recipient_in_jdl(manager, notification):
     """Test notification directive and notification recipient.
 
     When a notification mode is configured, the corresponding notification
     directive and the notification recipient, i.e. the workflow owner's email,
     are included in the JDL. When no notification mode is configured, both
     the notification directive and the notification recipient are absent
-    from the JDL.
+    from the JDL. The ``Never`` notification mode keeps the workflow owner's email
+    in the JDL for C4P credential-expiry notifications.
     """
     workflow = mock.MagicMock()
     workflow.get_full_workflow_name.return_value = "workflow"
@@ -83,31 +84,23 @@ def test_notification_in_jdl(manager, notification):
         assert "notify_user =" not in command
 
 
-def test_retrieve_email_workflow_owner(manager):
+@pytest.mark.parametrize(
+    "workflow, expected_email",
+    [
+        (None, None),
+        (mock.MagicMock(owner=None), None),
+        (mock.MagicMock(owner=mock.MagicMock(email="alice.hertzog@example.org")), "alice.hertzog@example.org"),
+    ],
+)
+def test_retrieve_email_workflow_owner(manager, workflow, expected_email):
     """Return workflow owner email address."""
-    workflow = mock.MagicMock()
-    workflow.owner_id = "owner-id"
-
-    user = mock.MagicMock()
-    user.email = "alice.hertzog@example.org"
-
-    user_query = mock.MagicMock()
-    user_query.filter_by.return_value.one_or_none.return_value = user
-
-    with (
-        mock.patch.object(
-            Compute4PUNCHJobManager,
-            "workflow",
-            new_callable=mock.PropertyMock,
-            return_value=workflow,
-        ),
-        mock.patch.object(
-            compute4punch_job_manager.Session,
-            "query",
-            return_value=user_query,
-        ),
+    with mock.patch.object(
+        Compute4PUNCHJobManager,
+        "workflow",
+        new_callable=mock.PropertyMock,
+        return_value=workflow,
     ):
-        assert manager.email_workflow_owner == "alice.hertzog@example.org"
+        assert manager.email_workflow_owner == expected_email
 
 
 @pytest.mark.parametrize(
