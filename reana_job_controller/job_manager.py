@@ -123,7 +123,6 @@ class JobManager:
             docker_img=self.docker_img,
             cmd=json.dumps(self.cmd),
             env_vars=json.dumps(self.env_vars),
-            deleted=False,
             job_name=self.job_name,
             prettified_cmd=self.prettified_cmd,
         )
