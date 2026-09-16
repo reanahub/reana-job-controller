@@ -225,9 +225,7 @@ def test_create_job_invalid_c4p_configuration(
         )
 
     assert response.status_code == 500
-    assert response.json == {
-        "message": f"Job submission failed. \n{expected_message}"
-    }
+    assert response.json == {"message": f"Job submission failed. \n{expected_message}"}
 
 
 @pytest.mark.parametrize(

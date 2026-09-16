@@ -14,8 +14,15 @@ import pytest
 
 from reana_job_controller import compute4punch_job_manager
 from reana_job_controller.compute4punch_job_manager import Compute4PUNCHJobManager
-from reana_job_controller.config import C4P_CPU_CORES
 from reana_job_controller.errors import Compute4PUNCHConfigurationError
+
+
+@pytest.fixture(autouse=True)
+def c4p_defaults(monkeypatch):
+    """C4P deployment defaults for manager tests."""
+    monkeypatch.setattr(compute4punch_job_manager, "C4P_CPU_CORES", "8")
+    monkeypatch.setattr(compute4punch_job_manager, "C4P_GPU_COUNT", "")
+    monkeypatch.setattr(compute4punch_job_manager, "C4P_NOTIFICATION", "")
 
 
 @pytest.fixture
@@ -49,20 +56,23 @@ def manager(monkeypatch):
         ("C4P_NOTIFICATION", "always"),
     ],
 )
-def test_ssh_not_called_for_invalid_c4p_configuration(
-    monkeypatch, parameter, invalid_value
-):
-    """Validate C4P configuration before creating SSH connection."""
+def test_invalid_config_before_remote_init(monkeypatch, parameter, invalid_value):
+    """Validate C4P configuration before remote initialisation."""
     monkeypatch.setattr(
         compute4punch_job_manager,
         parameter,
         invalid_value,
     )
-
-    with mock.patch.object(
-        compute4punch_job_manager,
-        "SSHClient",
-    ) as ssh_client:
+    with (
+        mock.patch.object(
+            compute4punch_job_manager,
+            "SSHClient",
+        ) as ssh_client,
+        mock.patch.object(
+            compute4punch_job_manager,
+            "motley_cue_auth_strategy_factory",
+        ) as auth_strategy_factory,
+    ):
         with pytest.raises(Compute4PUNCHConfigurationError):
             Compute4PUNCHJobManager(
                 docker_img="img",
@@ -74,6 +84,7 @@ def test_ssh_not_called_for_invalid_c4p_configuration(
             )
 
     ssh_client.assert_not_called()
+    auth_strategy_factory.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -118,6 +129,19 @@ def test_notification_directive_and_recipient_in_jdl(manager, notification):
     else:
         assert "notification =" not in command
         assert "notify_user =" not in command
+
+
+def test_notification_use_configured_default(monkeypatch, manager):
+    """Use configured notification default when no value is specified."""
+    monkeypatch.setattr(
+        compute4punch_job_manager,
+        "C4P_NOTIFICATION",
+        "Error",
+    )
+
+    manager.set_c4p_notification("")
+
+    assert manager.c4p_notification == "Error"
 
 
 @pytest.mark.parametrize(
@@ -167,10 +191,7 @@ def test_cpu_in_jdl(manager, cpu_cores):
 
     command = manager.c4p_connection.exec_command.call_args.args[0]
 
-    if cpu_cores == "2":
-        assert f"request_cpus = {cpu_cores}" in command
-    else:
-        assert f"request_cpus = {C4P_CPU_CORES}" in command
+    assert f"request_cpus = {manager.c4p_cpu_cores}" in command
 
 
 @pytest.mark.parametrize(
@@ -205,3 +226,29 @@ def test_gpu_in_jdl(manager, gpu_count):
         assert f"request_gpus = {gpu_count}" in command
     else:
         assert "request_gpus =" not in command
+
+
+def test_cpu_use_configured_default(monkeypatch, manager):
+    """Use CPU configured default when no value is specified."""
+    monkeypatch.setattr(
+        compute4punch_job_manager,
+        "C4P_CPU_CORES",
+        "4",
+    )
+
+    manager.set_c4p_cpu_cores("")
+
+    assert manager.c4p_cpu_cores == "4"
+
+
+def test_gpu_use_configured_default(monkeypatch, manager):
+    """Use configured GPU default when no value is specified."""
+    monkeypatch.setattr(
+        compute4punch_job_manager,
+        "C4P_GPU_COUNT",
+        "2",
+    )
+
+    manager.set_c4p_gpu_count("")
+
+    assert manager.c4p_gpu_count == "2"
