@@ -15,6 +15,7 @@ import pytest
 from reana_job_controller import compute4punch_job_manager
 from reana_job_controller.compute4punch_job_manager import Compute4PUNCHJobManager
 from reana_job_controller.config import C4P_CPU_CORES
+from reana_job_controller.errors import Compute4PUNCHConfigurationError
 
 
 @pytest.fixture
@@ -38,6 +39,41 @@ def manager(monkeypatch):
             workflow_workspace="/reana_workspace",
             job_name="job",
         )
+
+
+@pytest.mark.parametrize(
+    "parameter, invalid_value",
+    [
+        ("C4P_CPU_CORES", "0"),
+        ("C4P_GPU_COUNT", "0"),
+        ("C4P_NOTIFICATION", "always"),
+    ],
+)
+def test_ssh_not_called_for_invalid_c4p_configuration(
+    monkeypatch, parameter, invalid_value
+):
+    """Validate C4P configuration before creating SSH connection."""
+    monkeypatch.setattr(
+        compute4punch_job_manager,
+        parameter,
+        invalid_value,
+    )
+
+    with mock.patch.object(
+        compute4punch_job_manager,
+        "SSHClient",
+    ) as ssh_client:
+        with pytest.raises(Compute4PUNCHConfigurationError):
+            Compute4PUNCHJobManager(
+                docker_img="img",
+                cmd="true",
+                env_vars={},
+                workflow_uuid="uuid",
+                workflow_workspace="/reana_workspace",
+                job_name="job",
+            )
+
+    ssh_client.assert_not_called()
 
 
 @pytest.mark.parametrize(

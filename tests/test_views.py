@@ -18,6 +18,8 @@ from mock import Mock, patch
 from reana_commons.config import REANA_DEFAULT_SNAKEMAKE_ENV_IMAGE
 from reana_commons.job_utils import serialise_job_command
 
+from reana_job_controller.compute4punch_job_manager import Compute4PUNCHJobManager
+from reana_job_controller.config import C4P_NOTIFICATION_OPTIONS
 from reana_job_controller.job_db import JOB_DB
 
 
@@ -164,6 +166,68 @@ def test_create_job_unsupported_backend(app, job_spec):
         )
         assert res.json == {"job": expected_msg}
         assert res.status_code == 500
+
+
+@pytest.mark.parametrize(
+    "parameter, invalid_value, expected_message",
+    [
+        (
+            "C4P_CPU_CORES",
+            "0",
+            "c4p_cpu_cores must be a positive integer, got 0.",
+        ),
+        (
+            "C4P_GPU_COUNT",
+            "0",
+            "c4p_gpu_count must be a positive integer if defined, got 0.",
+        ),
+        (
+            "C4P_NOTIFICATION",
+            "always",
+            (
+                f"c4p_notification must be one of {C4P_NOTIFICATION_OPTIONS} "
+                "if defined, got always."
+            ),
+        ),
+    ],
+)
+@patch("reana_job_controller.schemas.REANA_KUBERNETES_JOBS_TIMEOUT_LIMIT", "10")
+@patch("reana_job_controller.schemas.REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT", "20")
+def test_create_job_invalid_c4p_configuration(
+    app, job_spec, monkeypatch, parameter, invalid_value, expected_message
+):
+    """Test invalid C4P configuration returns a JSON 500 response."""
+    job_spec["compute_backend"] = "compute4punch"
+    job_spec["cmd"] = serialise_job_command("true")
+
+    monkeypatch.setitem(app.config, "SUPPORTED_COMPUTE_BACKENDS", ["compute4punch"])
+    monkeypatch.setitem(
+        app.config,
+        "COMPUTE_BACKENDS",
+        {"compute4punch": lambda: Compute4PUNCHJobManager},
+    )
+
+    with (
+        patch(
+            f"reana_job_controller.compute4punch_job_manager.{parameter}",
+            invalid_value,
+        ),
+        patch(
+            "reana_job_controller.rest.get_cached_user_secrets",
+            return_value={},
+        ),
+        app.test_client() as client,
+    ):
+        response = client.post(
+            url_for("jobs.create_job"),
+            content_type="application/json",
+            data=json.dumps(job_spec),
+        )
+
+    assert response.status_code == 500
+    assert response.json == {
+        "message": f"Job submission failed. \n{expected_message}"
+    }
 
 
 @pytest.mark.parametrize(

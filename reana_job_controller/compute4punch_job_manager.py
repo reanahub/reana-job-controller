@@ -19,6 +19,7 @@ from typing import Iterable
 from reana_commons.workspace import is_directory, open_file, walk
 from reana_db.database import Session
 from reana_db.models import Workflow
+from reana_job_controller.errors import Compute4PUNCHConfigurationError
 from reana_job_controller.job_manager import JobManager
 from reana_job_controller.utils import SSHClient, motley_cue_auth_strategy_factory
 from reana_commons.job_utils import validate_htcondor_cpu_gpu
@@ -100,6 +101,13 @@ class Compute4PUNCHJobManager(JobManager):
         :param c4p_additional_requirements: additional HTCondor requirements for the job
         :type c4p_additional_requirements: str
         """
+
+        self.set_c4p_cpu_cores(c4p_cpu_cores)
+        self.set_c4p_gpu_count(c4p_gpu_count)
+        self.c4p_memory_limit = c4p_memory_limit
+        self.set_c4p_notification(c4p_notification)
+        self.c4p_additional_requirements = c4p_additional_requirements
+
         super(Compute4PUNCHJobManager, self).__init__(
             docker_img=docker_img,
             cmd=cmd,
@@ -128,12 +136,6 @@ class Compute4PUNCHJobManager(JobManager):
         self.job_description_path = os.path.join(
             self.c4p_abs_workspace_path, "submit.jdl"
         )
-
-        self.set_c4p_cpu_cores(c4p_cpu_cores)
-        self.set_c4p_gpu_count(c4p_gpu_count)
-        self.c4p_memory_limit = c4p_memory_limit
-        self.set_c4p_notification(c4p_notification)
-        self.c4p_additional_requirements = c4p_additional_requirements
 
     @JobManager.execution_hook
     def execute(self) -> str:
@@ -430,7 +432,7 @@ class Compute4PUNCHJobManager(JobManager):
         """Set C4P CPU cores and validate the value."""
         c4p_cpu_cores = C4P_CPU_CORES if c4p_cpu_cores in (None, "") else c4p_cpu_cores
         if not validate_htcondor_cpu_gpu(c4p_cpu_cores):
-            raise ValueError(
+            raise Compute4PUNCHConfigurationError(
                 f"c4p_cpu_cores must be a positive integer, got {c4p_cpu_cores}."
             )
         self.c4p_cpu_cores = c4p_cpu_cores
@@ -439,7 +441,7 @@ class Compute4PUNCHJobManager(JobManager):
         """Set C4P GPU count and validate the value."""
         c4p_gpu_count = C4P_GPU_COUNT if c4p_gpu_count in (None, "") else c4p_gpu_count
         if c4p_gpu_count and not validate_htcondor_cpu_gpu(c4p_gpu_count):
-            raise ValueError(
+            raise Compute4PUNCHConfigurationError(
                 f"c4p_gpu_count must be a positive integer if defined, got {c4p_gpu_count}."
             )
         self.c4p_gpu_count = c4p_gpu_count
@@ -448,7 +450,7 @@ class Compute4PUNCHJobManager(JobManager):
         """Set C4P notification and validate the value."""
         c4p_notification = C4P_NOTIFICATION if c4p_notification in (None, "") else c4p_notification
         if c4p_notification and c4p_notification not in C4P_NOTIFICATION_OPTIONS:
-            raise ValueError(
+            raise Compute4PUNCHConfigurationError(
                 f"c4p_notification must be one of {C4P_NOTIFICATION_OPTIONS} if defined, got {c4p_notification}."
             )
         self.c4p_notification = c4p_notification
