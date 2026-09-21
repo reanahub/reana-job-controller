@@ -164,14 +164,16 @@ def test_retrieve_email_workflow_owner(manager, workflow, expected_email):
 
 
 @pytest.mark.parametrize(
-    "cpu_cores",
-    ["2", ""],
+    "cpu_cores, expected_cpu_cores",
+    [
+        ("2", "2"),
+        ("", "8"),
+    ],
 )
-def test_cpu_in_jdl(manager, cpu_cores):
+def test_cpu_in_jdl(manager, cpu_cores, expected_cpu_cores):
     """Include CPU request using the configured default when not specified."""
     workflow = mock.MagicMock()
     workflow.get_full_workflow_name.return_value = "workflow"
-
     with (
         mock.patch.object(
             Compute4PUNCHJobManager,
@@ -191,14 +193,17 @@ def test_cpu_in_jdl(manager, cpu_cores):
 
     command = manager.c4p_connection.exec_command.call_args.args[0]
 
-    assert f"request_cpus = {manager.c4p_cpu_cores}" in command
+    assert f"request_cpus = {expected_cpu_cores}" in command
 
 
 @pytest.mark.parametrize(
-    "gpu_count",
-    ["2", ""],
+    "gpu_count, expected_gpu_count",
+    [
+        ("2", "2"),
+        ("", ""),
+    ],
 )
-def test_gpu_in_jdl(manager, gpu_count):
+def test_gpu_in_jdl(manager, gpu_count, expected_gpu_count):
     """Include or omit GPU request depending on configuration."""
     workflow = mock.MagicMock()
     workflow.get_full_workflow_name.return_value = "workflow"
@@ -222,8 +227,8 @@ def test_gpu_in_jdl(manager, gpu_count):
 
     command = manager.c4p_connection.exec_command.call_args.args[0]
 
-    if gpu_count == "2":
-        assert f"request_gpus = {gpu_count}" in command
+    if expected_gpu_count:
+        assert f"request_gpus = {expected_gpu_count}" in command
     else:
         assert "request_gpus =" not in command
 
