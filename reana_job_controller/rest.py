@@ -27,7 +27,10 @@ from reana_commons.errors import (
 from reana_db.models import JobStatus
 from reana_commons.k8s.secrets import UserSecrets, UserSecretsStore
 
-from reana_job_controller.errors import ComputingBackendSubmissionError
+from reana_job_controller.errors import (
+    Compute4PUNCHConfigurationError,
+    ComputingBackendSubmissionError,
+)
 from reana_job_controller.job_db import (
     JOB_DB,
     job_exists,
@@ -327,6 +330,10 @@ def create_job():  # noqa
             return jsonify({"message": e.message}), 400
         except REANAKubernetesUIDBelowMinimum as e:
             return jsonify({"message": e.message}), 403
+        except Compute4PUNCHConfigurationError as e:
+            msg = f"Job submission failed. \n{e}"
+            logging.error(msg, exc_info=True)
+            return jsonify({"message": msg}), 500
     if not job_creation_condition.start_creation():
         return jsonify({"message": "Cannot create new jobs, shutting down"}), 400
 

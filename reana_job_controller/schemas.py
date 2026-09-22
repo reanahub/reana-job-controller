@@ -12,12 +12,13 @@
 import logging
 import re
 
-from marshmallow import Schema, fields, ValidationError, pre_load
-from reana_commons.job_utils import deserialise_job_command
+from marshmallow import Schema, fields, ValidationError, pre_load, validate
+from reana_commons.job_utils import deserialise_job_command, validate_htcondor_cpu_gpu
 
 from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_TIMEOUT_LIMIT,
     REANA_KUBERNETES_JOBS_MAX_USER_TIMEOUT_LIMIT,
+    C4P_NOTIFICATION_OPTIONS,
 )
 
 try:
@@ -34,8 +35,6 @@ except ImportError:
         "expressions will not be validated at the schema layer. Expected "
         "only in test environments and non-HTCondor builds."
     )
-
-_POSITIVE_INTEGER_RE = re.compile(r"^[1-9]\d*$")
 
 HTCONDOR_QUANTITY_RE = re.compile(
     r"^(?P<value>[1-9]\d*)\s*(?P<unit>K|KB|M|MB|G|GB|T|TB)?$",
@@ -94,13 +93,13 @@ def htcondor_quantity_to_unit(value, default_unit):
     return (bytes_value + divisor - 1) // divisor
 
 
-def _validate_positive_integer_string(field_name):
+def _validate_htcondor_cpu_gpu(field_name):
     """Build a marshmallow validator for positive-integer string fields."""
 
     def _validate(value):
         if value in (None, ""):
             return
-        if not _POSITIVE_INTEGER_RE.match(value):
+        if not validate_htcondor_cpu_gpu(value):
             raise ValidationError(
                 f"{field_name} must be a positive integer, got {value!r}."
             )
@@ -194,7 +193,7 @@ class JobRequest(Schema):
     htcondor_accounting_group = fields.Str(required=False)
     htcondor_request_cpus = fields.Str(
         required=False,
-        validate=_validate_positive_integer_string("htcondor_request_cpus"),
+        validate=_validate_htcondor_cpu_gpu("htcondor_request_cpus"),
     )
     htcondor_request_memory = fields.Str(
         required=False,
@@ -210,8 +209,19 @@ class JobRequest(Schema):
     )
     slurm_partition = fields.Str(required=False)
     slurm_time = fields.Str(required=False)
-    c4p_cpu_cores = fields.Str(required=False)
+    c4p_cpu_cores = fields.Str(
+        required=False,
+        validate=_validate_htcondor_cpu_gpu("c4p_cpu_cores"),
+    )
+    c4p_gpu_count = fields.Str(
+        required=False,
+        validate=_validate_htcondor_cpu_gpu("c4p_gpu_count"),
+    )
     c4p_memory_limit = fields.Str(required=False)
+    c4p_notification = fields.Str(
+        required=False,
+        validate=validate.OneOf(C4P_NOTIFICATION_OPTIONS),
+    )
     c4p_additional_requirements = fields.Str(required=False)
 
     @pre_load
