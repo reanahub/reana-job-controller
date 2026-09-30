@@ -37,8 +37,8 @@ extras_require = {
         "htcondor>=24.12,<25",
     ],
     "tests": [
-        "reana-commons[kubernetes,tests]>=0.95.0a20,<0.96.0",
-        "reana-db[tests]>=0.95.0a10,<0.96.0",
+        "reana-commons[kubernetes,tests]>=0.95.0a24,<0.96.0",
+        "reana-db[tests]>=0.95.0a13,<0.96.0",
     ],
     # NOTE: Paramiko 5 removed GSSAPI/Kerberos support, which the SlurmCERN
     # backend needs for gss_auth SSH to the Slurm head node. Keep Paramiko
@@ -67,8 +67,8 @@ install_requires = [
     "Werkzeug>=3.0.0",
     "fs>=2.0",
     "marshmallow>=3.5.0,<4.0.0",
-    "reana-commons[kubernetes]>=0.95.0a20,<0.96.0",
-    "reana-db>=0.95.0a10,<0.96.0",
+    "reana-commons[kubernetes]>=0.95.0a24,<0.96.0",
+    "reana-db>=0.95.0a13,<0.96.0",
     "retrying>=1.3.3",
 ]
 
