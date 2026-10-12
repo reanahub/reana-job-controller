@@ -709,3 +709,331 @@ def test_set_user_id(
     else:
         job_manager.set_user_id(kubernetes_uid)
         assert job_manager.kubernetes_uid == expected_value
+
+
+@pytest.mark.parametrize("read_only", [False, True])
+def test_execute_kubernetes_job_read_only_root_filesystem(
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    user0,
+    empty_user_secrets,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+    read_only,
+):
+    """Test that the read-only root filesystem option shapes the job spec."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    expected_command = "ls"
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd=expected_command,
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+    )
+    hostpath_mounts = [
+        {"name": "data", "hostPath": "/data"},
+        {"name": "scratch", "hostPath": "/scratch", "readOnly": False},
+    ]
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client, mock.patch(
+        "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+        corev1_api_client_with_user_secrets(empty_user_secrets),
+    ), mock.patch(
+        "reana_job_controller.kubernetes_job_manager."
+        "REANA_KUBERNETES_JOBS_READ_ONLY_ROOT_FILESYSTEM",
+        read_only,
+    ), mock.patch(
+        "reana_job_controller.kubernetes_job_manager.REANA_JOB_HOSTPATH_MOUNTS",
+        hostpath_mounts,
+    ), mock.patch(
+        "reana_job_controller.kubernetes_job_manager."
+        "REANA_KUBERNETES_JOBS_SCRATCH_VOLUME_SIZE_LIMIT",
+        "2Gi",
+    ):
+        backend_job_id = job_manager.execute()
+
+    body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+    pod_spec = body["spec"]["template"]["spec"]
+    container = pod_spec["containers"][0]
+    security_context = container["securityContext"]
+    volume_mounts = {vm["name"]: vm for vm in container["volumeMounts"]}
+    volumes = {v["name"]: v for v in pod_spec["volumes"]}
+
+    # the user's command is left untouched in both the pod spec and the
+    # job database; no scratch-directory wrapper is injected
+    assert container["args"] == [expected_command]
+    created_job = session.query(Job).filter_by(backend_job_id=backend_job_id).one()
+    assert created_job.cmd == json.dumps(expected_command)
+
+    # host-path mounts default to read-only only when the option is on,
+    # and per-mount overrides are respected
+    assert volume_mounts["data"]["readOnly"] is read_only
+    assert volume_mounts["scratch"]["readOnly"] is False
+
+    if read_only:
+        assert security_context["readOnlyRootFilesystem"] is True
+        # the read-only flag must not replace the restricted security context
+        assert security_context["capabilities"] == {"drop": ["ALL"]}
+        # ephemeral scratch is provided as size-limited emptyDir mounts at
+        # the standard scratch and cache locations
+        assert volume_mounts["reana-tmp"]["mountPath"] == "/tmp"
+        assert volume_mounts["reana-cache"]["mountPath"] == "/.cache"
+        assert volumes["reana-tmp"]["emptyDir"] == {"sizeLimit": "2Gi"}
+        assert volumes["reana-cache"]["emptyDir"] == {"sizeLimit": "2Gi"}
+    else:
+        assert "readOnlyRootFilesystem" not in security_context
+        assert "reana-tmp" not in volume_mounts
+        assert "reana-cache" not in volume_mounts
+
+
+def test_execute_kubernetes_job_read_only_with_kerberos(
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    user0,
+    kerberos_user_secrets,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Test that the read-only scratch and Kerberos trap coexist on the job."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    expected_command = "ls"
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd=expected_command,
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+        kerberos=True,
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client, mock.patch(
+        "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+        corev1_api_client_with_user_secrets(kerberos_user_secrets),
+    ), mock.patch(
+        "reana_job_controller.kubernetes_job_manager."
+        "REANA_KUBERNETES_JOBS_READ_ONLY_ROOT_FILESYSTEM",
+        True,
+    ), mock.patch(
+        "reana_job_controller.kubernetes_job_manager."
+        "REANA_KUBERNETES_JOBS_SCRATCH_VOLUME_SIZE_LIMIT",
+        "",
+    ):
+        job_manager.execute()
+
+    body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+    pod_spec = body["spec"]["template"]["spec"]
+    volume_mounts = {vm["name"]: vm for vm in pod_spec["containers"][0]["volumeMounts"]}
+    volumes = {v["name"]: v for v in pod_spec["volumes"]}
+    command = pod_spec["containers"][0]["args"][0]
+
+    # the Kerberos trap still wraps the unmodified user command, with no
+    # scratch-directory mkdir injected
+    assert command.startswith("trap")
+    assert "mkdir -p" not in command
+    assert command.endswith(expected_command)
+    # the ephemeral scratch mounts are still present alongside Kerberos
+    assert volume_mounts["reana-tmp"]["mountPath"] == "/tmp"
+    assert volume_mounts["reana-cache"]["mountPath"] == "/.cache"
+    # an empty size limit leaves the scratch volumes unlimited
+    assert volumes["reana-tmp"]["emptyDir"] == {}
+    assert volumes["reana-cache"]["emptyDir"] == {}
+
+
+@pytest.mark.parametrize("read_only", [False, True])
+@pytest.mark.parametrize(
+    "auth_option, auth_secrets, cache_volume_name",
+    [
+        (
+            "kerberos",
+            {
+                "CERN_USER": ("johndoe", "env"),
+                "CERN_KEYTAB": (".keytab", "env"),
+                ".keytab": ("keytab data", "file"),
+            },
+            "krb5-cache",
+        ),
+        (
+            "voms_proxy",
+            {
+                "VOMSPROXY_FILE": ("proxy.pem", "env"),
+                "proxy.pem": ("proxy data", "file"),
+            },
+            "voms-proxy-cache",
+        ),
+        (
+            "rucio",
+            {
+                "VONAME": ("atlas", "env"),
+                "RUCIO_USERNAME": ("johndoe", "env"),
+            },
+            "rucio-cache",
+        ),
+    ],
+)
+def test_execute_kubernetes_job_read_only_credential_cache_limit(
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+    read_only,
+    auth_option,
+    auth_secrets,
+    cache_volume_name,
+):
+    """Test that credential cache volumes are size-limited in read-only jobs."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    user_secrets = {
+        name: _build_user_secret(value, type_)
+        for name, (value, type_) in auth_secrets.items()
+    }
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+        **{auth_option: True},
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client, mock.patch(
+        "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+        corev1_api_client_with_user_secrets(user_secrets),
+    ), mock.patch(
+        "reana_job_controller.kubernetes_job_manager."
+        "REANA_KUBERNETES_JOBS_READ_ONLY_ROOT_FILESYSTEM",
+        read_only,
+    ):
+        job_manager.execute()
+
+    body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+    pod_spec = body["spec"]["template"]["spec"]
+    volumes = {v["name"]: v for v in pod_spec["volumes"]}
+    user_mounts = {vm["name"] for vm in pod_spec["containers"][0]["volumeMounts"]}
+
+    # the user container can write to the credential cache, so it must not
+    # bypass the scratch size limit
+    assert cache_volume_name in user_mounts
+    if read_only:
+        assert volumes[cache_volume_name]["emptyDir"] == {"sizeLimit": "10Mi"}
+    else:
+        assert volumes[cache_volume_name]["emptyDir"] == {}
+
+
+@pytest.mark.parametrize(
+    "read_only_setting, expected_read_only",
+    [({}, True), ({"readOnly": False}, False)],
+)
+def test_execute_kubernetes_job_read_only_hostpath_replaces_scratch(
+    read_only_setting,
+    expected_read_only,
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    user0,
+    empty_user_secrets,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Test that a host-path mount at /tmp replaces the /tmp scratch volume.
+
+    The replacing mount is read-only unless it sets ``readOnly`` to false.
+    """
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+    )
+    hostpath_mounts = [
+        {
+            "name": "site-tmp",
+            "hostPath": "/mnt/job-tmp",
+            "mountPath": "/tmp",
+            **read_only_setting,
+        },
+    ]
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client, mock.patch(
+        "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+        corev1_api_client_with_user_secrets(empty_user_secrets),
+    ), mock.patch(
+        "reana_job_controller.kubernetes_job_manager."
+        "REANA_KUBERNETES_JOBS_READ_ONLY_ROOT_FILESYSTEM",
+        True,
+    ), mock.patch(
+        "reana_job_controller.kubernetes_job_manager.REANA_JOB_HOSTPATH_MOUNTS",
+        hostpath_mounts,
+    ):
+        job_manager.execute()
+
+    body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+    pod_spec = body["spec"]["template"]["spec"]
+    volume_mounts = pod_spec["containers"][0]["volumeMounts"]
+    volume_names = {v["name"] for v in pod_spec["volumes"]}
+
+    # Kubernetes refuses a pod with two mounts at the same path
+    tmp_mounts = [vm for vm in volume_mounts if vm["mountPath"] == "/tmp"]
+    assert tmp_mounts == [
+        {"name": "site-tmp", "mountPath": "/tmp", "readOnly": expected_read_only}
+    ]
+    assert "reana-tmp" not in volume_names
+    assert "reana-cache" in volume_names
+
+
+@pytest.mark.parametrize(
+    "eviction_message, expects_scratch_hint",
+    [
+        ('Usage of EmptyDir volume "reana-tmp" exceeds the limit "5Gi". ', True),
+        ("The node was low on resource: ephemeral-storage. ", False),
+    ],
+)
+def test_kubernetes_get_job_logs_evicted(
+    app, kubernetes_job_pod, eviction_message, expects_scratch_hint
+):
+    """Test that the logs of an evicted job explain the eviction to the user."""
+    k8s_corev1_api_client = mock.MagicMock()
+    k8s_corev1_api_client.read_namespaced_pod_log = lambda **kwargs: mock.MagicMock(
+        data=b"partial output"
+    )
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_corev1_api_client",
+        k8s_corev1_api_client,
+    ):
+        job_pod = kubernetes_job_pod("Failed", "Error")
+        job_pod.status.reason = "Evicted"
+        job_pod.status.message = eviction_message
+        logs = KubernetesJobManager.get_logs(
+            job_pod.metadata.labels["job-name"], job_pod=job_pod
+        )
+
+    assert "partial output" in logs
+    assert "Evicted: The job was evicted by Kubernetes." in logs
+    assert eviction_message.strip() in logs
+    assert ("local scratch space (/tmp or /.cache)" in logs) is expects_scratch_hint

@@ -10,7 +10,7 @@ import ast
 import logging
 import os
 import traceback
-from typing import Optional
+from typing import Dict, List, Optional
 
 from flask import current_app
 from kubernetes import client
@@ -65,12 +65,37 @@ from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_REQUEST,
     REANA_KUBERNETES_JOBS_MAX_USER_MEMORY_LIMIT,
     REANA_KUBERNETES_JOBS_MIN_USER_UID,
+    REANA_KUBERNETES_JOBS_READ_ONLY_ROOT_FILESYSTEM,
+    REANA_KUBERNETES_JOBS_SCRATCH_VOLUME_SIZE_LIMIT,
     REANA_USER_ID,
     KUEUE_ENABLED,
     KUEUE_LOCAL_QUEUE_NAME,
 )
 from reana_job_controller.errors import ComputingBackendSubmissionError
 from reana_job_controller.job_manager import JobManager
+
+READ_ONLY_ROOT_FILESYSTEM_SCRATCH_VOLUMES = (
+    ("reana-tmp", "/tmp"),
+    ("reana-cache", "/.cache"),
+)
+"""Names and mount paths of the scratch volumes of read-only root jobs."""
+
+CREDENTIAL_CACHE_VOLUME_SIZE_LIMIT = "10Mi"
+"""Size limit of the Kerberos, VOMS and Rucio cache volumes of read-only root jobs."""
+
+
+def _limit_credential_cache_volumes(volumes: List[Dict]) -> None:
+    """Limit the size of credential cache volumes of read-only root jobs.
+
+    The user container can write to these volumes, so without a limit they
+    would bypass the size limit of the scratch volumes.
+
+    :param volumes: Kubernetes volume specs to change in place.
+    """
+    if REANA_KUBERNETES_JOBS_READ_ONLY_ROOT_FILESYSTEM:
+        for volume in volumes:
+            if "emptyDir" in volume:
+                volume["emptyDir"]["sizeLimit"] = CREDENTIAL_CACHE_VOLUME_SIZE_LIMIT
 
 
 def _restricted_container_security_context(
@@ -292,6 +317,10 @@ class KubernetesJobManager(JobManager):
             self.job["spec"]["template"]["spec"]["containers"][0][
                 "securityContext"
             ] = _restricted_container_security_context()
+        if REANA_KUBERNETES_JOBS_READ_ONLY_ROOT_FILESYSTEM:
+            self.job["spec"]["template"]["spec"]["containers"][0]["securityContext"][
+                "readOnlyRootFilesystem"
+            ] = True
 
         secret_env_vars = self.secrets.get_env_secrets_as_k8s_spec()
         job_spec = self.job["spec"]["template"]["spec"]
@@ -306,6 +335,8 @@ class KubernetesJobManager(JobManager):
                 job_spec["containers"][0]["env"].append({"name": var, "value": value})
 
         self.add_resource_requests_and_limits(job_spec)
+        if REANA_KUBERNETES_JOBS_READ_ONLY_ROOT_FILESYSTEM:
+            self.add_read_only_root_filesystem_scratch()
         self.add_hostpath_volumes()
         self.add_workspace_volume()
         self.add_shared_volume()
@@ -474,6 +505,26 @@ class KubernetesJobManager(JobManager):
                 f"Kubernetes job id: {backend_job_id} was killed due to timeout."
             )
 
+        if job_pod.status.reason == "Evicted":
+            message = "Evicted: The job was evicted by Kubernetes."
+            eviction_message = job_pod.status.message
+            if isinstance(eviction_message, str) and eviction_message:
+                message += f" {eviction_message.strip()}"
+                if any(
+                    f'"{name}"' in eviction_message
+                    for name, _ in READ_ONLY_ROOT_FILESYSTEM_SCRATCH_VOLUMES
+                ):
+                    scratch_paths = " or ".join(
+                        path for _, path in READ_ONLY_ROOT_FILESYSTEM_SCRATCH_VOLUMES
+                    )
+                    message += (
+                        f" The job wrote more data to its local scratch space"
+                        f" ({scratch_paths}) than this cluster permits. Write"
+                        f" large files to the workflow workspace instead."
+                    )
+            logs = (logs or "") + f"\n{message}\n"
+            logging.warning(message)
+
         return logs
 
     def stop(backend_job_id, asynchronous=True):
@@ -580,6 +631,35 @@ class KubernetesJobManager(JobManager):
         if resources:
             job_spec["containers"][0]["resources"] = resources
 
+    def add_read_only_root_filesystem_scratch(self):
+        """Add ephemeral writable scratch dirs for read-only root jobs.
+
+        With a read-only root filesystem the container can no longer write to
+        ``/tmp`` and ``/.cache`` inside its image. Mount ephemeral ``emptyDir``
+        volumes there so that software using these paths keeps working without
+        granting any writable surface that survives the job or escapes onto
+        the shared workspace volume. Kubernetes evicts the job when one volume
+        goes over the configured size limit. A host-path mount configured at
+        the same path replaces the scratch volume.
+        """
+        empty_dir = {}
+        if REANA_KUBERNETES_JOBS_SCRATCH_VOLUME_SIZE_LIMIT:
+            empty_dir["sizeLimit"] = REANA_KUBERNETES_JOBS_SCRATCH_VOLUME_SIZE_LIMIT
+        hostpath_mount_paths = {
+            mount.get("mountPath", mount["hostPath"])
+            for mount in REANA_JOB_HOSTPATH_MOUNTS
+        }
+
+        volumes_to_mount = []
+        for name, mount_path in READ_ONLY_ROOT_FILESYSTEM_SCRATCH_VOLUMES:
+            if mount_path in hostpath_mount_paths:
+                continue
+            volume_mount = {"name": name, "mountPath": mount_path}
+            volume = {"name": name, "emptyDir": dict(empty_dir)}
+            volumes_to_mount.append((volume_mount, volume))
+
+        self.add_volumes(volumes_to_mount)
+
     def add_hostpath_volumes(self):
         """Add hostPath mounts from configuration to job."""
         volumes_to_mount = []
@@ -587,6 +667,9 @@ class KubernetesJobManager(JobManager):
             volume_mount = {
                 "name": mount["name"],
                 "mountPath": mount.get("mountPath", mount["hostPath"]),
+                "readOnly": mount.get(
+                    "readOnly", REANA_KUBERNETES_JOBS_READ_ONLY_ROOT_FILESYSTEM
+                ),
             }
             volume = {"name": mount["name"], "hostPath": {"path": mount["hostPath"]}}
             volumes_to_mount.append((volume_mount, volume))
@@ -612,6 +695,7 @@ class KubernetesJobManager(JobManager):
             kubernetes_uid=self.kubernetes_uid,
         )
 
+        _limit_credential_cache_volumes(krb5_config.volumes)
         self.job["spec"]["template"]["spec"]["volumes"].extend(krb5_config.volumes)
         self.job["spec"]["template"]["spec"]["containers"][0]["volumeMounts"].extend(
             krb5_config.volume_mounts
@@ -640,6 +724,7 @@ class KubernetesJobManager(JobManager):
     def _add_voms_proxy_init_container(self, secrets_volume_mount, secret_env_vars):
         """Add sidecar container for a job."""
         ticket_cache_volume = {"name": "voms-proxy-cache", "emptyDir": {}}
+        _limit_credential_cache_volumes([ticket_cache_volume])
         volume_mounts = [
             {
                 "name": ticket_cache_volume["name"],
@@ -741,6 +826,7 @@ class KubernetesJobManager(JobManager):
     def _add_rucio_init_container(self, secrets_volume_mount, secret_env_vars):
         """Add sidecar container for a job."""
         ticket_cache_volume = {"name": "rucio-cache", "emptyDir": {}}
+        _limit_credential_cache_volumes([ticket_cache_volume])
         volume_mounts = [
             {
                 "name": ticket_cache_volume["name"],

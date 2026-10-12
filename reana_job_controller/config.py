@@ -222,6 +222,31 @@ reserved 1-99 system-user range. Cluster administrators can raise this minimum
 to align with Pod Security Standards "restricted" expectations.
 """
 
+REANA_KUBERNETES_JOBS_READ_ONLY_ROOT_FILESYSTEM = bool(
+    strtobool(os.getenv("REANA_KUBERNETES_JOBS_READ_ONLY_ROOT_FILESYSTEM", "false"))
+)
+"""Whether to mount a read-only root filesystem in user job pods.
+
+When enabled, writes to paths inside the container image are rejected while
+mounted workspace volumes remain writable. Ephemeral ``emptyDir`` scratch
+volumes are mounted at ``/tmp`` and ``/.cache`` so that software using these
+paths keeps working; writes there are per-pod and discarded when the job
+finishes. Host-path mounts default to read-only unless a mount sets
+``readOnly: false``.
+"""
+
+REANA_KUBERNETES_JOBS_SCRATCH_VOLUME_SIZE_LIMIT = os.getenv(
+    "REANA_KUBERNETES_JOBS_SCRATCH_VOLUME_SIZE_LIMIT", "5Gi"
+)
+"""Size limit of each scratch volume mounted in read-only root filesystem jobs.
+
+The limit applies to each scratch volume separately. Kubernetes measures the
+usage periodically and evicts a job pod that goes over the limit. This reduces
+the risk that a job fills the local disk of its node, but it is not a hard
+quota: a job can write more than the limit before the eviction. An empty
+value disables the limit.
+"""
+
 SLURM_HEADNODE_HOSTNAME = os.getenv("SLURM_HOSTNAME", "hpc-batch.cern.ch")
 """Hostname of SLURM head-node used for job management via SSH."""
 
