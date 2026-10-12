@@ -15,6 +15,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check Docker credentials
+        run: echo "DOCKER_USER starts with $(echo $DOCKER_USER | cut -c1-4)..."
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
       - name: Build Docker image
         run: ./run-tests.sh --docker-build
 
