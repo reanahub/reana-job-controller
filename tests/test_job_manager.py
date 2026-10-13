@@ -445,7 +445,6 @@ def test_stop_kubernetes_job(
             kubernetes_client.delete_namespaced_job.assert_called_once()
 
 
-@mock.patch("reana_job_controller.job_manager.CACHE_ENABLED", True)
 def test_execution_hooks():
     """Test hook execution order."""
 
@@ -463,12 +462,9 @@ def test_execution_hooks():
         def create_job_in_db(self, job_id):
             self.order_list.append(3)
 
-        def cache_job(self):
-            self.order_list.append(4)
-
     job_manager = TestJobManger("docker.io/library/busybox", "ls", {})
     job_manager.execute()
-    assert job_manager.order_list == [1, 2, 3, 4]
+    assert job_manager.order_list == [1, 2, 3]
 
 
 @pytest.mark.parametrize(

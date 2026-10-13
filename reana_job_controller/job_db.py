@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2018, 2019, 2020, 2021, 2024 CERN.
+# Copyright (C) 2018, 2019, 2020, 2021, 2024, 2026 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -9,9 +9,8 @@
 """REANA-Job-Controller job database."""
 
 import logging
-from reana_commons.utils import calculate_hash_of_dir, calculate_job_input_hash
 from reana_db.database import Session
-from reana_db.models import Job, JobCache, JobStatus
+from reana_db.models import Job, JobStatus
 
 JOB_DB = {}
 
@@ -76,24 +75,6 @@ def retrieve_all_jobs():
             }
         )
     return job_list
-
-
-def job_is_cached(job_spec, workflow_json, workflow_workspace):
-    """Check if job result exists in the cache."""
-    input_hash = calculate_job_input_hash(job_spec, workflow_json)
-    workspace_hash = calculate_hash_of_dir(workflow_workspace)
-    if workspace_hash == -1:
-        return None
-
-    cached_job = (
-        Session.query(JobCache)
-        .filter_by(parameters=input_hash, workspace_hash=workspace_hash)
-        .first()
-    )
-    if cached_job:
-        return {"result_path": cached_job.result_path, "job_id": cached_job.job_id}
-    else:
-        return None
 
 
 def job_exists(job_id):
