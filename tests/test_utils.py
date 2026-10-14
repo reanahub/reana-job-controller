@@ -214,3 +214,55 @@ def test_ssh_client_exec_command_raises_remote_errors():
 def test_slurm_partition_uses_current_cern_default():
     """Test default Slurm partition follows the current CERN cluster."""
     assert SLURM_PARTITION == "photon"
+
+
+@pytest.fixture
+def keytab_mount(tmp_path, monkeypatch):
+    """Provide a secrets mount with one dummy keytab file."""
+    (tmp_path / "dummy.keytab").write_bytes(b"dummy")
+    monkeypatch.setattr(utils, "REANA_USER_SECRET_MOUNT_PATH", str(tmp_path))
+    monkeypatch.setattr(utils.Workflow, "update_workflow_status", mock.Mock())
+    return tmp_path
+
+
+def test_initialize_krb5_token_passes_values_as_arguments(keytab_mount, monkeypatch):
+    """Credential values are passed to kinit as data, not as shell syntax."""
+    monkeypatch.setenv("CERN_USER", "dummyuser")
+    monkeypatch.setenv("CERN_KEYTAB", "dummy.keytab")
+    with mock.patch.object(utils.subprocess, "check_output") as check_output:
+        utils.initialize_krb5_token(workflow_uuid="dummy-uuid")
+
+    check_output.assert_called_once_with(
+        [
+            "kinit",
+            "-kt",
+            str(keytab_mount / "dummy.keytab"),
+            "dummyuser@CERN.CH",
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    "cern_user,keytab",
+    [
+        ("dummyuser;touch /tmp/marker", "dummy.keytab"),
+        ("$(touch /tmp/marker)", "dummy.keytab"),
+        ("dummyuser\n", "dummy.keytab"),
+        ("dummyuser", "dummy.keytab; touch /tmp/marker"),
+        ("dummyuser", "../../../etc/passwd"),
+        ("dummyuser", "missing.keytab"),
+        ("dummyuser", ""),
+    ],
+)
+def test_initialize_krb5_token_rejects_unsafe_values(
+    keytab_mount, monkeypatch, cern_user, keytab
+):
+    """Malformed user names and keytab references never reach kinit."""
+    monkeypatch.setenv("CERN_USER", cern_user)
+    monkeypatch.setenv("CERN_KEYTAB", keytab)
+    with mock.patch.object(utils.subprocess, "check_output") as check_output:
+        with pytest.raises(SystemExit):
+            utils.initialize_krb5_token(workflow_uuid="dummy-uuid")
+
+    check_output.assert_not_called()
+    utils.Workflow.update_workflow_status.assert_called_once()

@@ -11,6 +11,7 @@
 import csv
 import logging
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -19,6 +20,7 @@ from logging import Formatter, LogRecord
 from io import StringIO
 from typing import List, Tuple
 
+from reana_commons.config import REANA_USER_SECRET_MOUNT_PATH
 from reana_db.database import Session
 from reana_db.models import Workflow
 
@@ -71,17 +73,45 @@ def update_workflow_logs(workflow_uuid, log_message):
         logging.error("Exception while saving logs: {}".format(str(e)), exc_info=True)
 
 
+CERN_USER_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_.-]{0,31}")
+"""Accepted format of ``CERN_USER`` (a POSIX user name)."""
+
+
+def _get_keytab_path(keytab_file):
+    """Return the path of a keytab file secret, or raise ``ValueError``."""
+    keytab_path = os.path.normpath(
+        os.path.join(REANA_USER_SECRET_MOUNT_PATH, keytab_file)
+    )
+    if (
+        not keytab_file
+        or os.path.dirname(keytab_path)
+        != os.path.normpath(REANA_USER_SECRET_MOUNT_PATH)
+        or not os.path.isfile(keytab_path)
+    ):
+        raise ValueError(
+            "CERN_KEYTAB must name a file secret, not {!r}.".format(keytab_file)
+        )
+    return keytab_path
+
+
 def initialize_krb5_token(workflow_uuid):
     """Create kerberos ticket from mounted keytab_file."""
     cern_user = os.environ.get("CERN_USER")
-    keytab_file = os.environ.get("CERN_KEYTAB")
-    cmd = "kinit -kt /etc/reana/secrets/{} {}@CERN.CH".format(keytab_file, cern_user)
+    keytab_file = os.environ.get("CERN_KEYTAB", "")
 
     if cern_user:
         try:
-            subprocess.check_output(cmd, shell=True)
-        except subprocess.CalledProcessError as err:
-            msg = "Executing: {} \n Authentication failed: {}".format(cmd, err)
+            if not CERN_USER_PATTERN.fullmatch(cern_user):
+                raise ValueError("CERN_USER is not a valid user name.")
+            cmd = [
+                "kinit",
+                "-kt",
+                _get_keytab_path(keytab_file),
+                "{}@CERN.CH".format(cern_user),
+            ]
+            subprocess.check_output(cmd)
+        except (subprocess.CalledProcessError, ValueError) as err:
+            msg = "Kerberos authentication failed: {}".format(err)
             Workflow.update_workflow_status(
                 db_session=Session,
                 workflow_uuid=workflow_uuid,
