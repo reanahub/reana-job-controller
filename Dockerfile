@@ -277,7 +277,6 @@ RUN pip check
 ENV COMPUTE_BACKENDS=$COMPUTE_BACKENDS \
     FLASK_APP=reana_job_controller/app.py \
     K8S_USE_SECURITY_CONTEXT=True \
-    LIBNSS_WRAPPER_PATH=/usr/local/lib/libnss_wrapper.so \
     NSS_WRAPPER_GROUP=/var/run/nss_wrapper/group \
     NSS_WRAPPER_PASSWD=/var/run/nss_wrapper/passwd \
     TERM=xterm

@@ -10,6 +10,7 @@
 
 import logging
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,11 +24,13 @@ DEFAULT_USER_NAME = "reana"
 FALLBACK_HOME_ROOT = Path("/tmp/reana-job-controller")
 FLASK_DEBUG_VALUES = {"1", "true"}
 GROUP_SOURCE = Path("/etc/group")
+LIBNSS_WRAPPER_PATH = Path("/usr/local/lib/libnss_wrapper.so")
+"""Image-owned nss_wrapper library; never taken from the environment."""
+NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_.-]{0,31}")
 PASSWD_SOURCE = Path("/etc/passwd")
 UWSGI_CONFIG_PATH = Path("/var/reana/uwsgi/uwsgi.ini")
 
 K8S_USE_SECURITY_CONTEXT_ENV = "K8S_USE_SECURITY_CONTEXT"
-LIBNSS_WRAPPER_PATH_ENV = "LIBNSS_WRAPPER_PATH"
 NSS_WRAPPER_GROUP_ENV = "NSS_WRAPPER_GROUP"
 NSS_WRAPPER_PASSWD_ENV = "NSS_WRAPPER_PASSWD"
 WORKFLOW_RUNTIME_GROUP_NAME_ENV = "WORKFLOW_RUNTIME_GROUP_NAME"
@@ -74,6 +77,8 @@ def _resolve_runtime_home(uid):
         candidate_paths.append(fallback_home)
 
     for candidate in candidate_paths:
+        if ":" in str(candidate) or "\n" in str(candidate):
+            continue
         try:
             candidate.mkdir(parents=True, exist_ok=True)
             probe = candidate / ".reana-write-test"
@@ -115,6 +120,10 @@ def get_runtime_identity():
             if configured_group_name == DEFAULT_GROUP_NAME and gid != 0
             else configured_group_name
         )
+
+    for name in (user_name, group_name):
+        if not NAME_PATTERN.fullmatch(name):
+            raise NSSWrapperSetupError(f"Invalid user or group name: {name!r}")
 
     return RuntimeIdentity(
         user_name=user_name,
@@ -173,7 +182,7 @@ def bootstrap_nss_wrapper():
     """Materialize passwd/group files and set nss_wrapper environment."""
     passwd_target = Path(_get_required_env(NSS_WRAPPER_PASSWD_ENV))
     group_target = Path(_get_required_env(NSS_WRAPPER_GROUP_ENV))
-    library_path = Path(_get_required_env(LIBNSS_WRAPPER_PATH_ENV))
+    library_path = LIBNSS_WRAPPER_PATH
     identity = get_runtime_identity()
     home_path = Path(identity.home)
     cache_path = home_path / ".cache"

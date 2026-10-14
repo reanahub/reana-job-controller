@@ -15,7 +15,6 @@ import pytest
 
 from reana_job_controller.nss_wrapper import (
     K8S_USE_SECURITY_CONTEXT_ENV,
-    LIBNSS_WRAPPER_PATH_ENV,
     NSS_WRAPPER_GROUP_ENV,
     NSS_WRAPPER_PASSWD_ENV,
     NSSWrapperSetupError,
@@ -95,7 +94,9 @@ def test_bootstrap_nss_wrapper_materializes_files_and_sets_env(tmp_path, monkeyp
     monkeypatch.setenv(WORKFLOW_RUNTIME_USER_GID_ENV, "0")
     monkeypatch.setenv(NSS_WRAPPER_PASSWD_ENV, str(passwd_target))
     monkeypatch.setenv(NSS_WRAPPER_GROUP_ENV, str(group_target))
-    monkeypatch.setenv(LIBNSS_WRAPPER_PATH_ENV, str(libnss_wrapper))
+    monkeypatch.setattr(
+        "reana_job_controller.nss_wrapper.LIBNSS_WRAPPER_PATH", libnss_wrapper
+    )
     monkeypatch.setenv("HOME", str(tmp_path / "runtime-home"))
     monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
 
@@ -139,7 +140,9 @@ def test_bootstrap_nss_wrapper_preserves_root_group_on_openshift_like_runtime(
     monkeypatch.setenv(WORKFLOW_RUNTIME_USER_NAME_ENV, "reana")
     monkeypatch.setenv(NSS_WRAPPER_PASSWD_ENV, str(passwd_target))
     monkeypatch.setenv(NSS_WRAPPER_GROUP_ENV, str(group_target))
-    monkeypatch.setenv(LIBNSS_WRAPPER_PATH_ENV, str(libnss_wrapper))
+    monkeypatch.setattr(
+        "reana_job_controller.nss_wrapper.LIBNSS_WRAPPER_PATH", libnss_wrapper
+    )
     monkeypatch.setenv("HOME", "/home/ubuntu")
     monkeypatch.setattr("os.getuid", lambda: 43210)
     monkeypatch.setattr("os.getgid", lambda: 54321)
@@ -200,7 +203,9 @@ def test_bootstrap_nss_wrapper_prepares_runtime_home_cache_dirs(tmp_path, monkey
     monkeypatch.setenv(WORKFLOW_RUNTIME_GROUP_NAME_ENV, "root")
     monkeypatch.setenv(NSS_WRAPPER_PASSWD_ENV, str(passwd_target))
     monkeypatch.setenv(NSS_WRAPPER_GROUP_ENV, str(group_target))
-    monkeypatch.setenv(LIBNSS_WRAPPER_PATH_ENV, str(libnss_wrapper))
+    monkeypatch.setattr(
+        "reana_job_controller.nss_wrapper.LIBNSS_WRAPPER_PATH", libnss_wrapper
+    )
     monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
     monkeypatch.setattr("os.getuid", lambda: 43210)
     monkeypatch.setattr("os.getgid", lambda: 54321)
@@ -235,12 +240,74 @@ def test_bootstrap_nss_wrapper_fails_without_library(tmp_path, monkeypatch):
     monkeypatch.setenv(WORKFLOW_RUNTIME_USER_GID_ENV, "0")
     monkeypatch.setenv(NSS_WRAPPER_PASSWD_ENV, str(passwd_target))
     monkeypatch.setenv(NSS_WRAPPER_GROUP_ENV, str(group_target))
-    monkeypatch.setenv(
-        LIBNSS_WRAPPER_PATH_ENV, str(tmp_path / "missing-libnss_wrapper.so")
+    monkeypatch.setattr(
+        "reana_job_controller.nss_wrapper.LIBNSS_WRAPPER_PATH",
+        tmp_path / "missing-libnss_wrapper.so",
     )
 
     with pytest.raises(NSSWrapperSetupError, match="libnss_wrapper"):
         bootstrap_nss_wrapper()
+
+
+def test_bootstrap_nss_wrapper_ignores_library_path_from_env(tmp_path, monkeypatch):
+    """The preload library must stay image-owned, whatever the environment says."""
+    passwd_source = tmp_path / "passwd.source"
+    group_source = tmp_path / "group.source"
+    libnss_wrapper = tmp_path / "libnss_wrapper.so"
+    untrusted_library = tmp_path / "workspace" / "evil.so"
+    passwd_source.write_text("root:x:0:0:root:/root:/bin/bash\n")
+    group_source.write_text("root:x:0:\n")
+    libnss_wrapper.write_text("placeholder")
+    untrusted_library.parent.mkdir()
+    untrusted_library.write_text("placeholder")
+
+    monkeypatch.setattr("reana_job_controller.nss_wrapper.PASSWD_SOURCE", passwd_source)
+    monkeypatch.setattr("reana_job_controller.nss_wrapper.GROUP_SOURCE", group_source)
+    monkeypatch.setattr(
+        "reana_job_controller.nss_wrapper.LIBNSS_WRAPPER_PATH", libnss_wrapper
+    )
+    monkeypatch.setenv("LIBNSS_WRAPPER_PATH", str(untrusted_library))
+    monkeypatch.setenv(K8S_USE_SECURITY_CONTEXT_ENV, "True")
+    monkeypatch.setenv(WORKFLOW_RUNTIME_USER_UID_ENV, "1000")
+    monkeypatch.setenv(WORKFLOW_RUNTIME_USER_GID_ENV, "0")
+    monkeypatch.setenv(NSS_WRAPPER_PASSWD_ENV, str(tmp_path / "passwd"))
+    monkeypatch.setenv(NSS_WRAPPER_GROUP_ENV, str(tmp_path / "group"))
+    monkeypatch.setenv("HOME", str(tmp_path / "runtime-home"))
+
+    bootstrap_nss_wrapper()
+
+    assert os.environ["LD_PRELOAD"] == str(libnss_wrapper)
+
+
+@pytest.mark.parametrize(
+    "cern_user",
+    ["bad:user", "bad\nroot:x:0:0::/root:/bin/bash", "alice\n", "-rf", "a" * 33],
+)
+def test_get_runtime_identity_rejects_malformed_user_name(monkeypatch, cern_user):
+    """Malformed names must not be written into passwd or group records."""
+    monkeypatch.setenv(K8S_USE_SECURITY_CONTEXT_ENV, "True")
+    monkeypatch.setenv("CERN_USER", cern_user)
+    monkeypatch.setenv(WORKFLOW_RUNTIME_USER_UID_ENV, "1000")
+    monkeypatch.setenv(WORKFLOW_RUNTIME_USER_GID_ENV, "0")
+
+    with pytest.raises(NSSWrapperSetupError, match="Invalid user or group name"):
+        get_runtime_identity()
+
+
+def test_get_runtime_identity_skips_home_with_passwd_separators(tmp_path, monkeypatch):
+    """A HOME value with passwd separators must not reach the passwd record."""
+    fallback_home_root = tmp_path / "fallback-home"
+    monkeypatch.setattr(
+        "reana_job_controller.nss_wrapper.FALLBACK_HOME_ROOT", fallback_home_root
+    )
+    monkeypatch.setenv(K8S_USE_SECURITY_CONTEXT_ENV, "True")
+    monkeypatch.setenv(WORKFLOW_RUNTIME_USER_UID_ENV, "1000")
+    monkeypatch.setenv(WORKFLOW_RUNTIME_USER_GID_ENV, "0")
+    monkeypatch.setenv("HOME", str(tmp_path / "home:0:0"))
+
+    identity = get_runtime_identity()
+
+    assert identity.home == str(fallback_home_root / "1000")
 
 
 def test_get_server_command_uses_flask_in_debug(monkeypatch):
