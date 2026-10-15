@@ -19,8 +19,12 @@ from typing import Iterable
 from reana_commons.workspace import is_directory, open_file, walk
 from reana_db.database import Session
 from reana_db.models import Workflow
+from reana_job_controller.errors import Compute4PUNCHConfigurationError
 from reana_job_controller.job_manager import JobManager
 from reana_job_controller.utils import SSHClient, motley_cue_auth_strategy_factory
+from reana_commons.job_utils import validate_htcondor_cpu_gpu
+
+
 from reana_job_controller.config import (
     C4P_LOGIN_NODE_HOSTNAME,
     C4P_LOGIN_NODE_PORT,
@@ -28,7 +32,10 @@ from reana_job_controller.config import (
     C4P_SSH_BANNER_TIMEOUT,
     C4P_SSH_AUTH_TIMEOUT,
     C4P_CPU_CORES,
+    C4P_GPU_COUNT,
+    C4P_NOTIFICATION_OPTIONS,
     C4P_MEMORY_LIMIT,
+    C4P_NOTIFICATION,
     C4P_ADDITIONAL_REQUIREMENTS,
     C4P_REANA_REL_WORKFLOW_PATH,
 )
@@ -55,8 +62,10 @@ class Compute4PUNCHJobManager(JobManager):
         cvmfs_mounts="false",
         shared_file_system=False,
         job_name=None,
-        c4p_cpu_cores=C4P_CPU_CORES,
+        c4p_cpu_cores=None,
+        c4p_gpu_count=None,
         c4p_memory_limit=C4P_MEMORY_LIMIT,
+        c4p_notification=None,
         c4p_additional_requirements=C4P_ADDITIONAL_REQUIREMENTS,
         **kwargs,
     ):
@@ -83,11 +92,22 @@ class Compute4PUNCHJobManager(JobManager):
         :type job_name: str
         :param c4p_cpu_cores: number of CPU cores to use on C4P
         :type c4p_cpu_cores: str
+        :param c4p_gpu_count: number of GPUs to use on C4P
+        :type c4p_gpu_count: str
         :param c4p_memory_limit: maximum memory to be used on C4P
         :type c4p_memory_limit: str
+        :param c4p_notification: notification option to be used on C4P
+        :type c4p_notification: str
         :param c4p_additional_requirements: additional HTCondor requirements for the job
         :type c4p_additional_requirements: str
         """
+
+        self.set_c4p_cpu_cores(c4p_cpu_cores)
+        self.set_c4p_gpu_count(c4p_gpu_count)
+        self.c4p_memory_limit = c4p_memory_limit
+        self.set_c4p_notification(c4p_notification)
+        self.c4p_additional_requirements = c4p_additional_requirements
+
         super(Compute4PUNCHJobManager, self).__init__(
             docker_img=docker_img,
             cmd=cmd,
@@ -116,10 +136,6 @@ class Compute4PUNCHJobManager(JobManager):
         self.job_description_path = os.path.join(
             self.c4p_abs_workspace_path, "submit.jdl"
         )
-
-        self.c4p_cpu_cores = c4p_cpu_cores
-        self.c4p_memory_limit = c4p_memory_limit
-        self.c4p_additional_requirements = c4p_additional_requirements
 
     @JobManager.execution_hook
     def execute(self) -> str:
@@ -240,6 +256,7 @@ class Compute4PUNCHJobManager(JobManager):
         job_inputs = ",".join(job_inputs)
         job_outputs = "."  # download everything from remote job
         job_environment = (f"{key}={value}" for key, value in self.env_vars.items())
+        email_workflow_owner = self.email_workflow_owner
         job_description_template = [
             f"executable = {os.path.basename(self.job_execution_script_path)}",
             "use_oauth_services = helmholtz",
@@ -253,7 +270,22 @@ class Compute4PUNCHJobManager(JobManager):
             f"transfer_input_files = {job_inputs}" if job_inputs else "",
             f"transfer_output_files = {job_outputs}",
             f"request_cpus = {self.c4p_cpu_cores}",
+            (
+                f"request_gpus = {self.c4p_gpu_count}"
+                if self.c4p_gpu_count
+                else ""
+            ),
             f"request_memory = {self.c4p_memory_limit}",
+            (
+                f"notification = {self.c4p_notification}"
+                if self.c4p_notification
+                else ""
+            ),
+            (
+                f"notify_user = {email_workflow_owner}"
+                if email_workflow_owner and self.c4p_notification
+                else ""
+            ),
             f'+SINGULARITY_JOB_CONTAINER = "{self.docker_img}"',
             (
                 f"requirements = {self.c4p_additional_requirements}"
@@ -383,9 +415,42 @@ class Compute4PUNCHJobManager(JobManager):
 
     @property
     def workflow(self):
-        """Get workflow from db."""
-        workflow = (
-            Session.query(Workflow).filter_by(id_=self.workflow_uuid).one_or_none()
-        )
-        if workflow:
-            return workflow
+        """Get workflow from db once."""
+        if not hasattr(self, "_workflow"):
+            self._workflow = (
+                Session.query(Workflow).filter_by(id_=self.workflow_uuid).one_or_none()
+            )
+        return self._workflow
+
+    @property
+    def email_workflow_owner(self):
+        """Get the email from the workflow owner."""
+        workflow = self.workflow
+        return workflow.owner.email if workflow and workflow.owner else None
+
+    def set_c4p_cpu_cores(self, c4p_cpu_cores):
+        """Set C4P CPU cores and validate the value."""
+        c4p_cpu_cores = C4P_CPU_CORES if c4p_cpu_cores in (None, "") else c4p_cpu_cores
+        if not validate_htcondor_cpu_gpu(c4p_cpu_cores):
+            raise Compute4PUNCHConfigurationError(
+                f"c4p_cpu_cores must be a positive integer, got {c4p_cpu_cores}."
+            )
+        self.c4p_cpu_cores = c4p_cpu_cores
+
+    def set_c4p_gpu_count(self, c4p_gpu_count):
+        """Set C4P GPU count and validate the value."""
+        c4p_gpu_count = C4P_GPU_COUNT if c4p_gpu_count in (None, "") else c4p_gpu_count
+        if c4p_gpu_count and not validate_htcondor_cpu_gpu(c4p_gpu_count):
+            raise Compute4PUNCHConfigurationError(
+                f"c4p_gpu_count must be a positive integer if defined, got {c4p_gpu_count}."
+            )
+        self.c4p_gpu_count = c4p_gpu_count
+
+    def set_c4p_notification(self, c4p_notification):
+        """Set C4P notification and validate the value."""
+        c4p_notification = C4P_NOTIFICATION if c4p_notification in (None, "") else c4p_notification
+        if c4p_notification and c4p_notification not in C4P_NOTIFICATION_OPTIONS:
+            raise Compute4PUNCHConfigurationError(
+                f"c4p_notification must be one of {C4P_NOTIFICATION_OPTIONS} if defined, got {c4p_notification}."
+            )
+        self.c4p_notification = c4p_notification
