@@ -132,7 +132,8 @@ def test_execute_kubernetes_job(
                     "seccompProfile": {"type": "RuntimeDefault"},
                 }
                 assert len(env_vars) == 7  # KRB5CCNAME is added
-                assert "trap" in command[0] and expected_command in command[0]
+                assert command[0].startswith("trap ")
+                assert command[0].endswith(f"; umask 0002; {expected_command}")
                 assert "kinit -R" in containers[1]["args"][0]
                 assert containers[1]["name"] == KRB5_RENEW_CONTAINER_NAME
                 assert containers[1]["securityContext"] == {
@@ -148,7 +149,7 @@ def test_execute_kubernetes_job(
                 assert len(init_containers) == 0
                 # custom env + REANA_WORKSPACE + REANA_WORKFLOW_UUID + DASK_SCHEDULER_URI + two secrets
                 assert len(env_vars) == 6
-                assert command == [expected_command]
+                assert command == [f"umask 0002; {expected_command}"]
 
 
 def test_slurm_pull_image_reuses_existing_container():
@@ -766,9 +767,10 @@ def test_execute_kubernetes_job_read_only_root_filesystem(
     volume_mounts = {vm["name"]: vm for vm in container["volumeMounts"]}
     volumes = {v["name"]: v for v in pod_spec["volumes"]}
 
-    # the user's command is left untouched in both the pod spec and the
-    # job database; no scratch-directory wrapper is injected
-    assert container["args"] == [expected_command]
+    # the pod spec only adds the workspace umask to the user's command; no
+    # scratch-directory wrapper is injected, and the job database keeps the
+    # original command
+    assert container["args"] == [f"umask 0002; {expected_command}"]
     created_job = session.query(Job).filter_by(backend_job_id=backend_job_id).one()
     assert created_job.cmd == json.dumps(expected_command)
 
