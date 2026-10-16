@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of REANA.
-# Copyright (C) 2018, 2019, 2020, 2021, 2024 CERN.
+# Copyright (C) 2018, 2019, 2020, 2021, 2024, 2026 CERN.
 #
 # REANA is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -9,10 +9,15 @@
 """REANA-Job-Controller application factory."""
 
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 from flask import Flask
-from reana_commons.config import REANA_LOG_FORMAT, REANA_LOG_LEVEL
+from reana_commons.config import (
+    REANA_LOG_FORMAT,
+    REANA_LOG_LEVEL,
+    REANA_WORKFLOW_UMASK,
+)
 from reana_db.database import Session, engine as db_engine
 from sqlalchemy import event
 
@@ -56,6 +61,7 @@ def shutdown_session(response_or_exc):
 
 def create_app(config_mapping=None):
     """Create REANA-Job-Controller application."""
+    os.umask(REANA_WORKFLOW_UMASK)
     handler = logging.StreamHandler()
     handler.setFormatter(MultilineFormatter(REANA_LOG_FORMAT))
     logging.basicConfig(
