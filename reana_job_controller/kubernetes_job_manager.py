@@ -24,6 +24,7 @@ from reana_commons.config import (
     REANA_JOB_HOSTPATH_MOUNTS,
     REANA_RUNTIME_KUBERNETES_NAMESPACE,
     REANA_RUNTIME_JOBS_KUBERNETES_NODE_LABEL,
+    REANA_WORKFLOW_UMASK,
     WORKFLOW_RUNTIME_USER_GID,
     WORKFLOW_RUNTIME_USER_UID,
 )
@@ -296,7 +297,11 @@ class KubernetesJobManager(JobManager):
                             {
                                 "image": self.docker_img,
                                 "command": ["bash", "-c"],
-                                "args": [self.cmd],
+                                # Keep workspace files group-writable for jobs
+                                # that run with a custom UID
+                                "args": [
+                                    f"umask {REANA_WORKFLOW_UMASK:04o}; {self.cmd}"
+                                ],
                                 "name": "job",
                                 "env": [],
                                 "securityContext": {"allowPrivilegeEscalation": False},
@@ -717,8 +722,10 @@ class KubernetesJobManager(JobManager):
         )
 
         # Extend the main job command to create a file after it's finished
-        self.job["spec"]["template"]["spec"]["containers"][0]["args"] = [
-            f"trap 'touch {KRB5_STATUS_FILE_LOCATION}' EXIT; " + self.cmd
+        job_container = self.job["spec"]["template"]["spec"]["containers"][0]
+        job_container["args"] = [
+            f"trap 'touch {KRB5_STATUS_FILE_LOCATION}' EXIT; "
+            + job_container["args"][0]
         ]
 
     def _add_voms_proxy_init_container(self, secrets_volume_mount, secret_env_vars):
