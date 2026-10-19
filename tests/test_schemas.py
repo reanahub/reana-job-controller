@@ -163,3 +163,55 @@ def test_htcondor_quantity_to_unit_rejects_invalid(bad_value):
     """Invalid quantity strings raise ValueError from the helper."""
     with pytest.raises(ValueError):
         htcondor_quantity_to_unit(bad_value, "M")
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["c4p_cpu_cores", "c4p_gpu_count"],
+)
+@pytest.mark.parametrize(
+    "value",
+    ["2", ""],
+)
+def test_c4p_resource_accepted(field, value):
+    """Positive integer strings are accepted for C4P CPU/GPU counts."""
+    loaded = JobRequest().load(dict(BASE_JOB_REQUEST, **{field: value}))
+    assert loaded[field] == value
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["c4p_cpu_cores", "c4p_gpu_count"],
+)
+@pytest.mark.parametrize(
+    "bad_value",
+    ["0", "-2", "two"],
+)
+def test_c4p_resource_rejected(field, bad_value):
+    """Invalid values are rejected for C4P CPU/GPU counts."""
+    payload = dict(BASE_JOB_REQUEST, **{field: bad_value})
+    with pytest.raises(ValidationError) as exc:
+        JobRequest().load(payload)
+    assert field in exc.value.messages
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["Always", "Complete", "Error", "Never"],
+)
+def test_c4p_notification_accepted(value):
+    """Supported C4P notification options are accepted."""
+    loaded = JobRequest().load(dict(BASE_JOB_REQUEST, c4p_notification=value))
+    assert loaded["c4p_notification"] == value
+
+
+@pytest.mark.parametrize(
+    "bad_value",
+    ["Start", "always"],
+)
+def test_c4p_notification_rejected(bad_value):
+    """Unsupported C4P notification options are rejected."""
+    payload = dict(BASE_JOB_REQUEST, c4p_notification=bad_value)
+    with pytest.raises(ValidationError) as exc:
+        JobRequest().load(payload)
+    assert "c4p_notification" in exc.value.messages
