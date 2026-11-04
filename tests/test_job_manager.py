@@ -8,8 +8,11 @@
 
 """REANA-Job-Controller Job Manager tests."""
 
+import ast
 import base64
 import json
+import re
+import subprocess
 import uuid
 from types import SimpleNamespace
 
@@ -1010,14 +1013,35 @@ def test_execute_kubernetes_job_read_only_hostpath_replaces_scratch(
 
 
 @pytest.mark.parametrize(
-    "eviction_message, expects_scratch_hint",
+    "eviction_message, expects_scratch_hint, image, expects_sif_hint",
     [
-        ('Usage of EmptyDir volume "reana-tmp" exceeds the limit "5Gi". ', True),
-        ("The node was low on resource: ephemeral-storage. ", False),
+        (
+            'Usage of EmptyDir volume "reana-tmp" exceeds the limit "5Gi". ',
+            True,
+            "ubuntu:24.04",
+            False,
+        ),
+        (
+            'Usage of EmptyDir volume "reana-tmp" exceeds the limit "5Gi". ',
+            True,
+            "ghcr.io/apptainer/apptainer:1.4.5",
+            True,
+        ),
+        (
+            "The node was low on resource: ephemeral-storage. ",
+            False,
+            "ghcr.io/apptainer/apptainer:1.4.5",
+            False,
+        ),
     ],
 )
 def test_kubernetes_get_job_logs_evicted(
-    app, kubernetes_job_pod, eviction_message, expects_scratch_hint
+    app,
+    kubernetes_job_pod,
+    eviction_message,
+    expects_scratch_hint,
+    image,
+    expects_sif_hint,
 ):
     """Test that the logs of an evicted job explain the eviction to the user."""
     k8s_corev1_api_client = mock.MagicMock()
@@ -1031,6 +1055,7 @@ def test_kubernetes_get_job_logs_evicted(
         job_pod = kubernetes_job_pod("Failed", "Error")
         job_pod.status.reason = "Evicted"
         job_pod.status.message = eviction_message
+        job_pod.spec.containers = [SimpleNamespace(image=image)]
         logs = KubernetesJobManager.get_logs(
             job_pod.metadata.labels["job-name"], job_pod=job_pod
         )
@@ -1039,3 +1064,388 @@ def test_kubernetes_get_job_logs_evicted(
     assert "Evicted: The job was evicted by Kubernetes." in logs
     assert eviction_message.strip() in logs
     assert ("local scratch space (/tmp or /.cache)" in logs) is expects_scratch_hint
+    assert ("extract the image to /tmp" in logs) is expects_sif_hint
+
+
+def test_execute_unpacked_cvmfs_image(
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    empty_user_secrets,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Test execution of a job with an unpacked /cvmfs image."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    cvmfs_image = "/cvmfs/unpacked.cern.ch/registry.hub.docker.com/library/python:3.9"
+    expected_command = "echo hello world"
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+
+    job_manager = KubernetesJobManager(
+        docker_img=cvmfs_image,
+        cmd=expected_command,
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client:
+        with mock.patch(
+            "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+            corev1_api_client_with_user_secrets(empty_user_secrets),
+        ):
+            job_manager.execute()
+            kubernetes_client.create_namespaced_job.assert_called_once()
+            body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+            job_spec = body["spec"]["template"]["spec"]
+            container = job_spec["containers"][0]
+
+            # Runner image should be the Apptainer image, not the CVMFS path
+            assert container["image"] == "ghcr.io/apptainer/apptainer:1.4.5"
+
+            # Pod shell should be 'sh'
+            assert container["command"] == ["sh", "-c"]
+
+            # Command should contain apptainer exec with the CVMFS path
+            cmd = container["args"][0]
+            assert "apptainer exec" in cmd
+            assert cvmfs_image in cmd
+            assert _decode_wrapped_command(cmd) == expected_command
+
+            # All job mounts reach the image, except the runner's passwd file
+            (binds,) = [
+                e["value"] for e in container["env"] if e["name"] == "APPTAINER_BIND"
+            ]
+            binds = binds.split(",")
+            assert workflow_workspace in binds
+            assert "/cvmfs/unpacked.cern.ch:/cvmfs/unpacked.cern.ch:ro" in binds
+            assert not any(bind.startswith("/etc/passwd") for bind in binds)
+
+            # CVMFS volume should be mounted
+            cvmfs_mount_paths = [
+                m["mountPath"]
+                for m in container["volumeMounts"]
+                if m.get("name") == "cvmfs"
+            ]
+            assert any("/cvmfs/unpacked.cern.ch" in path for path in cvmfs_mount_paths)
+
+            # Apptainer runs in an unprivileged user namespace
+            assert "apptainer exec --userns" in cmd
+            security_context = container["securityContext"]
+            assert security_context["seccompProfile"] == {"type": "Unconfined"}
+            assert security_context["appArmorProfile"] == {"type": "Unconfined"}
+            assert security_context["allowPrivilegeEscalation"] is False
+            assert security_context["capabilities"] == {"drop": ["ALL"]}
+
+            # The job user is made known to the runner image
+            (init_container,) = job_spec["initContainers"]
+            assert init_container["image"] == "ghcr.io/apptainer/apptainer:1.4.5"
+            assert init_container["securityContext"]["seccompProfile"] == {
+                "type": "RuntimeDefault"
+            }
+            assert {
+                "name": "unpacked-image-runner-passwd",
+                "mountPath": "/etc/passwd",
+                "subPath": "passwd",
+                "readOnly": True,
+            } in container["volumeMounts"]
+            assert {"name": "unpacked-image-runner-passwd", "emptyDir": {}} in job_spec[
+                "volumes"
+            ]
+
+
+def test_unpacked_image_merges_cvmfs_mounts(
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    empty_user_secrets,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Test that unpacked image auto-adds its CVMFS repo alongside user mounts."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+
+    job_manager = KubernetesJobManager(
+        docker_img="/cvmfs/unpacked.cern.ch/some/image",
+        cmd="ls",
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+        cvmfs_mounts="['sft.cern.ch']",
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client:
+        with mock.patch(
+            "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+            corev1_api_client_with_user_secrets(empty_user_secrets),
+        ):
+            job_manager.execute()
+            body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+            job_spec = body["spec"]["template"]["spec"]
+            container = job_spec["containers"][0]
+
+            # Both user-requested and auto-detected repos should be mounted
+            cvmfs_mount_paths = [
+                m["mountPath"]
+                for m in container["volumeMounts"]
+                if m.get("name") == "cvmfs"
+            ]
+            assert any("/cvmfs/sft.cern.ch" in p for p in cvmfs_mount_paths)
+            assert any("/cvmfs/unpacked.cern.ch" in p for p in cvmfs_mount_paths)
+
+
+def test_unpacked_image_special_characters(
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    empty_user_secrets,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Test that commands with special characters are safely base64-encoded."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+
+    special_cmd = "echo 'hello \"world\"' && cat file.txt | grep -E '^test$'"
+    job_manager = KubernetesJobManager(
+        docker_img="/cvmfs/unpacked.cern.ch/some/image",
+        cmd=special_cmd,
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client:
+        with mock.patch(
+            "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+            corev1_api_client_with_user_secrets(empty_user_secrets),
+        ):
+            job_manager.execute()
+            body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+            cmd = body["spec"]["template"]["spec"]["containers"][0]["args"][0]
+
+            assert _decode_wrapped_command(cmd) == special_cmd
+
+
+def test_normal_image_not_affected():
+    """Test that plain Docker images run natively, not via Apptainer."""
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+    )
+    pod_shell, docker_img, cmd, _ = job_manager._prepare_unpacked_image()
+    assert pod_shell == "bash"
+    assert docker_img == "docker.io/library/busybox"
+    assert cmd == "ls"
+
+
+@pytest.mark.parametrize(
+    "singularity_img,expected_path",
+    [
+        ("/workspace/images/my_tool.sif", "/workspace/images/my_tool.sif"),
+        ("images/my_tool.sif", "/var/reana/workspace/images/my_tool.sif"),
+        ("./my tool.sif", "'/var/reana/workspace/my tool.sif'"),
+    ],
+)
+def test_singularity_image_uses_apptainer_runner(singularity_img, expected_path):
+    """Test that .sif paths use the Apptainer runner.
+
+    Relative paths are resolved against the workflow workspace, and the image
+    is extracted to a sandbox directory before being executed.
+    """
+    job_manager = KubernetesJobManager(
+        docker_img=singularity_img,
+        cmd="echo hello",
+        env_vars={},
+        workflow_workspace="/var/reana/workspace",
+    )
+    pod_shell, docker_img, cmd, cvmfs_mounts = job_manager._prepare_unpacked_image()
+
+    assert pod_shell == "sh"
+    assert docker_img == "ghcr.io/apptainer/apptainer:1.4.5"
+    assert f"apptainer sif list {expected_path} " in cmd
+    assert f'-d "$sandbox" {expected_path} dev ' in cmd
+    assert "unsquashfs -q -n -f -no-xattrs -da 32 -fr 32 -excludes " in cmd
+    assert 'mkdir -p "$sandbox/dev"' in cmd
+    assert "apptainer exec --userns" in cmd
+    assert _decode_wrapped_command(cmd) == "echo hello"
+
+
+def test_singularity_image_on_cvmfs_mounts_repository():
+    """Test that a .sif file stored on CVMFS is extracted and its repository mounted."""
+    singularity_img = "/cvmfs/unpacked.cern.ch/images/my_tool.sif"
+    job_manager = KubernetesJobManager(
+        docker_img=singularity_img,
+        cmd="echo hello",
+        env_vars={},
+        workflow_workspace="/var/reana/workspace",
+    )
+    pod_shell, docker_img, cmd, cvmfs_mounts = job_manager._prepare_unpacked_image()
+
+    assert pod_shell == "sh"
+    assert docker_img == "ghcr.io/apptainer/apptainer:1.4.5"
+    assert ast.literal_eval(cvmfs_mounts) == ["unpacked.cern.ch"]
+    assert f'-d "$sandbox" {singularity_img} dev ' in cmd
+    assert (
+        'apptainer exec --userns --no-eval --pwd /var/reana/workspace "$sandbox"' in cmd
+    )
+
+
+def test_unpacked_img_hint_is_ignored_for_registry_images():
+    """Test that the HTCondor ``unpacked_img`` hint does not trigger Apptainer."""
+    job_manager = KubernetesJobManager(
+        docker_img="docker.io/library/busybox",
+        cmd="ls",
+        env_vars={},
+        unpacked_img=True,
+    )
+    pod_shell, docker_img, cmd, _ = job_manager._prepare_unpacked_image()
+    assert pod_shell == "bash"
+    assert docker_img == "docker.io/library/busybox"
+    assert cmd == "ls"
+
+
+def test_singularity_sif_does_not_add_cvmfs_volume(
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    empty_user_secrets,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Test that a .sif image does not trigger CVMFS volume mounting."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+
+    job_manager = KubernetesJobManager(
+        docker_img="/workspace/my_tool.sif",
+        cmd="run_analysis",
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client:
+        with mock.patch(
+            "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+            corev1_api_client_with_user_secrets(empty_user_secrets),
+        ):
+            job_manager.execute()
+            body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+            job_spec = body["spec"]["template"]["spec"]
+            container = job_spec["containers"][0]
+
+            assert container["image"] == "ghcr.io/apptainer/apptainer:1.4.5"
+            assert container["command"] == ["sh", "-c"]
+            assert "apptainer exec" in container["args"][0]
+
+            # No CVMFS volumes should be mounted
+            cvmfs_volumes = [v for v in job_spec["volumes"] if "cvmfs" in v["name"]]
+            assert cvmfs_volumes == []
+
+
+def _decode_wrapped_command(cmd):
+    """Return the user command that the Apptainer wrapper decodes."""
+    b64_match = re.search(r'cmd="\$\(printf %s (\S+) \| base64 -d\)"', cmd)
+    assert b64_match is not None
+    assert 'bash -c "$cmd"' in cmd
+    return base64.b64decode(b64_match.group(1)).decode("utf-8")
+
+
+def test_unpacked_image_command_keeps_stdin_and_exit_status():
+    """Test that the user command does not read its own lines from stdin."""
+    job_manager = KubernetesJobManager(
+        docker_img="/cvmfs/unpacked.cern.ch/some/image",
+        cmd="cat\nexit 42",
+        env_vars={},
+        workflow_workspace="/var/reana/workspace",
+    )
+    _, _, cmd, _ = job_manager._prepare_unpacked_image()
+
+    # Replace Apptainer by a function that runs the command it receives
+    stub = 'apptainer() { shift 6; "$@"; }; '
+    result = subprocess.run(
+        ["sh", "-c", stub + cmd], stdin=subprocess.DEVNULL, capture_output=True
+    )
+    assert result.returncode == 42
+    assert result.stdout == b""
+
+
+def test_unpacked_image_binds_all_job_mounts(
+    app,
+    session,
+    sample_serial_workflow_in_db,
+    sample_workflow_workspace,
+    user_secrets,
+    user0,
+    corev1_api_client_with_user_secrets,
+    monkeypatch,
+):
+    """Test that secrets, credential caches and CVMFS mounts reach a SIF image."""
+    workflow_uuid = sample_serial_workflow_in_db.id_
+    workflow_workspace = next(sample_workflow_workspace(str(workflow_uuid)))
+    monkeypatch.setenv("REANA_USER_ID", str(user0.id_))
+
+    job_manager = KubernetesJobManager(
+        docker_img="my_tool.sif",
+        cmd="ls",
+        env_vars={},
+        workflow_uuid=workflow_uuid,
+        workflow_workspace=workflow_workspace,
+        cvmfs_mounts="['sft.cern.ch']",
+        voms_proxy=True,
+        rucio=True,
+    )
+
+    with mock.patch(
+        "reana_job_controller.kubernetes_job_manager.current_k8s_batchv1_api_client"
+    ) as kubernetes_client:
+        with mock.patch(
+            "reana_commons.k8s.secrets.current_k8s_corev1_api_client",
+            corev1_api_client_with_user_secrets(user_secrets),
+        ):
+            job_manager.execute()
+            body = kubernetes_client.create_namespaced_job.call_args[1]["body"]
+            container = body["spec"]["template"]["spec"]["containers"][0]
+
+    (binds,) = [e["value"] for e in container["env"] if e["name"] == "APPTAINER_BIND"]
+    binds = binds.split(",")
+    assert workflow_workspace in binds
+    assert "/etc/reana/secrets:/etc/reana/secrets:ro" in binds
+    assert "/cvmfs/sft.cern.ch:/cvmfs/sft.cern.ch:ro" in binds
+    assert any(bind.startswith("/vomsproxy_cache") for bind in binds)
+    assert any(bind.startswith("/rucio_cache") for bind in binds)
+    assert not any(bind.startswith("/etc/passwd") for bind in binds)
+    assert len(binds) == len(container["volumeMounts"]) - 1
+
+    # Job variables, also secrets, override the variables of the image
+    env = {e["name"]: e for e in container["env"]}
+    for name in ("username", "REANA_WORKSPACE", "X509_USER_PROXY", "RUCIO_CONFIG"):
+        assert env[f"APPTAINERENV_{name}"] == dict(
+            env[name], name=f"APPTAINERENV_{name}"
+        )
+    assert "valueFrom" in env["APPTAINERENV_username"]
+    assert "APPTAINERENV_APPTAINER_BIND" not in env
+    assert "apptainer exec --userns --no-eval " in container["args"][0]

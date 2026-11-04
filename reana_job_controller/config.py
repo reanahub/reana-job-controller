@@ -126,6 +126,27 @@ RUCIO_CERN_BUNDLE_CACHE_FILENAME = "CERN-bundle.pem"
 IMAGE_PULL_SECRETS = os.getenv("IMAGE_PULL_SECRETS", "").split(",")
 """Docker image pull secrets which allow the usage of private images."""
 
+REANA_KUBERNETES_JOBS_APPTAINER_ENABLED = bool(
+    strtobool(os.getenv("REANA_KUBERNETES_JOBS_APPTAINER_ENABLED", "false"))
+)
+"""Whether Kubernetes jobs can use /cvmfs and ``.sif`` images via Apptainer.
+
+These jobs run without the default seccomp and AppArmor profiles, so the
+cluster administrators must enable them explicitly.
+"""
+
+REANA_UNPACKED_IMAGE_RUNNER = os.getenv(
+    "REANA_UNPACKED_IMAGE_RUNNER",
+    "ghcr.io/apptainer/apptainer:1.4.5",
+)
+"""Docker image used to run unpacked /cvmfs and ``.sif`` container images via Apptainer."""
+
+REANA_UNPACKED_IMAGE_RUNNER_COMMAND = os.getenv(
+    "REANA_UNPACKED_IMAGE_RUNNER_COMMAND",
+    "apptainer",
+)
+"""Command to invoke inside the unpacked image runner (e.g. apptainer or singularity)."""
+
 REANA_KUBERNETES_JOBS_CPU_REQUEST = os.getenv("REANA_KUBERNETES_JOBS_CPU_REQUEST")
 """Default cpu request for user job containers.
 

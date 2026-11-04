@@ -40,7 +40,11 @@ from reana_job_controller.job_db import (
     update_job_status,
 )
 from reana_job_controller.schemas import Job, JobRequest
-from reana_job_controller.utils import update_workflow_logs
+from reana_job_controller.utils import (
+    is_apptainer_image,
+    is_unvettable_image,
+    update_workflow_logs,
+)
 from reana_job_controller import config
 
 blueprint = Blueprint("jobs", __name__)
@@ -295,6 +299,13 @@ def create_job():  # noqa
     docker_img = job_request["docker_img"]
     if vetted_images["enabled"] and docker_img not in vetted_images["allowlist"]:
         return jsonify({"message": f"Image not allowed: {docker_img}"}), 403
+    # Users can change SIF files outside CVMFS, so their names say nothing
+    if vetted_images["enabled"] and is_unvettable_image(docker_img):
+        msg = (
+            f"Image not allowed: {docker_img}. With vetted container images,"
+            " only SIF files on /cvmfs can be used."
+        )
+        return jsonify({"message": msg}), 403
 
     compute_backend = job_request.get(
         "compute_backend", current_app.config["DEFAULT_COMPUTE_BACKEND"]
@@ -307,6 +318,17 @@ def create_job():  # noqa
         logging.error(msg, exc_info=True)
         update_workflow_logs(job_request["workflow_uuid"], msg)
         return jsonify({"job": msg}), 500
+
+    if (
+        compute_backend == "kubernetes"
+        and is_apptainer_image(docker_img)
+        and not current_app.config["REANA_KUBERNETES_JOBS_APPTAINER_ENABLED"]
+    ):
+        msg = (
+            f"Image not allowed: {docker_img}. Running /cvmfs and .sif images"
+            " on Kubernetes is not enabled on this cluster."
+        )
+        return jsonify({"message": msg}), 403
 
     with current_app.app_context():
         job_manager_cls = current_app.config["COMPUTE_BACKENDS"][compute_backend]()

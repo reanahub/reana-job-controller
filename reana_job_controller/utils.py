@@ -62,6 +62,16 @@ def singleton(cls):
     return getinstance
 
 
+def is_apptainer_image(image):
+    """Return whether the image is a /cvmfs path or a ``.sif`` file run by Apptainer."""
+    return image.startswith("/cvmfs/") or image.endswith(".sif")
+
+
+def is_unvettable_image(image):
+    """Return whether the image is a ``.sif`` file that users can change."""
+    return image.endswith(".sif") and not image.startswith("/cvmfs/")
+
+
 def update_workflow_logs(workflow_uuid, log_message):
     """Update workflow logs."""
     try:

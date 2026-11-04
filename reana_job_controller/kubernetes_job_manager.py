@@ -7,8 +7,10 @@
 """Kubernetes Job Manager."""
 
 import ast
+import base64
 import logging
 import os
+import shlex
 import traceback
 from typing import Dict, List, Optional
 
@@ -49,6 +51,7 @@ from reana_commons.k8s.api_client import (
 from reana_commons.k8s.kerberos import get_kerberos_k8s_config
 from reana_commons.k8s.secrets import UserSecretsStore, UserSecrets
 from reana_commons.k8s.volumes import (
+    extract_cvmfs_repository,
     get_k8s_cvmfs_volumes,
     get_reana_shared_volume,
     get_workspace_volume,
@@ -68,6 +71,8 @@ from reana_job_controller.config import (
     REANA_KUBERNETES_JOBS_MIN_USER_UID,
     REANA_KUBERNETES_JOBS_READ_ONLY_ROOT_FILESYSTEM,
     REANA_KUBERNETES_JOBS_SCRATCH_VOLUME_SIZE_LIMIT,
+    REANA_UNPACKED_IMAGE_RUNNER,
+    REANA_UNPACKED_IMAGE_RUNNER_COMMAND,
     REANA_USER_ID,
     KUEUE_ENABLED,
     KUEUE_LOCAL_QUEUE_NAME,
@@ -188,6 +193,7 @@ class KubernetesJobManager(JobManager):
         kubernetes_cpu_limit=None,
         kubernetes_memory_request=None,
         kubernetes_memory_limit=None,
+        unpacked_img=None,
         voms_proxy=False,
         rucio=False,
         kubernetes_job_timeout: Optional[int] = None,
@@ -220,6 +226,10 @@ class KubernetesJobManager(JobManager):
         :type kubernetes_uid: int
         :param kubernetes_memory_limit: Memory limit for job container.
         :type kubernetes_memory_limit: str
+        :param unpacked_img: HTCondor-specific hint, ignored by the Kubernetes
+            backend. Apptainer is used automatically when ``docker_img`` is a
+            ``/cvmfs/`` path or a ``.sif`` file.
+        :type unpacked_img: bool
         :param kubernetes_job_timeout: Job timeout in seconds.
         :type kubernetes_job_timeout: int
         :param voms_proxy: Decides if a voms-proxy certificate should be
@@ -245,6 +255,7 @@ class KubernetesJobManager(JobManager):
         self.cvmfs_mounts = cvmfs_mounts
         self.shared_file_system = shared_file_system
         self.kerberos = kerberos
+        self.unpacked_img = unpacked_img
         self.voms_proxy = voms_proxy
         self.rucio = rucio
         self.set_user_id(kubernetes_uid)
@@ -263,10 +274,166 @@ class KubernetesJobManager(JobManager):
             self._secrets = UserSecretsStore.fetch(REANA_USER_ID)
         return self._secrets
 
+    def _get_singularity_image(self):
+        """Return the image to run via Apptainer, or None for native Docker.
+
+        Relative ``.sif`` paths are resolved against the workflow workspace.
+        """
+        if self.docker_img.endswith(".sif"):
+            return os.path.normpath(
+                os.path.join(self.workflow_workspace, self.docker_img)
+            )
+        if self.docker_img.startswith("/cvmfs/"):
+            return self.docker_img
+        return None
+
+    def _prepare_unpacked_image(self):
+        """Prepare job for execution with a Singularity/Apptainer container image.
+
+        When ``docker_img`` is a CVMFS unpacked path or a ``.sif`` file,
+        the job is wrapped so that:
+        - The pod runs a lightweight Apptainer runner image instead
+        - The original command is executed inside the image via ``apptainer exec``
+          in an unprivileged user namespace
+        - All volumes of the job container are bind-mounted into the image, see
+          :meth:`_add_unpacked_image_binds`
+        - For CVMFS paths, the required repository is also auto-mounted
+        - ``.sif`` files are first extracted to a temporary sandbox directory,
+          as FUSE is not available in unprivileged pods
+
+        :returns: Tuple of ``(pod_shell, docker_img, cmd, cvmfs_mounts)``.
+            ``pod_shell`` is ``"sh"`` for Apptainer runner images and ``"bash"``
+            for plain Docker images.
+        """
+        singularity_img = self._get_singularity_image()
+        if singularity_img is None:
+            return "bash", self.docker_img, self.cmd, self.cvmfs_mounts
+
+        runner = REANA_UNPACKED_IMAGE_RUNNER_COMMAND
+        workspace = shlex.quote(self.workflow_workspace)
+        image = shlex.quote(singularity_img)
+        # Wrap command with base64-encode to avoid quoting issues. It is decoded
+        # into one argument, so that it does not read the job script from stdin
+        encoded_cmd = base64.b64encode(self.cmd.encode("utf-8")).decode("utf-8")
+        exec_cmd = (
+            f'cmd="$(printf %s {encoded_cmd} | base64 -d)"'
+            f" && {runner} exec --userns --no-eval --pwd {workspace}"
+            ' {image} bash -c "$cmd"'
+        )
+
+        cvmfs_mounts = self.cvmfs_mounts
+        if singularity_img.startswith("/cvmfs/"):
+            # The image lives on CVMFS, mount its repository too
+            if self.cvmfs_mounts and self.cvmfs_mounts != "false":
+                try:
+                    cvmfs_repos = ast.literal_eval(self.cvmfs_mounts)
+                except (ValueError, SyntaxError) as e:
+                    raise ValueError(
+                        f"Invalid cvmfs_mounts value {self.cvmfs_mounts!r}: {e}"
+                    ) from e
+            else:
+                cvmfs_repos = []
+
+            repository = extract_cvmfs_repository(singularity_img)
+            if repository not in cvmfs_repos:
+                cvmfs_repos.append(repository)
+            cvmfs_mounts = str(cvmfs_repos)
+
+        if singularity_img.endswith(".sif"):
+            # Singularity image file, extracted to a sandbox directory first
+            cmd = (
+                'sandbox="$(mktemp -d)"'
+                f' && offset="$({runner} sif list {image}'
+                " | awk -F'|' '$5 ~ /FS \\(Squashfs/"
+                ' {split($4, range, "-"); print range[1] + 0; exit}\')"'
+                # small queues keep the extraction within low job memory limits.
+                # A non-root user cannot create device nodes or set system
+                # xattrs, so these are skipped, as Apptainer does it
+                " && unsquashfs -q -n -f -no-xattrs -da 32 -fr 32 -excludes"
+                f' -o "$offset" -d "$sandbox" {image} dev'
+                ' && mkdir -p "$sandbox/dev"'
+                " && " + exec_cmd.format(image='"$sandbox"')
+            )
+        else:
+            # Unpacked image directory
+            cmd = exec_cmd.format(image=image)
+
+        return "sh", REANA_UNPACKED_IMAGE_RUNNER, cmd, cvmfs_mounts
+
+    def _add_unpacked_image_runner_setup(self):
+        """Adapt the job pod so that Apptainer can run as the job user.
+
+        Apptainer refuses to start for users unknown to the runner image, so
+        an init container generates a ``passwd`` file containing the job user.
+        Creating the user namespace and mounting the image also requires the
+        default seccomp and AppArmor profiles to be lifted for the job
+        container. The container stays unprivileged otherwise.
+        """
+        job_spec = self.job["spec"]["template"]["spec"]
+        job_container = job_spec["containers"][0]
+        passwd_volume = {"name": "unpacked-image-runner-passwd", "emptyDir": {}}
+        init_container = {
+            "name": "unpacked-image-runner-setup",
+            "image": REANA_UNPACKED_IMAGE_RUNNER,
+            "command": ["sh", "-c"],
+            "args": [
+                "cp /etc/passwd /runner-passwd/passwd"
+                ' && { getent passwd "$(id -u)" > /dev/null'
+                ' || echo "reana:x:$(id -u):$(id -g):REANA:/tmp:/bin/sh"'
+                " >> /runner-passwd/passwd; }"
+            ],
+            "securityContext": {"allowPrivilegeEscalation": False},
+            "volumeMounts": [
+                {"name": passwd_volume["name"], "mountPath": "/runner-passwd"}
+            ],
+        }
+        if K8S_USE_SECURITY_CONTEXT:
+            init_container["securityContext"] = _restricted_container_security_context()
+        job_spec["volumes"].append(passwd_volume)
+        job_spec["initContainers"].append(init_container)
+        job_container["volumeMounts"].append(
+            {
+                "name": passwd_volume["name"],
+                "mountPath": "/etc/passwd",
+                "subPath": "passwd",
+                "readOnly": True,
+            }
+        )
+        job_container["securityContext"]["seccompProfile"] = {"type": "Unconfined"}
+        job_container["securityContext"]["appArmorProfile"] = {"type": "Unconfined"}
+
+    def _add_unpacked_image_binds(self):
+        """Pass all volumes and variables of the job container to the Apptainer image.
+
+        The volumes include the workspace, secrets, credential caches, EOS,
+        host-path and CVMFS mounts. The generated ``passwd`` file is only for
+        the runner. The job variables override the variables of the image, as
+        in regular jobs.
+        """
+        job_container = self.job["spec"]["template"]["spec"]["containers"][0]
+        runner = REANA_UNPACKED_IMAGE_RUNNER_COMMAND.upper()
+        job_container["env"].extend(
+            dict(variable, name=f"{runner}ENV_{variable['name']}")
+            for variable in list(job_container["env"])
+        )
+        binds = [
+            (
+                f"{mount['mountPath']}:{mount['mountPath']}:ro"
+                if mount.get("readOnly")
+                else mount["mountPath"]
+            )
+            for mount in job_container["volumeMounts"]
+            if mount["mountPath"] != "/etc/passwd"
+        ]
+        job_container["env"].append(
+            {"name": f"{runner}_BIND", "value": ",".join(binds)}
+        )
+
     @JobManager.execution_hook
     def execute(self):
         """Execute a job in Kubernetes."""
         backend_job_id = build_unique_component_name("run-job")
+        pod_shell, docker_img, cmd, cvmfs_mounts = self._prepare_unpacked_image()
 
         self.job = {
             "kind": "Job",
@@ -295,15 +462,13 @@ class KubernetesJobManager(JobManager):
                         "automountServiceAccountToken": False,
                         "containers": [
                             {
-                                "image": self.docker_img,
-                                "command": ["bash", "-c"],
+                                "image": docker_img,
+                                "command": [pod_shell, "-c"],
                                 # Apply the workspace umask to every job, also
                                 # to default-UID jobs, because steps with other
                                 # UIDs can write to their outputs. It also
                                 # applies to files created outside the workspace
-                                "args": [
-                                    f"umask {REANA_WORKFLOW_UMASK:04o}; {self.cmd}"
-                                ],
+                                "args": [f"umask {REANA_WORKFLOW_UMASK:04o}; {cmd}"],
                                 "name": "job",
                                 "env": [],
                                 "securityContext": {"allowPrivilegeEscalation": False},
@@ -329,6 +494,9 @@ class KubernetesJobManager(JobManager):
                 "readOnlyRootFilesystem"
             ] = True
 
+        if docker_img != self.docker_img:
+            self._add_unpacked_image_runner_setup()
+
         secret_env_vars = self.secrets.get_env_secrets_as_k8s_spec()
         job_spec = self.job["spec"]["template"]["spec"]
         job_spec["containers"][0]["env"].extend(secret_env_vars)
@@ -351,8 +519,8 @@ class KubernetesJobManager(JobManager):
         self.add_image_pull_secrets()
         self.add_kubernetes_job_timeout()
 
-        if self.cvmfs_mounts != "false":
-            cvmfs_repositories = ast.literal_eval(self.cvmfs_mounts)
+        if cvmfs_mounts != "false":
+            cvmfs_repositories = ast.literal_eval(cvmfs_mounts)
             volume_mounts, volumes = get_k8s_cvmfs_volumes(cvmfs_repositories)
             job_spec["containers"][0]["volumeMounts"].extend(volume_mounts)
             job_spec["volumes"].extend(volumes)
@@ -374,6 +542,9 @@ class KubernetesJobManager(JobManager):
 
         if self.rucio:
             self._add_rucio_init_container(secrets_volume_mount, secret_env_vars)
+
+        if docker_img != self.docker_img:
+            self._add_unpacked_image_binds()
 
         if REANA_RUNTIME_JOBS_KUBERNETES_NODE_LABEL:
             self.job["spec"]["template"]["spec"][
@@ -529,6 +700,11 @@ class KubernetesJobManager(JobManager):
                         f" ({scratch_paths}) than this cluster permits. Write"
                         f" large files to the workflow workspace instead."
                     )
+                    if job_pod.spec.containers[0].image == REANA_UNPACKED_IMAGE_RUNNER:
+                        message += (
+                            " Jobs with a .sif image also extract the image"
+                            " to /tmp before the command starts."
+                        )
             logs = (logs or "") + f"\n{message}\n"
             logging.warning(message)
 
