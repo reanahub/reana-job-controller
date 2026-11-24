@@ -29,9 +29,6 @@ A new random key is generated on every start of job-controller, but this is not 
 issues as job-controller is never restarted (and thus the secret never changes)
 during the execution of a single workflow."""
 
-CACHE_ENABLED = False
-"""Determines if jobs caching is enabled."""
-
 DASK_SCHEDULER_URI = os.getenv("DASK_SCHEDULER_URI", "tcp://127.0.0.1:8080")
 """Address of the Dask Scheduler."""
 
