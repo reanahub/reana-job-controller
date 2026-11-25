@@ -308,7 +308,8 @@ class KubernetesJobManager(JobManager):
                                 "env": [],
                                 "securityContext": {"allowPrivilegeEscalation": False},
                                 "volumeMounts": [],
-                            }
+                                "securityContext": {"allowPrivilegeEscalation": False},
+                            },
                         ],
                         "initContainers": [],
                         "volumes": [],
