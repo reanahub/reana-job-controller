@@ -11,3 +11,7 @@
 
 class ComputingBackendSubmissionError(Exception):
     """Operation to compute backend could not be performed."""
+
+
+class Compute4PUNCHConfigurationError(ValueError):
+    """Raised when a Compute4PUNCH deployment configuration is invalid."""
