@@ -302,7 +302,7 @@ CMD ["python3", "-m", "reana_job_controller.nss_wrapper"]
 
 # Set image labels
 LABEL org.opencontainers.image.authors="team@reanahub.io"
-LABEL org.opencontainers.image.created="2026-09-30"
+LABEL org.opencontainers.image.created="2026-11-25"
 LABEL org.opencontainers.image.description="REANA reproducible analysis platform - job controller component"
 LABEL org.opencontainers.image.documentation="https://reana-job-controller.readthedocs.io/"
 LABEL org.opencontainers.image.licenses="MIT"
@@ -311,5 +311,5 @@ LABEL org.opencontainers.image.title="reana-job-controller"
 LABEL org.opencontainers.image.url="https://github.com/reanahub/reana-job-controller"
 LABEL org.opencontainers.image.vendor="reanahub"
 # x-release-please-start-version
-LABEL org.opencontainers.image.version="0.95.0-alpha.6"
+LABEL org.opencontainers.image.version="0.95.0-alpha.7"
 # x-release-please-end
